@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ThemeProvider } from './context/ThemeContext';
 import Header from './components/Header';
 import GNB from './components/GNB';
 import HomePage from './pages/HomePage';
@@ -22,24 +23,26 @@ function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/signup" element={<SignupPage />} />
-        <Route
-          path="/*"
-          element={
-            <Layout>
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/date" element={<DatePage />} />
-                <Route path="/meeting" element={<MeetingPage />} />
-                <Route path="/community" element={<CommunityPage />} />
-                <Route path="/myinfo" element={<MyInfoPage />} />
-              </Routes>
-            </Layout>
-          }
-        />
-      </Routes>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/signup" element={<SignupPage />} />
+          <Route
+            path="/*"
+            element={
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/date" element={<DatePage />} />
+                  <Route path="/meeting" element={<MeetingPage />} />
+                  <Route path="/community" element={<CommunityPage />} />
+                  <Route path="/myinfo" element={<MyInfoPage />} />
+                </Routes>
+              </Layout>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

@@ -2,19 +2,21 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(15, 15, 20, 0.92);
+  background: var(--header-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: none;
+  transition: background 0.4s ease;
 }
 
 .header-inner {
   width: 100%;
-  padding: 0 20px;
+  padding: 0 18px;
   height: 54px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
 }
 
 .brand {
@@ -23,10 +25,12 @@
   letter-spacing: -0.5px;
   cursor: pointer;
   user-select: none;
+  flex-shrink: 0;
 }
 
 .brand-dash {
-  color: var(--white);
+  color: var(--text);
+  transition: color 0.4s ease;
 }
 
 .brand-tag {
@@ -36,18 +40,57 @@
   background-clip: text;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 테마 토글 버튼 */
+.theme-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  color: var(--text-sub);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 20px;
+  min-height: 34px;
+  transition: all 0.2s;
+}
+
+.theme-btn:active {
+  transform: scale(0.94);
+  border-color: var(--primary);
+}
+
+.theme-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.theme-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* 시작하기 버튼 */
 .signup-btn {
   background: var(--gradient);
-  color: var(--white);
+  color: #fff;
   font-size: 13px;
   font-weight: 700;
-  padding: 8px 18px;
+  padding: 7px 16px;
   border-radius: 20px;
-  min-height: 36px;
+  min-height: 34px;
+  flex-shrink: 0;
   transition: opacity 0.2s, transform 0.15s;
 }
 
 .signup-btn:active {
   opacity: 0.85;
-  transform: scale(0.97);
+  transform: scale(0.96);
 }

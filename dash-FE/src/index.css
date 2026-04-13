@@ -5,25 +5,17 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ═══════════════════════════════════════════
+   공통 (테마 무관) 변수
+═══════════════════════════════════════════ */
 :root {
-  /* ── 연한 핑크 컬러 팔레트 ── */
   --primary: #FF80AB;
   --primary-light: #FFB3CC;
   --primary-dark: #F06292;
-  --primary-bg: rgba(255,128,171,0.12);
-  --primary-border: rgba(255,128,171,0.28);
-
-  --bg: #0F0F14;
-  --bg-card: #1C1C26;
-  --bg-card2: #252530;
-  --border: #2C2C3A;
-  --text: #F2F2F7;
-  --text-sub: #9898B0;
-  --text-muted: #58587A;
-  --white: #FFFFFF;
-
+  --primary-bg: rgba(255, 128, 171, 0.12);
+  --primary-border: rgba(255, 128, 171, 0.28);
   --gradient: linear-gradient(135deg, #FF80AB 0%, #FFB3CC 100%);
-  --gradient-soft: linear-gradient(135deg, rgba(255,128,171,0.18) 0%, rgba(255,179,204,0.10) 100%);
+  --gradient-soft: linear-gradient(135deg, rgba(255, 128, 171, 0.18) 0%, rgba(255, 179, 204, 0.10) 100%);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -31,22 +23,59 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ═══════════════════════════════════════════
+   다크 모드 (기본 / 18시 ~ 06시)
+═══════════════════════════════════════════ */
+[data-theme="dark"] {
+  --bg: #0F0F14;
+  --bg-card: #1C1C26;
+  --bg-card2: #252530;
+  --border: #2C2C3A;
+  --text: #F2F2F7;
+  --text-sub: #9898B0;
+  --text-muted: #58587A;
+  --shadow: rgba(0, 0, 0, 0.4);
+  --body-bg: #080810;
+  --header-bg: rgba(15, 15, 20, 0.92);
+  --gnb-bg: rgba(15, 15, 20, 0.95);
+}
+
+/* ═══════════════════════════════════════════
+   라이트 모드 (06시 ~ 18시)
+═══════════════════════════════════════════ */
+[data-theme="light"] {
+  --bg: #FFF6F9;
+  --bg-card: #FFFFFF;
+  --bg-card2: #FFF0F5;
+  --border: #FFD6E8;
+  --text: #1A1A2E;
+  --text-sub: #6B6B8A;
+  --text-muted: #A0A0B8;
+  --shadow: rgba(255, 128, 171, 0.12);
+  --body-bg: #FFE8F2;
+  --header-bg: rgba(255, 246, 249, 0.92);
+  --gnb-bg: rgba(255, 246, 249, 0.97);
+}
+
+/* ═══════════════════════════════════════════
+   레이아웃
+═══════════════════════════════════════════ */
 html {
   height: 100%;
 }
 
 body {
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: #080810;
+  background-color: var(--body-bg);
   color: var(--text);
   min-height: 100%;
   overflow-x: hidden;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
-/* 데스크탑에서 모바일 앱처럼 중앙 정렬 */
+/* 데스크탑: 폰 모양 중앙 정렬 */
 @media (min-width: 520px) {
   body {
-    background: #080810;
     display: flex;
     justify-content: center;
   }
@@ -54,8 +83,7 @@ body {
   #root {
     width: 390px;
     min-height: 100vh;
-    background-color: var(--bg);
-    box-shadow: 0 0 60px rgba(0,0,0,0.7);
+    box-shadow: 0 0 60px var(--shadow);
     position: relative;
   }
 }
@@ -65,6 +93,36 @@ body {
   display: flex;
   flex-direction: column;
   background-color: var(--bg);
+  transition: background-color 0.4s ease;
+}
+
+/* 테마 전환 시 부드러운 색상 전환 */
+*,
+*::before,
+*::after {
+  transition:
+    background-color 0.35s ease,
+    border-color 0.35s ease,
+    color 0.35s ease,
+    box-shadow 0.35s ease;
+}
+
+/* transition 예외: 애니메이션/transform은 별도 관리 */
+button,
+.choice-btn,
+.gnb-item,
+.menu-card,
+.profile-card,
+.date-card,
+.post-card,
+.meeting-card {
+  transition:
+    background-color 0.35s ease,
+    border-color 0.35s ease,
+    color 0.35s ease,
+    transform 0.15s ease,
+    opacity 0.2s ease,
+    box-shadow 0.35s ease;
 }
 
 a {
