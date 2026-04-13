@@ -1,0 +1,116 @@
+.myinfo-page {
+  padding: 0 18px;
+}
+
+.profile-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+  padding: 18px 0 24px;
+}
+
+.my-avatar {
+  width: 84px;
+  height: 84px;
+  background: var(--bg-card2);
+  border-radius: 26px;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+}
+
+.edit-profile-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 20px;
+  border-radius: 20px;
+  min-height: 38px;
+  transition: border-color 0.2s;
+}
+
+.edit-profile-btn:active {
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.info-group {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.info-group-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 13px 16px 9px;
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-rows {
+  padding: 4px 0;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  min-height: 48px;
+}
+
+.info-row + .info-row {
+  border-top: 1px solid rgba(44,44,58,0.6);
+}
+
+.info-label {
+  font-size: 14px;
+  color: var(--text-sub);
+}
+
+.info-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.info-value.empty {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 13px;
+}
+
+.start-fill-btn {
+  width: 100%;
+  background: var(--gradient);
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 16px;
+  border-radius: 16px;
+  min-height: 52px;
+  box-shadow: 0 4px 20px rgba(255,128,171,0.3);
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.start-fill-btn:active {
+  opacity: 0.85;
+  transform: scale(0.98);
+}
+
+.bottom-spacer { height: 24px; }
