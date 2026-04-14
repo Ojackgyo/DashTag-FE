@@ -7,6 +7,7 @@ import DatePage from './pages/DatePage';
 import MeetingPage from './pages/MeetingPage';
 import CommunityPage from './pages/CommunityPage';
 import MyInfoPage from './pages/MyInfoPage';
+import ChatPage from './pages/ChatPage';
 import SignupPage from './pages/SignupPage';
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -37,6 +38,7 @@ export default function App() {
                   <Route path="/meeting" element={<MeetingPage />} />
                   <Route path="/community" element={<CommunityPage />} />
                   <Route path="/myinfo" element={<MyInfoPage />} />
+                  <Route path="/chat" element={<ChatPage />} />
                 </Routes>
               </Layout>
             }

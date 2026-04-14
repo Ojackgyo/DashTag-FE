@@ -1,5 +1,4 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import './GNB.css';
 
 const PINK_A = '#FF80AB';
 const PINK_B = '#FFB3CC';
@@ -81,17 +80,39 @@ export default function GNB() {
   if (location.pathname === '/signup') return null;
 
   return (
-    <nav className="gnb">
+    <nav
+      className="sticky top-[54px] z-[99] w-full h-[50px] flex items-center px-1"
+      style={{
+        background: 'var(--gnb-bg)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid var(--border)',
+      }}
+    >
       {NAV_ITEMS.map(({ path, label, icon: Icon }) => {
         const active = location.pathname === path;
         return (
           <button
             key={path}
-            className={`gnb-item ${active ? 'active' : ''}`}
             onClick={() => navigate(path)}
+            className="flex-1 flex flex-col items-center justify-center gap-[3px] min-h-[44px] rounded-[10px] text-[10px] font-medium active:scale-90"
+            style={{
+              color: active ? 'var(--primary)' : 'var(--text-muted)',
+              background: active ? 'var(--primary-bg)' : 'transparent',
+            }}
           >
             <Icon active={active} />
-            <span>{label}</span>
+            <span
+              style={active ? {
+                background: 'var(--gradient)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                fontWeight: 700,
+              } : {}}
+            >
+              {label}
+            </span>
           </button>
         );
       })}
