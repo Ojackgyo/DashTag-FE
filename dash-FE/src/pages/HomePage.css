@@ -60,6 +60,94 @@
   opacity: 0.9;
 }
 
+/* ── Energy bar ── */
+.energy-section {
+  margin-bottom: 24px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 16px 18px;
+}
+
+.energy-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.energy-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+
+.energy-msg {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.energy-count {
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  transition: color 0.4s;
+}
+
+.energy-total {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.energy-track {
+  height: 14px;
+  border-radius: 10px;
+  background: var(--bg-card2);
+  overflow: hidden;
+  position: relative;
+}
+
+@keyframes energyShimmer {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(250%); }
+}
+
+@keyframes energyGrow {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+.energy-fill {
+  height: 100%;
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+  transition: width 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.energy-fill.available {
+  width: 100%;
+  background: linear-gradient(90deg, #FF80AB 0%, #FFB3CC 50%, #FF80AB 100%);
+  background-size: 200% 100%;
+  animation: energyGrow 1s cubic-bezier(0.4, 0, 0.2, 1) both;
+  box-shadow: 0 0 12px rgba(255, 128, 171, 0.5);
+}
+
+.energy-fill.available::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+  animation: energyShimmer 1.8s ease-in-out infinite;
+}
+
+.energy-fill.spent {
+  width: 0%;
+}
+
 /* Section */
 .section {
   margin-bottom: 28px;

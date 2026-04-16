@@ -241,7 +241,7 @@ function ChatRoomView({ room, onBack }: { room: ChatRoom; onBack: () => void }) 
           placeholder="메시지 입력..."
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && sendMessage()}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) sendMessage(); }}
         />
         <button
           className="w-10 h-10 rounded-full flex items-center justify-center text-[18px] font-bold shrink-0"

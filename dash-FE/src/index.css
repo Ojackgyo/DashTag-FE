@@ -106,3 +106,42 @@ a { text-decoration: none; color: inherit; }
 
 /* GNB 높이 보조 */
 .pb-gnb { padding-bottom: 72px; }
+
+/* 페이지 슬라이드 전환 */
+@keyframes slideInFromRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes slideOutToRight {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+.slide-in-right  { animation: slideInFromRight 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.slide-out-right { animation: slideOutToRight  0.25s cubic-bezier(0.4, 0, 1, 1) both; }
+
+/* 슬롯 릴 드롭 */
+@keyframes slotReel {
+  0%   { transform: translateY(-90px) scaleY(0.7); opacity: 0; filter: blur(6px); }
+  55%  { transform: translateY(9px)   scaleY(1.04); opacity: 1; filter: blur(0); }
+  72%  { transform: translateY(-4px)  scaleY(0.98); }
+  85%  { transform: translateY(2px)   scaleY(1.01); }
+  100% { transform: translateY(0)     scaleY(1); }
+}
+.slot-reel {
+  animation: slotReel 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 대기 슬롯 펄스 */
+@keyframes waitSlot {
+  0%, 100% { opacity: 0.35; transform: scale(0.97); }
+  50%       { opacity: 0.65; transform: scale(1); }
+}
+.wait-slot { animation: waitSlot 1.4s ease-in-out infinite; }
+
+/* 점 깜빡임 */
+@keyframes dotBlink {
+  0%, 100% { opacity: 0.2; } 33% { opacity: 1; }
+}
+.dot1 { animation: dotBlink 1.2s ease-in-out infinite 0s; }
+.dot2 { animation: dotBlink 1.2s ease-in-out infinite 0.2s; }
+.dot3 { animation: dotBlink 1.2s ease-in-out infinite 0.4s; }

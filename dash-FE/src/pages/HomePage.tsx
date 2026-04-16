@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useChance } from '../hooks/useChance';
 import './HomePage.css';
 
 const MOCK_PROFILES = [
@@ -9,6 +10,7 @@ const MOCK_PROFILES = [
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { hasChance } = useChance();
 
   return (
     <div className="home-page">
@@ -22,6 +24,26 @@ export default function HomePage() {
         <button className="hero-cta" onClick={() => navigate('/signup')}>
           무료로 시작하기 →
         </button>
+      </section>
+
+      {/* ── 에너지바 ── */}
+      <section className="energy-section">
+        <div className="energy-top">
+          <div>
+            <p className="energy-label">⚡ 오늘의 기회</p>
+            <p className="energy-msg">
+              {hasChance
+                ? '오늘 사용할 수 있는 기회가 있습니다'
+                : '오늘의 기회를 이미 사용했어요'}
+            </p>
+          </div>
+          <span className="energy-count" style={{ color: hasChance ? 'var(--primary)' : 'var(--text-muted)' }}>
+            {hasChance ? '1' : '0'}<span className="energy-total">/1</span>
+          </span>
+        </div>
+        <div className="energy-track">
+          <div className={`energy-fill ${hasChance ? 'available' : 'spent'}`} />
+        </div>
       </section>
 
       <section className="section">
