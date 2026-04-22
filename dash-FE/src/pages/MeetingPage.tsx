@@ -545,78 +545,71 @@ function ChancePage({
 
   const FilledSlot = ({ p, delay, teamColor }: { p: Participant; delay: number; teamColor: string }) => (
     <div
-      className="slot-reel rounded-[18px] p-3 border flex flex-col gap-2"
+      className="slot-reel rounded-[14px] px-2.5 py-2 border flex items-center gap-2.5"
       style={{
         animationDelay: `${delay}s`,
         background: 'var(--bg-card)',
         borderColor: teamColor === 'pink' ? 'var(--primary-border)' : 'rgba(100,180,255,0.35)',
         boxShadow: teamColor === 'pink'
-          ? '0 2px 12px rgba(255,128,171,0.18)'
-          : '0 2px 12px rgba(100,180,255,0.18)',
+          ? '0 2px 8px rgba(255,128,171,0.15)'
+          : '0 2px 8px rgba(100,180,255,0.15)',
       }}
     >
       {/* 아바타 */}
       <div
-        className="w-full aspect-square rounded-[14px] flex items-center justify-center text-[32px]"
+        className="w-[40px] h-[40px] rounded-[11px] flex items-center justify-center text-[20px] shrink-0"
         style={{
-          background: teamColor === 'pink'
-            ? 'var(--primary-bg)'
-            : 'rgba(100,180,255,0.12)',
+          background: teamColor === 'pink' ? 'var(--primary-bg)' : 'rgba(100,180,255,0.12)',
         }}
       >
         {p.emoji}
       </div>
-      {/* 닉네임 */}
-      <p className="text-[13px] font-extrabold text-center truncate" style={{ color: 'var(--text)' }}>
-        {p.nickname}
-      </p>
-      {/* MBTI 뱃지 */}
-      <div className="flex justify-center">
-        <span
-          className="text-[10px] font-bold px-2 py-[2px] rounded-[6px]"
-          style={{
-            color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF',
-            background: teamColor === 'pink' ? 'var(--primary-bg)' : 'rgba(100,180,255,0.14)',
-          }}
-        >
-          {p.mbti}
-        </span>
-      </div>
-      {/* 매력 태그 (첫 번째만) */}
-      {p.charmPoints[0] && (
-        <div className="flex justify-center">
+      {/* 정보 */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1 mb-[3px]">
+          <span className="text-[12px] font-extrabold truncate" style={{ color: 'var(--text)' }}>{p.nickname}</span>
           <span
-            className="text-[10px] font-semibold px-2 py-[2px] rounded-[20px] truncate max-w-full"
+            className="text-[9px] font-bold px-1.5 py-[1px] rounded-[5px] shrink-0"
+            style={{
+              color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF',
+              background: teamColor === 'pink' ? 'var(--primary-bg)' : 'rgba(100,180,255,0.14)',
+            }}
+          >{p.mbti}</span>
+        </div>
+        {p.charmPoints[0] && (
+          <span
+            className="text-[9px] font-semibold px-1.5 py-[1px] rounded-[20px] inline-block truncate max-w-full"
             style={{
               color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF',
               background: teamColor === 'pink' ? 'var(--primary-bg)' : 'rgba(100,180,255,0.12)',
               border: teamColor === 'pink' ? '1px solid var(--primary-border)' : '1px solid rgba(100,180,255,0.3)',
             }}
-          >
-            #{p.charmPoints[0]}
-          </span>
-        </div>
-      )}
+          >#{p.charmPoints[0]}</span>
+        )}
+      </div>
     </div>
   );
 
   const EmptySlot = ({ teamColor, delay }: { teamColor: string; delay: number }) => (
     <div
-      className="wait-slot rounded-[18px] p-3 border border-dashed flex flex-col items-center justify-center gap-2"
+      className="wait-slot rounded-[14px] px-2.5 py-2 border border-dashed flex items-center gap-2.5"
       style={{
         animationDelay: `${delay}s`,
-        aspectRatio: '1',
+        height: 56,
         borderColor: teamColor === 'pink' ? 'rgba(255,128,171,0.3)' : 'rgba(100,180,255,0.3)',
         background: teamColor === 'pink' ? 'rgba(255,128,171,0.04)' : 'rgba(100,180,255,0.04)',
       }}
     >
-      <span className="text-[28px]" style={{ opacity: 0.4 }}>
+      <div
+        className="w-[40px] h-[40px] rounded-[11px] flex items-center justify-center text-[18px] shrink-0"
+        style={{ opacity: 0.35, background: teamColor === 'pink' ? 'rgba(255,128,171,0.08)' : 'rgba(100,180,255,0.08)' }}
+      >
         {teamColor === 'pink' ? '🩷' : '🩵'}
-      </span>
-      <div className="flex gap-[3px]">
-        <span className="dot1 text-[16px] font-black" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>·</span>
-        <span className="dot2 text-[16px] font-black" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>·</span>
-        <span className="dot3 text-[16px] font-black" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>·</span>
+      </div>
+      <div className="flex items-center gap-[2px]">
+        <span className="dot1 text-[18px] font-black leading-none" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>·</span>
+        <span className="dot2 text-[18px] font-black leading-none" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>·</span>
+        <span className="dot3 text-[18px] font-black leading-none" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>·</span>
       </div>
     </div>
   );
@@ -643,22 +636,22 @@ function ChancePage({
       </div>
 
       {/* 대기창 본체 */}
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex-1 overflow-y-auto px-4 pt-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
         {/* 상단 배너 */}
         <div
-          className="rounded-[18px] px-4 py-3 mb-4 flex items-center justify-between"
-          style={{ background: 'var(--gradient)', boxShadow: '0 4px 18px rgba(255,128,171,0.35)' }}
+          className="rounded-[16px] px-3.5 py-2.5 mb-3 flex items-center justify-between gap-2"
+          style={{ background: 'var(--gradient)', boxShadow: '0 3px 14px rgba(255,128,171,0.35)' }}
         >
-          <div>
-            <p className="text-[11px] font-bold text-white opacity-80 mb-0.5">MATCHING ROOM</p>
-            <p className="text-[15px] font-extrabold text-white truncate">{meeting.title}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[9px] font-bold text-white opacity-70 mb-0.5 tracking-widest">MATCHING ROOM</p>
+            <p className="text-[13px] font-extrabold text-white truncate">{meeting.title}</p>
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1 shrink-0">
             {meeting.keywords.map(k => (
               <span
                 key={k}
-                className="text-[10px] font-bold px-2 py-[3px] rounded-[7px]"
+                className="text-[9px] font-bold px-1.5 py-[2px] rounded-[6px]"
                 style={{ background: 'rgba(255,255,255,0.22)', color: 'white' }}
               >#{k}</span>
             ))}
@@ -666,31 +659,31 @@ function ChancePage({
         </div>
 
         {/* 팀 헤더 */}
-        <div className="flex items-center mb-3 gap-2">
-          <div className="flex-1 flex items-center gap-1.5 rounded-[12px] px-3 py-2" style={{ background: 'var(--primary-bg)', border: '1.5px solid var(--primary-border)' }}>
-            <span className="text-[16px]">🩷</span>
-            <span className="text-[12px] font-extrabold" style={{ color: 'var(--primary)' }}>TEAM</span>
-            <span className="text-[11px] font-bold ml-auto" style={{ color: 'var(--primary)' }}>
+        <div className="flex items-center mb-2.5 gap-2">
+          <div className="flex-1 flex items-center gap-1 rounded-[10px] px-2.5 py-1.5" style={{ background: 'var(--primary-bg)', border: '1.5px solid var(--primary-border)' }}>
+            <span className="text-[13px]">🩷</span>
+            <span className="text-[11px] font-extrabold" style={{ color: 'var(--primary)' }}>TEAM</span>
+            <span className="text-[10px] font-bold ml-auto" style={{ color: 'var(--primary)' }}>
               {females.length}/{meeting.femaleCount}
             </span>
           </div>
           <div
-            className="text-[12px] font-extrabold px-2 py-1 rounded-[10px] shrink-0"
+            className="text-[11px] font-extrabold px-2 py-1 rounded-[8px] shrink-0"
             style={{ background: 'var(--bg-card2)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
           >VS</div>
-          <div className="flex-1 flex items-center gap-1.5 rounded-[12px] px-3 py-2" style={{ background: 'rgba(100,180,255,0.1)', border: '1.5px solid rgba(100,180,255,0.3)' }}>
-            <span className="text-[16px]">🩵</span>
-            <span className="text-[12px] font-extrabold" style={{ color: '#60B4FF' }}>TEAM</span>
-            <span className="text-[11px] font-bold ml-auto" style={{ color: '#60B4FF' }}>
+          <div className="flex-1 flex items-center gap-1 rounded-[10px] px-2.5 py-1.5" style={{ background: 'rgba(100,180,255,0.1)', border: '1.5px solid rgba(100,180,255,0.3)' }}>
+            <span className="text-[13px]">🩵</span>
+            <span className="text-[11px] font-extrabold" style={{ color: '#60B4FF' }}>TEAM</span>
+            <span className="text-[10px] font-bold ml-auto" style={{ color: '#60B4FF' }}>
               {males.length}/{meeting.maleCount}
             </span>
           </div>
         </div>
 
         {/* 슬롯 그리드 */}
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           {/* 여성 슬롯 컬럼 */}
-          <div className="flex-1 flex flex-col gap-2.5">
+          <div className="flex-1 flex flex-col gap-2">
             {femaleSlots.map((p, i) =>
               p
                 ? <FilledSlot key={i} p={p} delay={i * 0.15} teamColor="pink" />
@@ -706,7 +699,7 @@ function ChancePage({
           </div>
 
           {/* 남성 슬롯 컬럼 */}
-          <div className="flex-1 flex flex-col gap-2.5">
+          <div className="flex-1 flex flex-col gap-2">
             {maleSlots.map((p, i) =>
               p
                 ? <FilledSlot key={i} p={p} delay={0.25 + i * 0.15} teamColor="blue" />
