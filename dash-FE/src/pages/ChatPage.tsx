@@ -66,7 +66,7 @@ function getSelectableDates() {
 }
 
 /* ── 날짜 모달 ── */
-function DateModal({ scheduledDate, onConfirm, onClose }: { scheduledDate: string | null; onConfirm: (d: string) => void; onClose: () => void }) {
+function DateModal({ onConfirm, onClose }: { onConfirm: (d: string) => void; onClose: () => void }) {
   const dates = getSelectableDates();
   const [activeDateIdx, setActiveDateIdx] = useState(0);
   const [selectedTime, setSelectedTime] = useState('오후 3시');
@@ -135,12 +135,109 @@ function DateModal({ scheduledDate, onConfirm, onClose }: { scheduledDate: strin
   );
 }
 
+/* ── 신고 모달 ── */
+const REPORT_REASONS = ['욕설 / 비하', '부적절한 내용', '스팸 / 광고', '사기 의심', '기타'];
+
+function ReportModal({ roomName, onClose }: { roomName: string; onClose: () => void }) {
+  const [reason, setReason] = useState('');
+  const [detail, setDetail] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  return (
+    <div
+      className="fixed inset-0 flex items-end justify-center z-[300]"
+      style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="rounded-[28px_28px_0_0] px-5 pt-6 pb-9 w-full max-w-[390px] max-h-[88vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ background: 'var(--bg-card)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {submitted ? (
+          <div className="flex flex-col items-center py-10 gap-4">
+            <span style={{ fontSize: 56 }}>✅</span>
+            <p className="text-[18px] font-extrabold" style={{ color: 'var(--text)' }}>신고가 접수됐어요</p>
+            <p className="text-[13px] text-center" style={{ color: 'var(--text-muted)' }}>
+              검토 후 적절한 조치를 취하겠습니다.<br />불편을 드려서 죄송해요.
+            </p>
+            <button
+              className="w-full py-[15px] rounded-[16px] font-bold text-[15px] text-white mt-2"
+              style={{ background: 'var(--gradient)' }}
+              onClick={onClose}
+            >확인</button>
+          </div>
+        ) : (
+          <>
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-[17px] font-extrabold" style={{ color: 'var(--text)' }}>🚨 신고하기</span>
+              <button
+                className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[13px] border"
+                style={{ background: 'var(--bg-card2)', color: 'var(--text-muted)', borderColor: 'var(--border)' }}
+                onClick={onClose}
+              >✕</button>
+            </div>
+            <p className="text-[13px] mb-5" style={{ color: 'var(--text-muted)' }}>
+              "{roomName}" 신고 이유를 선택해주세요.
+            </p>
+            <div className="flex flex-col gap-2 mb-4">
+              {REPORT_REASONS.map(r => (
+                <button
+                  key={r}
+                  className="flex items-center gap-3 p-[14px] rounded-[14px] border text-left active:opacity-75"
+                  style={reason === r
+                    ? { background: 'rgba(255,60,60,0.08)', borderColor: 'rgba(255,60,60,0.35)' }
+                    : { background: 'var(--bg-card2)', borderColor: 'var(--border)' }
+                  }
+                  onClick={() => setReason(r)}
+                >
+                  <div
+                    className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
+                    style={{ borderColor: reason === r ? '#FF3C3C' : 'var(--text-muted)' }}
+                  >
+                    {reason === r && <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#FF3C3C' }} />}
+                  </div>
+                  <span
+                    className="text-[14px]"
+                    style={{ fontWeight: reason === r ? 700 : 500, color: reason === r ? '#FF3C3C' : 'var(--text)' }}
+                  >{r}</span>
+                </button>
+              ))}
+            </div>
+            {reason && (
+              <textarea
+                className="w-full rounded-[14px] px-4 py-3 text-[13px] border mb-4 resize-none"
+                rows={3}
+                placeholder="자세한 내용을 입력해주세요 (선택)"
+                value={detail}
+                onChange={e => setDetail(e.target.value)}
+                style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)' }}
+              />
+            )}
+            <button
+              className="w-full py-[15px] rounded-[16px] font-bold text-[15px] active:opacity-80"
+              style={{
+                background: reason ? '#FF3C3C' : 'var(--bg-card2)',
+                color: reason ? 'white' : 'var(--text-muted)',
+                boxShadow: reason ? '0 4px 14px rgba(255,60,60,0.3)' : 'none',
+              }}
+              disabled={!reason}
+              onClick={() => reason && setSubmitted(true)}
+            >신고 제출</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── 채팅방 뷰 ── */
 function ChatRoomView({ room, onBack }: { room: ChatRoom; onBack: () => void }) {
   const [messages, setMessages] = useState<Message[]>(DUMMY_MESSAGES[room.id] || []);
   const [input, setInput] = useState('');
   const [showDateModal, setShowDateModal] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<string | null>(null);
+  const [showReport, setShowReport] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -182,6 +279,12 @@ function ChatRoomView({ room, onBack }: { room: ChatRoom; onBack: () => void }) 
         >
           📅 날짜 정하기
         </button>
+        <button
+          className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[15px] border shrink-0 active:opacity-75"
+          style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+          onClick={() => setShowReport(true)}
+          title="신고하기"
+        >🚨</button>
       </div>
 
       {/* 약속 배너 */}
@@ -253,7 +356,8 @@ function ChatRoomView({ room, onBack }: { room: ChatRoom; onBack: () => void }) 
         </button>
       </div>
 
-      {showDateModal && <DateModal scheduledDate={scheduledDate} onConfirm={handleConfirmDate} onClose={() => setShowDateModal(false)} />}
+      {showDateModal && <DateModal onConfirm={handleConfirmDate} onClose={() => setShowDateModal(false)} />}
+      {showReport && <ReportModal roomName={room.name} onClose={() => setShowReport(false)} />}
     </div>
   );
 }

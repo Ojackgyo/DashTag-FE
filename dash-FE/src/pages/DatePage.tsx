@@ -139,7 +139,7 @@ export default function DatePage() {
             onClick={() => handleCardClick(p.id)}
           >
             <span style={{ fontSize: '48px', lineHeight: 1 }}>{p.emoji}</span>
-            <p className="text-[14px] font-bold" style={{ color: 'var(--text)' }}>{p.face}</p>
+            <p className="text-[14px] font-bold" style={{ color: 'var(--text)' }}>{p.nickname}</p>
             <span
               className="text-[11px] font-bold px-2 py-[2px] rounded-[7px]"
               style={{ color: 'var(--primary)', background: 'rgba(255,128,171,0.18)' }}

@@ -4,13 +4,12 @@ import './SignupPage.css';
 
 /* ─── Step types ─── */
 type Step =
-  | { type: 'text';       key: string; question: string; placeholder: string; sub?: string }
-  | { type: 'choice';     key: string; question: string; options: { label: string; emoji: string }[]; sub?: string }
-  | { type: 'range';      key: string; question: string; sub?: string }
-  | { type: 'mbti';       key: string; question: string; sub?: string }
-  | { type: 'mbti-multi'; key: string; question: string; sub?: string }
-  | { type: 'intro';      key: string; question: string }
-  | { type: 'tags';       key: string; question: string; placeholder: string; sub?: string; max: number };
+  | { type: 'text';          key: string; question: string; placeholder: string; sub?: string }
+  | { type: 'choice';        key: string; question: string; options: { label: string; emoji: string }[]; sub?: string }
+  | { type: 'range';         key: string; question: string; sub?: string }
+  | { type: 'intro';         key: string; question: string }
+  | { type: 'tags';          key: string; question: string; placeholder: string; sub?: string; max: number }
+  | { type: 'mbti-selector'; key: string; question: string; ideal?: boolean; sub?: string };
 
 /* ─── Hair style options ─── */
 const MALE_HAIR = [
@@ -71,7 +70,10 @@ function getSteps(gender: string): Step[] {
         { label: '매우 어두움', emoji: '🌑' },
       ],
     },
-    { type: 'mbti', key: 'mbti', question: 'MBTI가 뭐예요? 🧠' },
+    {
+      type: 'mbti-selector', key: 'mbti', question: 'MBTI가 뭐예요? 🧠',
+      sub: '각 항목에서 해당하는 쪽을 선택해주세요',
+    },
     { type: 'text', key: 'age',   question: '몇 살이에요? 🎂',        placeholder: '나이를 숫자로 입력 (ex. 24)' },
     { type: 'text', key: 'major', question: '학과가 어떻게 돼요? 🎓', placeholder: 'ex. 경영학과, 컴퓨터공학과' },
   ];
@@ -141,11 +143,21 @@ function getSteps(gender: string): Step[] {
       ],
     },
     {
-      type: 'mbti-multi', key: 'idealMbti',
-      question: '선호하는 MBTI를 골라봐요 🧠',
-      sub: '최대 3개까지 선택할 수 있어요',
+      type: 'mbti-selector', key: 'idealMbti', question: '선호하는 MBTI는? 🧠',
+      ideal: true, sub: '상관없으면 🤷를 선택해주세요',
     },
-    { type: 'text', key: 'idealAge', question: '선호하는 나이대는? 🎂', placeholder: 'ex. 21~27' },
+    {
+      type: 'choice', key: 'idealAge', question: '나이 차이는 얼마나 괜찮아요? 🎂',
+      sub: '내 나이 기준으로 선택해주세요',
+      options: [
+        { label: '±1살', emoji: '🎯' },
+        { label: '±2살', emoji: '💕' },
+        { label: '±3살', emoji: '🌸' },
+        { label: '±5살', emoji: '✨' },
+        { label: '±7살', emoji: '🌈' },
+        { label: '상관없어요', emoji: '🤷' },
+      ],
+    },
     {
       type: 'choice', key: 'idealHairStyle', question: '선호하는 헤어스타일은? 💇',
       options: [...idealHair, { label: '상관없어요', emoji: '🤷' }],
@@ -179,8 +191,96 @@ function getSteps(gender: string): Step[] {
   return steps;
 }
 
-const MBTI_TYPES = ['INTJ','INTP','ENTJ','ENTP','INFJ','INFP','ENFJ','ENFP',
-                    'ISTJ','ISFJ','ESTJ','ESFJ','ISTP','ISFP','ESTP','ESFP'];
+/* ─── MBTI 한 페이지 선택 ─── */
+const MBTI_DIMS = [
+  { idx: 0, left: 'E', leftLabel: '외향형', right: 'I', rightLabel: '내향형', desc: '에너지 방향' },
+  { idx: 1, left: 'S', leftLabel: '감각형', right: 'N', rightLabel: '직관형', desc: '인식 방식' },
+  { idx: 2, left: 'T', leftLabel: '사고형', right: 'F', rightLabel: '감정형', desc: '판단 방식' },
+  { idx: 3, left: 'J', leftLabel: '계획형', right: 'P', rightLabel: '즉흥형', desc: '생활 방식' },
+];
+
+function MbtiSelector({ value, onChange, ideal }: { value: string; onChange: (v: string) => void; ideal?: boolean }) {
+  const parts = value ? value.split(',') : Array(4).fill('');
+
+  const pick = (idx: number, letter: string) => {
+    const next = [...parts];
+    while (next.length < 4) next.push('');
+    next[idx] = next[idx] === letter ? '' : letter;
+    onChange(next.join(','));
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
+      {MBTI_DIMS.map(({ idx, left, leftLabel, right, rightLabel, desc }) => {
+        const sel = parts[idx] ?? '';
+        return (
+          <div
+            key={idx}
+            style={{
+              borderRadius: 16, padding: '10px 12px',
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+            }}
+          >
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600 }}>{desc}</p>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {/* Left */}
+              <button
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  padding: '10px 4px', borderRadius: 12, gap: 3,
+                  background: sel === left ? 'var(--gradient)' : 'var(--bg-card2)',
+                  border: sel === left ? 'none' : '1.5px solid var(--border)',
+                  color: sel === left ? 'white' : 'var(--text-sub)',
+                  cursor: 'pointer',
+                }}
+                onClick={() => pick(idx, left)}
+              >
+                <span style={{ fontSize: 18, fontWeight: 800 }}>{left}</span>
+                <span style={{ fontSize: 10 }}>{leftLabel}</span>
+              </button>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}>vs</span>
+              {/* Right */}
+              <button
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  padding: '10px 4px', borderRadius: 12, gap: 3,
+                  background: sel === right ? 'var(--gradient)' : 'var(--bg-card2)',
+                  border: sel === right ? 'none' : '1.5px solid var(--border)',
+                  color: sel === right ? 'white' : 'var(--text-sub)',
+                  cursor: 'pointer',
+                }}
+                onClick={() => pick(idx, right)}
+              >
+                <span style={{ fontSize: 18, fontWeight: 800 }}>{right}</span>
+                <span style={{ fontSize: 10 }}>{rightLabel}</span>
+              </button>
+              {/* 상관없어요 (ideal only) */}
+              {ideal && (
+                <>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}>or</span>
+                  <button
+                    style={{
+                      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      padding: '10px 4px', borderRadius: 12, gap: 3,
+                      background: sel === '?' ? 'var(--primary-bg)' : 'var(--bg-card2)',
+                      border: sel === '?' ? '1.5px solid var(--primary-border)' : '1.5px solid var(--border)',
+                      color: sel === '?' ? 'var(--primary)' : 'var(--text-muted)',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => pick(idx, '?')}
+                  >
+                    <span style={{ fontSize: 16 }}>🤷</span>
+                    <span style={{ fontSize: 9 }}>상관없음</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 /* ─── Height/Weight slider ─── */
 function RangeInput({ stepKey, value, onChange }: { stepKey: string; value: string; onChange: (v: string) => void }) {
@@ -314,15 +414,6 @@ export default function SignupPage() {
 
   const currentValue = answers[step.key] || '';
 
-  const toggleMbtiMulti = (val: string) => {
-    const current = currentValue ? currentValue.split(',').filter(Boolean) : [];
-    if (current.includes(val)) {
-      setAnswers(prev => ({ ...prev, [step.key]: current.filter(v => v !== val).join(',') }));
-    } else if (current.length < 3) {
-      setAnswers(prev => ({ ...prev, [step.key]: [...current, val].join(',') }));
-    }
-  };
-
   const advance = () => {
     setExiting(true);
     setTimeout(() => {
@@ -333,7 +424,12 @@ export default function SignupPage() {
   };
 
   const handleNext = () => {
-    if (step.type !== 'intro' && step.type !== 'tags' && !currentValue) return;
+    if (step.type === 'mbti-selector') {
+      const ideal = 'ideal' in step ? step.ideal : false;
+      if (!mbtiAllSelected(currentValue, ideal)) return;
+    } else if (step.type !== 'intro' && step.type !== 'tags' && !currentValue) {
+      return;
+    }
     if (isLast) { navigate('/'); return; }
     advance();
   };
@@ -346,7 +442,7 @@ export default function SignupPage() {
 
   const select = (val: string) => {
     setAnswers(prev => ({ ...prev, [step.key]: val }));
-    if (step.type !== 'text' && step.type !== 'mbti-multi') {
+    if (step.type !== 'text') {
       setTimeout(() => {
         setExiting(true);
         setTimeout(() => {
@@ -358,12 +454,25 @@ export default function SignupPage() {
     }
   };
 
+  const mbtiAllSelected = (val: string, ideal?: boolean) => {
+    const parts = val ? val.split(',') : [];
+    if (parts.length < 4) return false;
+    return parts.every(p => p === 'E' || p === 'I' || p === 'S' || p === 'N' ||
+      p === 'T' || p === 'F' || p === 'J' || p === 'P' || (ideal && p === '?'));
+  };
+
   const showFooter =
     step.type === 'text' ||
     step.type === 'range' ||
-    step.type === 'mbti-multi' ||
     step.type === 'tags' ||
-    step.type === 'intro';
+    step.type === 'intro' ||
+    step.type === 'mbti-selector';
+
+  const isNextEnabled =
+    step.type === 'intro' ||
+    step.type === 'tags' ||
+    (step.type === 'mbti-selector' && mbtiAllSelected(currentValue, 'ideal' in step ? step.ideal : false)) ||
+    !!(step.type !== 'mbti-selector' && currentValue);
 
   return (
     <div className="signup-page">
@@ -384,7 +493,7 @@ export default function SignupPage() {
           <h2 className="signup-question">{step.question}</h2>
         )}
 
-        {'sub' in step && step.sub && step.type !== 'intro' && (
+        {'sub' in step && step.sub && (
           <p className="signup-sub">{step.sub}</p>
         )}
 
@@ -439,53 +548,24 @@ export default function SignupPage() {
           />
         )}
 
-        {/* ── MBTI (single) ── */}
-        {step.type === 'mbti' && (
-          <div className="mbti-grid">
-            {MBTI_TYPES.map(m => (
-              <button
-                key={m}
-                className={`mbti-btn ${currentValue === m ? 'selected' : ''}`}
-                onClick={() => select(m)}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
+        {/* ── MBTI Selector ── */}
+        {step.type === 'mbti-selector' && (
+          <MbtiSelector
+            value={currentValue}
+            ideal={'ideal' in step ? step.ideal : false}
+            onChange={v => setAnswers(prev => ({ ...prev, [step.key]: v }))}
+          />
         )}
 
-        {/* ── MBTI multi (max 3) ── */}
-        {step.type === 'mbti-multi' && (() => {
-          const selected = currentValue ? currentValue.split(',').filter(Boolean) : [];
-          return (
-            <div className="mbti-grid">
-              {MBTI_TYPES.map(m => {
-                const isSelected = selected.includes(m);
-                const maxed = selected.length >= 3 && !isSelected;
-                return (
-                  <button
-                    key={m}
-                    className={`mbti-btn ${isSelected ? 'selected' : ''} ${maxed ? 'opacity-30' : ''}`}
-                    onClick={() => toggleMbtiMulti(m)}
-                    disabled={maxed}
-                  >
-                    {m}
-                    {isSelected && <span style={{ fontSize: '9px', display: 'block', marginTop: '2px' }}>✓</span>}
-                  </button>
-                );
-              })}
-            </div>
-          );
-        })()}
       </div>
 
       {/* Footer button */}
       {showFooter && (
         <div className="signup-footer">
           <button
-            className={`next-btn ${(currentValue || step.type === 'intro' || step.type === 'tags') ? 'active' : ''}`}
+            className={`next-btn ${isNextEnabled ? 'active' : ''}`}
             onClick={handleNext}
-            disabled={step.type !== 'intro' && step.type !== 'tags' && !currentValue}
+            disabled={!isNextEnabled}
           >
             {step.type === 'intro'
               ? '시작하기! 💕'

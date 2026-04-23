@@ -82,7 +82,6 @@ const MEETINGS: Meeting[] = [
   },
 ];
 
-const KEYWORDS = ['카페', '운동', '맛집', '영화', '게임', '취미', '조용한', '활발한', '유쾌한', '감성적'];
 
 /* ── 세로 배터리 컴포넌트 ── */
 function Battery({ filled, total }: { filled: number; total: number }) {
@@ -263,8 +262,12 @@ function MeetingRoomView({ meeting, onBack }: { meeting: Meeting; onBack: () => 
 
   return (
     <div
-      className="slide-in-right fixed inset-0 overflow-y-auto pb-24 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      style={{ background: 'var(--bg)', zIndex: 100 }}
+      className="fixed inset-0 flex justify-center"
+      style={{ zIndex: 200 }}
+    >
+    <div
+      className="slide-in-right w-full overflow-y-auto pb-24 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      style={{ background: 'var(--bg)', maxWidth: '390px' }}
     >
       {/* 헤더 */}
       <div
@@ -340,6 +343,7 @@ function MeetingRoomView({ meeting, onBack }: { meeting: Meeting; onBack: () => 
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
@@ -459,16 +463,14 @@ function CreateSheet({ onClose }: { onClose: () => void }) {
         </p>
         <div className="flex gap-2 mb-3">
           <input
-            className="flex-1 rounded-[12px] px-4 py-[11px] text-[14px] border"
-            style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)' }}
             placeholder={keywords.length >= 3 ? '최대 3개까지 입력할 수 있어요' : 'ex. 카페, 운동, 감성적…'}
             value={keywordInput}
             onChange={e => setKeywordInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); addKeyword(); } }}
             disabled={keywords.length >= 3}
             style={keywords.length >= 3
-              ? { background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)', opacity: 0.45, flex: 1, borderRadius: '12px', padding: '11px 16px', fontSize: '14px' }
-              : { background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)', flex: 1, borderRadius: '12px', padding: '11px 16px', fontSize: '14px' }
+              ? { background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)', opacity: 0.45, flex: 1, borderRadius: '12px', padding: '11px 16px', fontSize: '14px', border: '1px solid var(--border)' }
+              : { background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)', flex: 1, borderRadius: '12px', padding: '11px 16px', fontSize: '14px', border: '1px solid var(--border)' }
             }
           />
           <button
@@ -615,9 +617,10 @@ function ChancePage({
   );
 
   return (
+    <div className="fixed inset-0 flex justify-center" style={{ zIndex: 200 }}>
     <div
-      className="slide-in-right fixed inset-0 flex flex-col overflow-hidden"
-      style={{ background: 'var(--bg)', zIndex: 100 }}
+      className="slide-in-right w-full flex flex-col overflow-hidden"
+      style={{ background: 'var(--bg)', maxWidth: '390px' }}
     >
       {/* 헤더 */}
       <div
@@ -735,6 +738,7 @@ function ChancePage({
         )}
       </div>
     </div>
+    </div>
   );
 }
 
@@ -745,7 +749,7 @@ export default function MeetingPage() {
   const [chanceRoom,   setChanceRoom]   = useState<Meeting | null>(null);
   const [showChanceModal, setShowChanceModal] = useState(false);
   const [activeRoom,   setActiveRoom]   = useState<Meeting | null>(null);
-  const { hasChance, spend } = useChance();
+  const { spend } = useChance();
 
   if (activeRoom) return <MeetingRoomView meeting={activeRoom} onBack={() => setActiveRoom(null)} />;
 
