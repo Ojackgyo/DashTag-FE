@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useChance } from '../hooks/useChance';
+import ChanceModal from '../components/ChanceModal';
 
 type Category = '소개팅' | '미팅' | '소모임';
 
@@ -130,6 +132,66 @@ function DateModal({ onConfirm, onClose }: { onConfirm: (d: string) => void; onC
         >
           약속 잡기
         </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── 연락 확인 모달 ── */
+interface IncomingRequest {
+  id: string;
+  name: string;
+  emoji: string;
+}
+
+function RequestConfirmModal({
+  request,
+  onChat,
+  onClose,
+}: {
+  request: IncomingRequest;
+  onChat: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center px-6"
+      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[320px] rounded-[28px] p-6 text-center"
+        style={{ background: 'var(--bg-card)', boxShadow: '0 24px 60px rgba(0,0,0,0.35)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div
+          className="w-[72px] h-[72px] rounded-[22px] flex items-center justify-center text-[38px] mx-auto mb-4"
+          style={{ background: 'var(--gradient)', boxShadow: '0 8px 24px rgba(255,128,171,0.45)' }}
+        >
+          {request.emoji}
+        </div>
+        <h3 className="text-[19px] font-extrabold mb-2" style={{ color: 'var(--text)' }}>
+          {request.name}와 연락을 하시겠습니까?
+        </h3>
+        <p className="text-[13px] mb-6" style={{ color: 'var(--text-muted)' }}>
+          대화하기를 누르면 오늘의 기회가 사용됩니다
+        </p>
+        <div className="flex gap-2.5">
+          <button
+            className="flex-1 py-[14px] rounded-[16px] text-[15px] font-bold active:opacity-75"
+            style={{ background: 'var(--bg-card2)', color: 'var(--text-sub)' }}
+            onClick={onClose}
+          >
+            취소
+          </button>
+          <button
+            className="flex-1 py-[14px] rounded-[16px] text-[15px] font-bold text-white active:opacity-80"
+            style={{ background: 'var(--gradient)', boxShadow: '0 4px 16px rgba(255,128,171,0.4)' }}
+            onClick={onChat}
+          >
+            대화하기 💬
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -371,6 +433,19 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const [category, setCategory] = useState<Category>('소개팅');
   const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<IncomingRequest[]>([
+    { id: 'req_jeff', name: 'JEFF', emoji: '🐺' },
+  ]);
+  const [selectedRequest, setSelectedRequest] = useState<IncomingRequest | null>(null);
+  const [showChanceForRequest, setShowChanceForRequest] = useState(false);
+  const { hasChance, spend } = useChance();
+
+  const acceptRequest = () => {
+    spend();
+    setPendingRequests(prev => prev.filter(r => r.id !== selectedRequest!.id));
+    setShowChanceForRequest(false);
+    setSelectedRequest(null);
+  };
 
   if (activeRoom) return <ChatRoomView room={activeRoom} onBack={() => setActiveRoom(null)} />;
 
@@ -402,8 +477,34 @@ export default function ChatPage() {
         ))}
       </div>
 
+      {/* 소개팅 탭 - 들어온 연락 요청 */}
+      {category === '소개팅' && pendingRequests.map(req => (
+        <button
+          key={req.id}
+          className="flex items-center gap-[13px] py-3.5 mb-1 rounded-[18px] w-full text-left active:opacity-80 border-[1.5px]"
+          style={{ background: 'var(--primary-bg)', borderColor: 'var(--primary-border)', padding: '14px' }}
+          onClick={() => setSelectedRequest(req)}
+        >
+          <div
+            className="w-[50px] h-[50px] rounded-[16px] flex items-center justify-center text-[24px] shrink-0"
+            style={{ background: 'var(--gradient)', boxShadow: '0 4px 12px rgba(255,128,171,0.4)' }}
+          >
+            {req.emoji}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between items-start mb-1 gap-2">
+              <span className="text-[15px] font-bold" style={{ color: 'var(--text)' }}>
+                {req.name}에게 연락이 왔습니다
+              </span>
+              <span className="text-[10px] font-bold px-2 py-[3px] rounded-[8px] shrink-0 text-white" style={{ background: 'var(--primary)' }}>NEW</span>
+            </div>
+            <span className="text-[13px]" style={{ color: 'var(--primary)' }}>소개팅 대화 요청이 도착했어요 💘</span>
+          </div>
+        </button>
+      ))}
+
       {/* 목록 */}
-      {rooms.length === 0 ? (
+      {rooms.length === 0 && (category !== '소개팅' || pendingRequests.length === 0) ? (
         <div className="flex flex-col items-center py-16 gap-2.5">
           <span className="text-[52px]" style={{ animation: 'float 2.8s ease-in-out infinite' }}>{CATEGORY_EMOJI[category]}</span>
           <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>아직 채팅방이 없어요</p>
@@ -429,6 +530,27 @@ export default function ChatPage() {
             </button>
           ))}
         </div>
+      )}
+
+      {/* 연락 확인 모달 */}
+      {selectedRequest && !showChanceForRequest && (
+        <RequestConfirmModal
+          request={selectedRequest}
+          onChat={() => {
+            if (!hasChance) return;
+            setShowChanceForRequest(true);
+          }}
+          onClose={() => setSelectedRequest(null)}
+        />
+      )}
+
+      {/* 기회 사용 팝업 */}
+      {showChanceForRequest && selectedRequest && (
+        <ChanceModal
+          label={`${selectedRequest.name}와의 대화에 오늘의 기회를 사용하시겠습니까?`}
+          onConfirm={acceptRequest}
+          onCancel={() => setShowChanceForRequest(false)}
+        />
       )}
     </div>
   );

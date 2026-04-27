@@ -349,3 +349,107 @@
 .bottom-spacer {
   height: 24px;
 }
+
+/* ── 오늘 들어온 요청 ── */
+.request-count-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  background: var(--gradient);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.request-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@keyframes requestPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 128, 171, 0.35); }
+  50%       { box-shadow: 0 0 0 6px rgba(255, 128, 171, 0); }
+}
+
+.request-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1.5px solid var(--primary-border);
+  background: var(--primary-bg);
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s;
+  animation: requestPulse 2.4s ease-in-out infinite;
+}
+
+.request-card:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
+.request-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(255, 128, 171, 0.4);
+}
+
+.request-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.request-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 3px;
+  flex-wrap: wrap;
+}
+
+.request-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.request-age {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+
+.request-mbti {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  background: rgba(255, 128, 171, 0.2);
+  padding: 2px 7px;
+  border-radius: 7px;
+}
+
+.request-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.request-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.request-arrow {
+  font-size: 18px;
+  color: var(--primary);
+  flex-shrink: 0;
+}

@@ -9,6 +9,7 @@ import CommunityPage from './pages/CommunityPage';
 import MyInfoPage from './pages/MyInfoPage';
 import ChatPage from './pages/ChatPage';
 import SignupPage from './pages/SignupPage';
+import LoginPage from './pages/LoginPage';
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -27,6 +28,7 @@ export default function App() {
     <ThemeProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route
             path="/*"

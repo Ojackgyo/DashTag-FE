@@ -326,7 +326,7 @@ export default function DatePage() {
                         ? '⚡ 오늘 기회를 사용했어요'
                         : chatDisabled
                           ? '오늘 채팅 요청을 이미 보냈어요'
-                          : '💬 채팅하기'}
+                          : '💬 대화 신청하기'}
                   </button>
                   {!isChatSent && !chatDisabled && (
                     <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>

@@ -2,6 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { useChance } from '../hooks/useChance';
 import './HomePage.css';
 
+const INCOMING_REQUESTS = [
+  { id: 'req_jeff', name: 'JEFF', emoji: '🐺', mbti: 'INTJ', face: '늑대상', major: '컴퓨터공학과', age: 25 },
+];
+
 const MOCK_PROFILES = [
   { id: 1, nickname: 'Aria', age: 23, major: '경영학과', face: '여우상', mbti: 'ENFP', tags: ['커피 좋아해', '여행 매니아'] },
   { id: 2, nickname: 'Luna', age: 25, major: '디자인학과', face: '고양이상', mbti: 'INFJ', tags: ['그림 그리기', '독서'] },
@@ -21,7 +25,7 @@ export default function HomePage() {
           <span className="gradient-text">특별한 인연</span>을 찾아요
         </h1>
         <p className="hero-sub">DashTag와 함께 진짜 나와 맞는 사람을 만나보세요</p>
-        <button className="hero-cta" onClick={() => navigate('/signup')}>
+        <button className="hero-cta" onClick={() => navigate('/login')}>
           무료로 시작하기 →
         </button>
       </section>
@@ -45,6 +49,35 @@ export default function HomePage() {
           <div className={`energy-fill ${hasChance ? 'available' : 'spent'}`} />
         </div>
       </section>
+
+      {/* ── 오늘 들어온 요청 ── */}
+      {INCOMING_REQUESTS.length > 0 && (
+        <section className="section">
+          <div className="section-header">
+            <h2 className="section-title">오늘 들어온 요청</h2>
+            <span className="request-count-badge">{INCOMING_REQUESTS.length}건</span>
+          </div>
+          <div className="request-list">
+            {INCOMING_REQUESTS.map(req => (
+              <button key={req.id} className="request-card" onClick={() => navigate('/chat')}>
+                <div className="request-avatar">
+                  <span style={{ fontSize: '26px' }}>{req.emoji}</span>
+                </div>
+                <div className="request-info">
+                  <div className="request-top">
+                    <span className="request-name">{req.name}</span>
+                    <span className="request-age">{req.age}세</span>
+                    <span className="request-mbti">{req.mbti}</span>
+                  </div>
+                  <p className="request-meta">{req.major} · {req.face}</p>
+                  <p className="request-label">💌 소개팅 대화 요청을 보냈어요</p>
+                </div>
+                <span className="request-arrow">→</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="section">
         <div className="section-header">
