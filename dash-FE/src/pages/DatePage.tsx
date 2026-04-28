@@ -79,7 +79,9 @@ export default function DatePage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [flipped, setFlipped] = useState(false);
   const [chatSentId, setChatSentId] = useState<number | null>(null);
+  const [showMsgSheet, setShowMsgSheet] = useState(false);
   const [showChanceModal, setShowChanceModal] = useState(false);
+  const [introMsg, setIntroMsg] = useState('');
   const { hasChance, spend } = useChance();
 
   const selectedProfile = PROFILES.find(p => p.id === selectedId) ?? null;
@@ -87,7 +89,6 @@ export default function DatePage() {
   const handleCardClick = (id: number) => {
     setFlipped(false);
     setSelectedId(id);
-    // 모달이 마운트된 뒤 flip 시작
     setTimeout(() => setFlipped(true), 60);
   };
 
@@ -98,13 +99,15 @@ export default function DatePage() {
 
   const handleChatRequest = () => {
     if (chatSentId !== null || !hasChance) return;
-    setShowChanceModal(true);
+    setShowMsgSheet(true);
   };
 
   const confirmChat = () => {
     spend();
     setChatSentId(selectedId);
     setShowChanceModal(false);
+    setShowMsgSheet(false);
+    setIntroMsg('');
   };
 
   const isChatSent = selectedId !== null && chatSentId === selectedId;
@@ -150,6 +153,53 @@ export default function DatePage() {
           );
         })}
       </div>
+
+      {/* 한 줄 메시지 바텀시트 */}
+      {showMsgSheet && selectedProfile && (
+        <div
+          className="fixed inset-0 z-[250] flex items-end justify-center"
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowMsgSheet(false)}
+        >
+          <div
+            className="w-full max-w-[390px] rounded-[28px_28px_0_0] px-5 pt-5 pb-10"
+            style={{ background: 'var(--bg-card)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-9 h-1 rounded-full mx-auto mb-4" style={{ background: 'var(--border)' }} />
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-[44px] h-[44px] rounded-[14px] flex items-center justify-center text-[22px]" style={{ background: 'var(--primary-bg)' }}>
+                {selectedProfile.emoji}
+              </div>
+              <div>
+                <p className="text-[15px] font-bold" style={{ color: 'var(--text)' }}>{selectedProfile.nickname}에게 첫 인사를</p>
+                <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>한 줄로 남겨보세요</p>
+              </div>
+            </div>
+            <input
+              className="w-full rounded-[14px] px-4 py-3.5 text-[14px] border mb-3"
+              style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)' }}
+              placeholder="ex. 안녕하세요! 프로필 보고 연락했어요 😊"
+              maxLength={50}
+              value={introMsg}
+              onChange={e => setIntroMsg(e.target.value)}
+              autoFocus
+            />
+            <p className="text-right text-[11px] mb-4" style={{ color: 'var(--text-muted)' }}>{introMsg.length}/50</p>
+            <button
+              className="w-full py-[14px] rounded-[16px] text-[15px] font-bold text-white active:opacity-80"
+              style={introMsg.trim()
+                ? { background: 'var(--gradient)', boxShadow: '0 4px 14px rgba(255,128,171,0.35)' }
+                : { background: 'var(--bg-card2)', color: 'var(--text-muted)' }
+              }
+              disabled={!introMsg.trim()}
+              onClick={() => { setShowMsgSheet(false); setShowChanceModal(true); }}
+            >
+              보내기 💌
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 기회 확인 팝업 */}
       {showChanceModal && (

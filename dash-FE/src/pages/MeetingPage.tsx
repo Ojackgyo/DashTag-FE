@@ -358,6 +358,19 @@ function CreateSheet({ onClose }: { onClose: () => void }) {
   const [femaleCount,  setFemaleCount]  = useState(2);
   const [maleCount,    setMaleCount]    = useState(2);
   const [selectedDay,  setSelectedDay]  = useState(0);
+  const [createdCode,  setCreatedCode]  = useState('');
+  const [copied,       setCopied]       = useState(false);
+
+  const handleCreate = () => {
+    const code = 'DT-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    setCreatedCode(code);
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(createdCode).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const addKeyword = () => {
     const k = keywordInput.trim();
@@ -516,13 +529,49 @@ function CreateSheet({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <button
-          className="w-full text-[15px] font-bold py-[15px] rounded-[16px] min-h-[52px] text-white active:opacity-80"
-          style={{ background: 'var(--gradient)', boxShadow: '0 4px 16px rgba(255,128,171,0.35)' }}
-          onClick={onClose}
-        >
-          개설하기 🎉
-        </button>
+        {createdCode ? (
+          /* 개설 완료 - 코드 표시 */
+          <div className="flex flex-col items-center gap-4 py-4">
+            <span className="text-[52px]">🎉</span>
+            <p className="text-[18px] font-extrabold" style={{ color: 'var(--text)' }}>방이 개설됐어요!</p>
+            <p className="text-[13px] text-center" style={{ color: 'var(--text-muted)' }}>
+              아래 코드를 친구에게 공유해서<br/>같이 입장할 수 있어요
+            </p>
+            <div
+              className="flex items-center justify-between w-full rounded-[16px] px-5 py-4 border"
+              style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)' }}
+            >
+              <span className="text-[26px] font-extrabold tracking-[4px]" style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>
+                {createdCode}
+              </span>
+              <button
+                className="text-[13px] font-bold px-3 py-2 rounded-[10px] min-w-[64px]"
+                style={copied
+                  ? { background: 'rgba(100,200,130,0.15)', color: '#4CAF50', border: '1px solid rgba(100,200,130,0.4)' }
+                  : { background: 'var(--gradient)', color: 'white' }
+                }
+                onClick={handleCopy}
+              >
+                {copied ? '✓ 복사됨' : '복사'}
+              </button>
+            </div>
+            <button
+              className="w-full text-[15px] font-bold py-[15px] rounded-[16px] min-h-[52px] text-white active:opacity-80"
+              style={{ background: 'var(--gradient)', boxShadow: '0 4px 16px rgba(255,128,171,0.35)' }}
+              onClick={onClose}
+            >
+              확인
+            </button>
+          </div>
+        ) : (
+          <button
+            className="w-full text-[15px] font-bold py-[15px] rounded-[16px] min-h-[52px] text-white active:opacity-80"
+            style={{ background: 'var(--gradient)', boxShadow: '0 4px 16px rgba(255,128,171,0.35)' }}
+            onClick={handleCreate}
+          >
+            개설하기 🎉
+          </button>
+        )}
       </div>
     </div>
   );
@@ -930,9 +979,27 @@ export default function MeetingPage() {
         </button>
       </div>
 
+      {/* 검색 */}
+      <div
+        className="flex items-center gap-2 rounded-[14px] px-[14px] py-[11px] mb-3 border"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+      >
+        <span className="text-[15px] shrink-0">🔍</span>
+        <input
+          className="flex-1 bg-transparent text-[14px] min-w-0"
+          style={{ color: 'var(--text)' }}
+          placeholder="키워드로 검색 (ex. 카페, 운동)"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {search && (
+          <button className="text-[12px] px-1" style={{ color: 'var(--text-muted)' }} onClick={() => setSearch('')}>✕</button>
+        )}
+      </div>
+
       {/* 방 코드 입장 */}
       <div
-        className="rounded-[18px] p-3.5 mb-3 border"
+        className="rounded-[18px] p-3.5 mb-4 border"
         style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
       >
         <p className="text-[11px] font-bold mb-2.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
@@ -966,24 +1033,6 @@ export default function MeetingPage() {
         </div>
         {codeError && (
           <p className="text-[11px] mt-2" style={{ color: '#FF5252' }}>코드를 찾을 수 없어요. 다시 확인해주세요.</p>
-        )}
-      </div>
-
-      {/* 검색 */}
-      <div
-        className="flex items-center gap-2 rounded-[14px] px-[14px] py-[11px] mb-4 border"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
-      >
-        <span className="text-[15px] shrink-0">🔍</span>
-        <input
-          className="flex-1 bg-transparent text-[14px] min-w-0"
-          style={{ color: 'var(--text)' }}
-          placeholder="키워드로 검색 (ex. 카페, 운동)"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        {search && (
-          <button className="text-[12px] px-1" style={{ color: 'var(--text-muted)' }} onClick={() => setSearch('')}>✕</button>
         )}
       </div>
 
