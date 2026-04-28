@@ -145,3 +145,11 @@ a { text-decoration: none; color: inherit; }
 .dot1 { animation: dotBlink 1.2s ease-in-out infinite 0s; }
 .dot2 { animation: dotBlink 1.2s ease-in-out infinite 0.2s; }
 .dot3 { animation: dotBlink 1.2s ease-in-out infinite 0.4s; }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  40%       { transform: translateX(6px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}

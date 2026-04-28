@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChance } from '../hooks/useChance';
 import './HomePage.css';
 
-const INCOMING_REQUESTS = [
+type Request = { id: string; name: string; emoji: string; mbti: string; face: string; major: string; age: number };
+
+const INCOMING_REQUESTS: Request[] = [
   { id: 'req_jeff', name: 'JEFF', emoji: '🐺', mbti: 'INTJ', face: '늑대상', major: '컴퓨터공학과', age: 25 },
 ];
 
@@ -15,6 +18,7 @@ const MOCK_PROFILES = [
 export default function HomePage() {
   const navigate = useNavigate();
   const { hasChance } = useChance();
+  const [selectedReq, setSelectedReq] = useState<Request | null>(null);
 
   return (
     <div className="home-page">
@@ -59,9 +63,9 @@ export default function HomePage() {
           </div>
           <div className="request-list">
             {INCOMING_REQUESTS.map(req => (
-              <button key={req.id} className="request-card" onClick={() => navigate('/chat')}>
-                <div className="request-avatar">
-                  <span style={{ fontSize: '26px' }}>{req.emoji}</span>
+              <button key={req.id} className="request-card" onClick={() => setSelectedReq(req)}>
+                <div className="request-avatar-sm">
+                  <span>{req.emoji}</span>
                 </div>
                 <div className="request-info">
                   <div className="request-top">
@@ -69,10 +73,9 @@ export default function HomePage() {
                     <span className="request-age">{req.age}세</span>
                     <span className="request-mbti">{req.mbti}</span>
                   </div>
-                  <p className="request-meta">{req.major} · {req.face}</p>
                   <p className="request-label">💌 소개팅 대화 요청을 보냈어요</p>
                 </div>
-                <span className="request-arrow">→</span>
+                <span className="request-arrow">›</span>
               </button>
             ))}
           </div>
@@ -135,6 +138,30 @@ export default function HomePage() {
       </section>
 
       <div className="bottom-spacer" />
+
+      {/* ── 요청 정보 카드 바텀시트 ── */}
+      {selectedReq && (
+        <div className="req-sheet-overlay" onClick={() => setSelectedReq(null)}>
+          <div className="req-sheet" onClick={e => e.stopPropagation()}>
+            <div className="req-sheet-handle" />
+            <div className="req-sheet-avatar">
+              <span>{selectedReq.emoji}</span>
+            </div>
+            <h3 className="req-sheet-name">{selectedReq.name}</h3>
+            <div className="req-sheet-badges">
+              <span className="req-badge mbti">{selectedReq.mbti}</span>
+              <span className="req-badge face">{selectedReq.face}</span>
+              <span className="req-badge age">{selectedReq.age}세</span>
+            </div>
+            <p className="req-sheet-major">{selectedReq.major}</p>
+            <p className="req-sheet-msg">💌 나에게 소개팅 대화 요청을 보냈어요</p>
+            <div className="req-sheet-actions">
+              <button className="req-btn decline" onClick={() => setSelectedReq(null)}>거절하기</button>
+              <button className="req-btn accept" onClick={() => { setSelectedReq(null); navigate('/chat'); }}>수락하기</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

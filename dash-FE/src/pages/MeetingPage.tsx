@@ -28,6 +28,7 @@ interface Participant {
 
 interface Meeting {
   id: number;
+  code: string;
   title: string;
   keywords: string[];
   femaleCount: number;
@@ -39,7 +40,7 @@ interface Meeting {
 
 const MEETINGS: Meeting[] = [
   {
-    id: 1, title: '조용한 카페에서 같이 공부해요 ☕', keywords: ['카페', '조용한'],
+    id: 1, code: 'DT-CAFE', title: '조용한 카페에서 같이 공부해요 ☕', keywords: ['카페', '조용한'],
     femaleCount: 2, maleCount: 2, day: '4/20(일)', joined: { f: 1, m: 2 },
     participants: [
       { nickname: 'Nova',  emoji: '🐱', face: '고양이상', mbti: 'INFJ', charmPoints: ['감성적', '그림 잘 그림'],         gender: 'f' },
@@ -48,7 +49,7 @@ const MEETINGS: Meeting[] = [
     ],
   },
   {
-    id: 2, title: '헬스하고 같이 밥 먹을 사람 🏋️', keywords: ['운동', '활발한'],
+    id: 2, code: 'DT-GYM1', title: '헬스하고 같이 밥 먹을 사람 🏋️', keywords: ['운동', '활발한'],
     femaleCount: 3, maleCount: 3, day: '4/22(화)', joined: { f: 2, m: 1 },
     participants: [
       { nickname: 'Aria',  emoji: '🦊', face: '여우상', mbti: 'ENFP', charmPoints: ['유머러스', '애교 많음'],            gender: 'f' },
@@ -57,14 +58,14 @@ const MEETINGS: Meeting[] = [
     ],
   },
   {
-    id: 3, title: '홍대 맛집 투어 같이 가요 🍜', keywords: ['맛집', '유쾌한'],
+    id: 3, code: 'DT-FOOD', title: '홍대 맛집 투어 같이 가요 🍜', keywords: ['맛집', '유쾌한'],
     femaleCount: 2, maleCount: 2, day: '4/23(수)', joined: { f: 0, m: 1 },
     participants: [
       { nickname: 'Ryan',  emoji: '🦊', face: '여우상', mbti: 'ESTP', charmPoints: ['유쾌함', '맛집 탐방 고수'],        gender: 'm' },
     ],
   },
   {
-    id: 4, title: '영화 보고 카페 수다 떨어요 🎬', keywords: ['영화', '취미'],
+    id: 4, code: 'DT-FILM', title: '영화 보고 카페 수다 떨어요 🎬', keywords: ['영화', '취미'],
     femaleCount: 3, maleCount: 3, day: '4/25(금)', joined: { f: 2, m: 2 },
     participants: [
       { nickname: 'Mia',   emoji: '🐰', face: '토끼상', mbti: 'ESFJ', charmPoints: ['친절함', '밝은 에너지'],           gender: 'f' },
@@ -74,7 +75,7 @@ const MEETINGS: Meeting[] = [
     ],
   },
   {
-    id: 5, title: '보드게임 카페 즐길 분 구해요 🎲', keywords: ['게임', '감성적'],
+    id: 5, code: 'DT-GAME', title: '보드게임 카페 즐길 분 구해요 🎲', keywords: ['게임', '감성적'],
     femaleCount: 2, maleCount: 2, day: '4/26(토)', joined: { f: 1, m: 0 },
     participants: [
       { nickname: 'Hana',  emoji: '🐻', face: '곰상',   mbti: 'ISFJ', charmPoints: ['꼼꼼함', '보드게임 고수'],          gender: 'f' },
@@ -527,6 +528,70 @@ function CreateSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
+/* ── 친구 초대 바텀시트 ── */
+function InviteSheet({ code, onClose }: { code: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-end justify-center"
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[390px] rounded-[28px_28px_0_0] px-5 pt-5 pb-10"
+        style={{ background: 'var(--bg-card)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="w-9 h-1 rounded-full mx-auto mb-5" style={{ background: 'var(--border)' }} />
+
+        <p className="text-[18px] font-extrabold mb-1" style={{ color: 'var(--text)' }}>👫 친구 초대하기</p>
+        <p className="text-[13px] mb-5" style={{ color: 'var(--text-muted)' }}>
+          친구가 이 코드로 입장하면 같은 팀에 자동 배정돼요
+        </p>
+
+        {/* 초대 코드 */}
+        <div
+          className="flex items-center justify-between rounded-[16px] px-4 py-3.5 mb-3 border"
+          style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)' }}
+        >
+          <span className="text-[22px] font-extrabold tracking-[4px]" style={{ color: 'var(--primary)' }}>{code}</span>
+          <button
+            className="text-[12px] font-bold px-3 py-1.5 rounded-[10px] min-w-[60px] transition-all"
+            style={copied
+              ? { background: 'rgba(100,200,130,0.15)', color: '#4CAF50', border: '1px solid rgba(100,200,130,0.4)' }
+              : { background: 'var(--gradient)', color: 'white' }
+            }
+            onClick={handleCopy}
+          >
+            {copied ? '✓ 복사됨' : '복사'}
+          </button>
+        </div>
+
+        {/* 카카오 공유 */}
+        <button
+          className="w-full flex items-center justify-center gap-2 py-[14px] rounded-[16px] text-[14px] font-bold mb-4"
+          style={{ background: '#FEE500', color: '#3A1D1D' }}
+          onClick={onClose}
+        >
+          <span className="text-[18px]">💬</span>
+          카카오로 친구에게 공유하기
+        </button>
+
+        <p className="text-center text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          코드는 이 미팅이 마감될 때까지 유효해요
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /* ── 기회 사용 페이지 (크레이지 아케이드 대기창 스타일) ── */
 function ChancePage({
   meeting,
@@ -538,6 +603,10 @@ function ChancePage({
   onUse: () => void;
 }) {
   const { hasChance } = useChance();
+  const [showInvite,    setShowInvite]    = useState(false);
+  const [friendInvited, setFriendInvited] = useState(false);
+  const [inviteCode]                      = useState(() => 'DT-' + Math.random().toString(36).slice(2, 6).toUpperCase());
+
   const females = meeting.participants.filter(p => p.gender === 'f');
   const males   = meeting.participants.filter(p => p.gender === 'm');
 
@@ -592,31 +661,49 @@ function ChancePage({
     </div>
   );
 
-  const EmptySlot = ({ teamColor, delay }: { teamColor: string; delay: number }) => (
+  const EmptySlot = ({ teamColor, delay, invited = false }: { teamColor: string; delay: number; invited?: boolean }) => (
     <div
-      className="wait-slot rounded-[14px] px-2.5 py-2 border border-dashed flex items-center gap-2.5"
+      className="wait-slot rounded-[14px] px-2.5 py-2 border flex items-center gap-2.5"
       style={{
         animationDelay: `${delay}s`,
         height: 56,
-        borderColor: teamColor === 'pink' ? 'rgba(255,128,171,0.3)' : 'rgba(100,180,255,0.3)',
-        background: teamColor === 'pink' ? 'rgba(255,128,171,0.04)' : 'rgba(100,180,255,0.04)',
+        borderStyle: invited ? 'solid' : 'dashed',
+        borderColor: invited
+          ? (teamColor === 'pink' ? 'rgba(255,128,171,0.7)' : 'rgba(100,180,255,0.7)')
+          : (teamColor === 'pink' ? 'rgba(255,128,171,0.3)' : 'rgba(100,180,255,0.3)'),
+        background: invited
+          ? (teamColor === 'pink' ? 'rgba(255,128,171,0.1)' : 'rgba(100,180,255,0.1)')
+          : (teamColor === 'pink' ? 'rgba(255,128,171,0.04)' : 'rgba(100,180,255,0.04)'),
       }}
     >
       <div
         className="w-[40px] h-[40px] rounded-[11px] flex items-center justify-center text-[18px] shrink-0"
-        style={{ opacity: 0.35, background: teamColor === 'pink' ? 'rgba(255,128,171,0.08)' : 'rgba(100,180,255,0.08)' }}
+        style={{
+          opacity: invited ? 0.9 : 0.35,
+          background: teamColor === 'pink' ? 'rgba(255,128,171,0.12)' : 'rgba(100,180,255,0.12)',
+        }}
       >
-        {teamColor === 'pink' ? '🩷' : '🩵'}
+        {invited ? '👫' : (teamColor === 'pink' ? '🩷' : '🩵')}
       </div>
-      <div className="flex items-center gap-[2px]">
-        <span className="dot1 text-[18px] font-black leading-none" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>·</span>
-        <span className="dot2 text-[18px] font-black leading-none" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>·</span>
-        <span className="dot3 text-[18px] font-black leading-none" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>·</span>
-      </div>
+      {invited ? (
+        <div className="flex flex-col gap-[2px]">
+          <span className="text-[11px] font-bold" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>
+            친구 대기 중
+          </span>
+          <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>초대 코드 공유됨</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-[2px]">
+          <span className="dot1 text-[18px] font-black leading-none" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>·</span>
+          <span className="dot2 text-[18px] font-black leading-none" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>·</span>
+          <span className="dot3 text-[18px] font-black leading-none" style={{ color: teamColor === 'pink' ? 'var(--primary)' : '#60B4FF' }}>·</span>
+        </div>
+      )}
     </div>
   );
 
   return (
+    <>
     <div className="fixed inset-0 flex justify-center" style={{ zIndex: 200 }}>
     <div
       className="slide-in-right w-full flex flex-col overflow-hidden"
@@ -687,11 +774,12 @@ function ChancePage({
         <div className="flex gap-2">
           {/* 여성 슬롯 컬럼 */}
           <div className="flex-1 flex flex-col gap-2">
-            {femaleSlots.map((p, i) =>
-              p
+            {femaleSlots.map((p, i) => {
+              const emptyIdx = femaleSlots.filter((s, j) => j < i && !s).length;
+              return p
                 ? <FilledSlot key={i} p={p} delay={i * 0.15} teamColor="pink" />
-                : <EmptySlot  key={i} delay={0} teamColor="pink" />
-            )}
+                : <EmptySlot  key={i} delay={0} teamColor="pink" invited={friendInvited && emptyIdx === 0} />;
+            })}
           </div>
 
           {/* 중앙 구분선 */}
@@ -703,11 +791,12 @@ function ChancePage({
 
           {/* 남성 슬롯 컬럼 */}
           <div className="flex-1 flex flex-col gap-2">
-            {maleSlots.map((p, i) =>
-              p
+            {maleSlots.map((p, i) => {
+              const emptyIdx = maleSlots.filter((s, j) => j < i && !s).length;
+              return p
                 ? <FilledSlot key={i} p={p} delay={0.25 + i * 0.15} teamColor="blue" />
-                : <EmptySlot  key={i} delay={0} teamColor="blue" />
-            )}
+                : <EmptySlot  key={i} delay={0} teamColor="blue" invited={friendInvited && emptyIdx === 0} />;
+            })}
           </div>
         </div>
       </div>
@@ -717,6 +806,19 @@ function ChancePage({
         className="shrink-0 px-4 pt-3 pb-8 border-t"
         style={{ background: 'var(--header-bg)', backdropFilter: 'blur(16px)', borderColor: 'var(--border)' }}
       >
+        {/* 친구 초대 버튼 */}
+        <button
+          className="w-full flex items-center justify-center gap-2 text-[14px] font-bold py-[13px] rounded-[16px] mb-2.5 active:opacity-75"
+          style={friendInvited
+            ? { background: 'rgba(100,200,130,0.12)', color: '#4CAF50', border: '1.5px solid rgba(100,200,130,0.4)' }
+            : { background: 'var(--bg-card2)', color: 'var(--text-sub)', border: '1.5px solid var(--border)' }
+          }
+          onClick={() => { setShowInvite(true); setFriendInvited(true); }}
+        >
+          <span className="text-[16px]">{friendInvited ? '✓' : '👫'}</span>
+          {friendInvited ? '친구 초대 완료 · 자리 예약됨' : '친구 초대하기'}
+        </button>
+
         <button
           className="w-full text-[16px] font-extrabold py-[16px] rounded-[18px] min-h-[56px] active:opacity-80"
           style={{
@@ -739,17 +841,35 @@ function ChancePage({
       </div>
     </div>
     </div>
+
+    {showInvite && (
+      <InviteSheet code={inviteCode} onClose={() => setShowInvite(false)} />
+    )}
+    </>
   );
 }
 
 /* ── 메인 ── */
 export default function MeetingPage() {
-  const [search,       setSearch]       = useState('');
-  const [showCreate,   setShowCreate]   = useState(false);
-  const [chanceRoom,   setChanceRoom]   = useState<Meeting | null>(null);
+  const [search,        setSearch]        = useState('');
+  const [showCreate,    setShowCreate]    = useState(false);
+  const [chanceRoom,    setChanceRoom]    = useState<Meeting | null>(null);
   const [showChanceModal, setShowChanceModal] = useState(false);
-  const [activeRoom,   setActiveRoom]   = useState<Meeting | null>(null);
+  const [activeRoom,    setActiveRoom]    = useState<Meeting | null>(null);
+  const [codeInput,     setCodeInput]     = useState('');
+  const [codeError,     setCodeError]     = useState(false);
   const { spend } = useChance();
+
+  const handleCodeEnter = () => {
+    const match = MEETINGS.find(m => m.code === codeInput.trim().toUpperCase());
+    if (match) {
+      setCodeInput('');
+      setChanceRoom(match);
+    } else {
+      setCodeError(true);
+      setTimeout(() => setCodeError(false), 600);
+    }
+  };
 
   if (activeRoom) return <MeetingRoomView meeting={activeRoom} onBack={() => setActiveRoom(null)} />;
 
@@ -808,6 +928,45 @@ export default function MeetingPage() {
           <span className="text-[15px]">＋</span>
           개설
         </button>
+      </div>
+
+      {/* 방 코드 입장 */}
+      <div
+        className="rounded-[18px] p-3.5 mb-3 border"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+      >
+        <p className="text-[11px] font-bold mb-2.5 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+          <span>🎮</span> 방 코드로 바로 입장
+        </p>
+        <div className="flex gap-2">
+          <input
+            className="flex-1 rounded-[12px] px-3 py-2.5 text-[15px] font-extrabold tracking-[3px] border min-w-0 uppercase"
+            style={{
+              background: 'var(--bg-card2)',
+              color: codeError ? '#FF5252' : 'var(--primary)',
+              borderColor: codeError ? '#FF5252' : 'var(--border)',
+              fontFamily: 'monospace',
+              animation: codeError ? 'shake 0.3s ease' : 'none',
+              transition: 'border-color 0.2s, color 0.2s',
+            }}
+            placeholder="DT-????"
+            value={codeInput}
+            maxLength={7}
+            onChange={e => setCodeInput(e.target.value.toUpperCase())}
+            onKeyDown={e => { if (e.key === 'Enter') handleCodeEnter(); }}
+          />
+          <button
+            className="px-4 rounded-[12px] text-[13px] font-bold shrink-0 active:opacity-75"
+            style={codeInput.length >= 4
+              ? { background: 'var(--gradient)', color: 'white', boxShadow: '0 2px 10px rgba(255,128,171,0.35)' }
+              : { background: 'var(--bg-card2)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
+            }
+            onClick={handleCodeEnter}
+          >입장</button>
+        </div>
+        {codeError && (
+          <p className="text-[11px] mt-2" style={{ color: '#FF5252' }}>코드를 찾을 수 없어요. 다시 확인해주세요.</p>
+        )}
       </div>
 
       {/* 검색 */}
