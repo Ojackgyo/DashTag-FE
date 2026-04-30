@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChance } from '../hooks/useChance';
 import ChanceModal from '../components/ChanceModal';
+import { useAcceptedDashes } from '../context/AcceptedDashContext';
 import './HomePage.css';
 
 interface DashPerson {
@@ -20,6 +21,7 @@ interface DashPerson {
   tattoo: string;
   smoking: string;
   charmPoints: string[];
+  requestMsg?: string;
 }
 
 const RECEIVED_DASHES: DashPerson[] = [
@@ -28,12 +30,14 @@ const RECEIVED_DASHES: DashPerson[] = [
     mbti: 'INTJ', face: '늑대상', major: '컴퓨터공학과', age: 25, studentId: '19학번',
     height: 180, weight: 73, skinTone: '밝음', hairStyle: '짧은 머리', tattoo: '없어요', smoking: '비흡연',
     charmPoints: ['논리적', '운동 잘함', '과묵한 매력'],
+    requestMsg: '안녕하세요! 프로필 보고 연락드려요 😊',
   },
   {
     id: 'michael', name: 'Michael', emoji: '🐶',
     mbti: 'ENFP', face: '강아지상', major: '경영학과', age: 24, studentId: '20학번',
     height: 176, weight: 68, skinTone: '매우 밝음', hairStyle: '중단발', tattoo: '없어요', smoking: '비흡연',
     charmPoints: ['유머러스', '애교 많음', '추진력 있음'],
+    requestMsg: '혹시 한번 만나볼 수 있을까요? 잘 부탁드려요 💌',
   },
 ];
 
@@ -62,13 +66,13 @@ const DETAIL_ROWS = (p: DashPerson) => [
 export default function HomePage() {
   const navigate = useNavigate();
   const { hasChance, spend } = useChance();
+  const { acceptedDashes, addAccepted } = useAcceptedDashes();
   const [selected, setSelected]         = useState<DashPerson | null>(null);
   const [flipped,  setFlipped]          = useState(false);
   const [showChanceModal, setShowChanceModal] = useState(false);
-  const [acceptedIds, setAcceptedIds]   = useState<string[]>([]);
 
   const isReceived = selected ? RECEIVED_DASHES.some(p => p.id === selected.id) : false;
-  const isAccepted = selected ? acceptedIds.includes(selected.id) : false;
+  const isAccepted = selected ? acceptedDashes.some(d => d.id === selected.id) : false;
 
   const openCard = (p: DashPerson) => {
     setFlipped(false);
@@ -88,8 +92,12 @@ export default function HomePage() {
 
   const confirmAccept = () => {
     spend();
-    if (selected) setAcceptedIds(prev => [...prev, selected.id]);
+    if (selected) {
+      addAccepted({ id: selected.id, name: selected.name, emoji: selected.emoji, requestMsg: selected.requestMsg ?? '' });
+    }
     setShowChanceModal(false);
+    closeCard();
+    navigate('/chat');
   };
 
   return (
@@ -266,6 +274,25 @@ export default function HomePage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* 받은 메시지 */}
+                  {isReceived && selected.requestMsg && (
+                    <div style={{ marginBottom: '14px' }}>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>💌 보낸 메시지</p>
+                      <div style={{
+                        background: 'var(--primary-bg)',
+                        border: '1.5px solid var(--primary-border)',
+                        borderRadius: '14px',
+                        padding: '12px 14px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: 'var(--text)',
+                        lineHeight: 1.5,
+                      }}>
+                        {selected.requestMsg}
+                      </div>
+                    </div>
+                  )}
 
                   {/* 매력포인트 */}
                   {selected.charmPoints.length > 0 && (

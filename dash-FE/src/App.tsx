@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
+import { AcceptedDashProvider } from './context/AcceptedDashContext';
 import Header from './components/Header';
 import GNB from './components/GNB';
 import HomePage from './pages/HomePage';
@@ -26,6 +27,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <ThemeProvider>
+      <AcceptedDashProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -47,6 +49,7 @@ export default function App() {
           />
         </Routes>
       </BrowserRouter>
+      </AcceptedDashProvider>
     </ThemeProvider>
   );
 }

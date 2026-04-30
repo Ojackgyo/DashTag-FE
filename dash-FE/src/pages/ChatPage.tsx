@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChance } from '../hooks/useChance';
 import ChanceModal from '../components/ChanceModal';
+import { useAcceptedDashes } from '../context/AcceptedDashContext';
 
 
 
@@ -30,7 +31,6 @@ interface Message {
 
 const ROOMS: ChatRoom[] = [
   { id: 'd1', category: '소개팅', name: '여우상 매칭', emoji: '🦊', lastMsg: '안녕하세요 💘', time: '방금', unread: 2 },
-  { id: 'd2', category: '소개팅', name: '고양이상 매칭', emoji: '🐱', lastMsg: '안녕하세요! 프로필 보고 연락했어요 😊', time: '5분 전', unread: 1, requestMsg: '안녕하세요! 프로필 보고 연락했어요 😊' },
   { id: 'm1', category: '미팅', name: '4/20 카페 미팅', emoji: '☕', lastMsg: '몇 시에 만나요?', time: '10분 전', unread: 3, members: 4 },
   { id: 'm2', category: '미팅', name: '랜덤 미팅방 #2', emoji: '🎲', lastMsg: '기대되네요!', time: '어제', unread: 0, members: 6 },
   { id: 'c1', category: '소모임', name: '공대생 독서 모임', emoji: '📚', lastMsg: '이번 달 책 정했어요', time: '30분 전', unread: 1, members: 4 },
@@ -44,7 +44,6 @@ const DUMMY_MESSAGES: Record<string, Message[]> = {
     { id: 3, text: '프로필 보니까 경영학과 다니시나봐요', mine: false, time: '오후 2:12' },
     { id: 4, text: '네 맞아요~ 혹시 언제 한번 만날까요?', mine: true, time: '오후 2:14' },
   ],
-  d2: [{ id: 1, text: '안녕하세요 :)', mine: false, time: '오후 1:00' }, { id: 2, text: '언제 만날까요?', mine: false, time: '오후 1:01' }],
   m1: [{ id: 1, text: '안녕하세요 다들~', mine: false, time: '오후 3:00' }, { id: 2, text: '반갑습니다!', mine: true, time: '오후 3:01' }, { id: 3, text: '몇 시에 만나요?', mine: false, time: '오후 3:02' }],
   m2: [{ id: 1, text: '기대되네요!', mine: false, time: '어제 오후 8:00' }],
   c1: [{ id: 1, text: '이번 달 책 정했어요 — 「채식주의자」', mine: false, time: '오후 4:20' }, { id: 2, text: '오! 좋은 선택이에요', mine: true, time: '오후 4:22' }],
@@ -237,8 +236,8 @@ function ReportModal({ roomName, onClose }: { roomName: string; onClose: () => v
 }
 
 /* ── 채팅방 뷰 ── */
-function ChatRoomView({ room, onBack }: { room: ChatRoom; onBack: () => void }) {
-  const [messages, setMessages] = useState<Message[]>(DUMMY_MESSAGES[room.id] || []);
+function ChatRoomView({ room, initialMessages, onBack }: { room: ChatRoom; initialMessages: Message[]; onBack: () => void }) {
+  const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [showDateModal, setShowDateModal] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<string | null>(null);
@@ -313,7 +312,13 @@ function ChatRoomView({ room, onBack }: { room: ChatRoom; onBack: () => void }) 
 
       {/* 메시지 */}
       <div className="flex-1 overflow-y-auto px-[18px] py-4 flex flex-col gap-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {messages.map(msg =>
+        {locked ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
+            <span className="text-[48px]">💌</span>
+            <p className="text-[15px] font-bold" style={{ color: 'var(--text-sub)' }}>새로운 소개팅 요청이 왔어요!</p>
+            <p className="text-[13px] text-center" style={{ color: 'var(--text-muted)' }}>대화 이어가기를 눌러<br />메시지를 확인해보세요</p>
+          </div>
+        ) : messages.map(msg =>
           msg.type === 'date-confirm' ? (
             <div key={msg.id} className="self-center flex items-center gap-2.5 rounded-[16px] px-4 py-3 my-1.5 border" style={{ background: 'var(--primary-bg)', borderColor: 'var(--primary-border)' }}>
               <span className="text-[24px]">📅</span>
@@ -340,7 +345,7 @@ function ChatRoomView({ room, onBack }: { room: ChatRoom; onBack: () => void }) 
             </div>
           )
         )}
-        <div ref={bottomRef} />
+        {!locked && <div ref={bottomRef} />}
       </div>
 
       {/* 잠긴 채팅 - 대화 이어가기 */}
@@ -405,12 +410,32 @@ const CATEGORY_EMPTY: Record<Category, string> = { 소개팅: '소개팅 매칭�
 
 export default function ChatPage() {
   const navigate = useNavigate();
+  const { acceptedDashes } = useAcceptedDashes();
   const [category, setCategory] = useState<Category>('소개팅');
   const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
 
-  if (activeRoom) return <ChatRoomView room={activeRoom} onBack={() => setActiveRoom(null)} />;
+  const acceptedRooms: ChatRoom[] = acceptedDashes.map(d => ({
+    id: d.id,
+    category: '소개팅' as Category,
+    name: `${d.name} 매칭`,
+    emoji: d.emoji,
+    lastMsg: d.requestMsg,
+    time: '방금',
+    unread: 1,
+  }));
 
-  const rooms = ROOMS.filter(r => r.category === category);
+  const allRooms = [...ROOMS, ...acceptedRooms];
+
+  const acceptedMessages: Record<string, Message[]> = Object.fromEntries(
+    acceptedDashes.map(d => [d.id, [{ id: 1, text: d.requestMsg, mine: false, time: '방금' }]])
+  );
+
+  if (activeRoom) {
+    const msgs = { ...DUMMY_MESSAGES, ...acceptedMessages };
+    return <ChatRoomView room={activeRoom} initialMessages={msgs[activeRoom.id] ?? []} onBack={() => setActiveRoom(null)} />;
+  }
+
+  const rooms = allRooms.filter(r => r.category === category);
 
   return (
     <div className="px-[18px] pb-6">
