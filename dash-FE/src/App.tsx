@@ -11,6 +11,8 @@ import MyInfoPage from './pages/MyInfoPage';
 import ChatPage from './pages/ChatPage';
 import SignupPage from './pages/SignupPage';
 import LoginPage from './pages/LoginPage';
+import ReceivedDashPage from './pages/ReceivedDashPage';
+import SentDashPage from './pages/SentDashPage';
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -32,6 +34,8 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/received-dashes" element={<ReceivedDashPage />} />
+          <Route path="/sent-dashes" element={<SentDashPage />} />
           <Route
             path="/*"
             element={

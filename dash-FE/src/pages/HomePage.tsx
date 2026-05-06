@@ -1,397 +1,299 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChance } from '../hooks/useChance';
-import ChanceModal from '../components/ChanceModal';
 import { useAcceptedDashes } from '../context/AcceptedDashContext';
-import './HomePage.css';
+import { RECEIVED_DASHES, SENT_DASHES } from '../data/dashes';
 
-interface DashPerson {
-  id: string;
-  name: string;
-  emoji: string;
-  mbti: string;
-  face: string;
-  major: string;
-  age: number;
-  studentId: string;
-  height: number;
-  weight: number;
-  skinTone: string;
-  hairStyle: string;
-  tattoo: string;
-  smoking: string;
-  charmPoints: string[];
-  requestMsg?: string;
-}
-
-const RECEIVED_DASHES: DashPerson[] = [
-  {
-    id: 'jeff', name: 'Jeff', emoji: '🐺',
-    mbti: 'INTJ', face: '늑대상', major: '컴퓨터공학과', age: 25, studentId: '19학번',
-    height: 180, weight: 73, skinTone: '밝음', hairStyle: '짧은 머리', tattoo: '없어요', smoking: '비흡연',
-    charmPoints: ['논리적', '운동 잘함', '과묵한 매력'],
-    requestMsg: '안녕하세요! 프로필 보고 연락드려요 😊',
-  },
-  {
-    id: 'michael', name: 'Michael', emoji: '🐶',
-    mbti: 'ENFP', face: '강아지상', major: '경영학과', age: 24, studentId: '20학번',
-    height: 176, weight: 68, skinTone: '매우 밝음', hairStyle: '중단발', tattoo: '없어요', smoking: '비흡연',
-    charmPoints: ['유머러스', '애교 많음', '추진력 있음'],
-    requestMsg: '혹시 한번 만나볼 수 있을까요? 잘 부탁드려요 💌',
-  },
-];
-
-const SENT_DASHES: DashPerson[] = [
-  {
-    id: 'john', name: 'John', emoji: '🐻',
-    mbti: 'ISTJ', face: '곰상', major: '기계공학과', age: 26, studentId: '18학번',
-    height: 178, weight: 75, skinTone: '중간', hairStyle: '스포츠 컷', tattoo: '없어요', smoking: '금연 중이에요',
-    charmPoints: ['믿음직함', '요리 잘함'],
-  },
-];
-
-const TODAY_SCHEDULE    = '4/30 (목) 미팅';
-const UPCOMING_SCHEDULE = ['5/13 (수) 영화 모임', '5/19 (월) Michael'];
-
-const DETAIL_ROWS = (p: DashPerson) => [
-  { label: '🎂 나이',      value: `${p.age}세 (${p.studentId})` },
-  { label: '🎓 학과',      value: p.major },
-  { label: '📏 키 / 몸무게', value: `${p.height}cm / ${p.weight}kg` },
-  { label: '🎨 피부톤',    value: p.skinTone },
-  { label: '💇 헤어스타일', value: p.hairStyle },
-  { label: '🖊️ 타투',     value: p.tattoo },
-  { label: '🚬 흡연',      value: p.smoking },
+const SCHEDULES = [
+  { date: '2026-05-13', label: '영화 모임' },
+  { date: '2026-05-19', label: 'Michael' },
+  { date: '2026-05-25', label: '미팅' },
 ];
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { hasChance, spend } = useChance();
-  const { acceptedDashes, addAccepted } = useAcceptedDashes();
-  const [selected, setSelected]         = useState<DashPerson | null>(null);
-  const [flipped,  setFlipped]          = useState(false);
-  const [showChanceModal, setShowChanceModal] = useState(false);
+  const { hasChance } = useChance();
+  const { acceptedDashes } = useAcceptedDashes();
 
-  const isReceived = selected ? RECEIVED_DASHES.some(p => p.id === selected.id) : false;
-  const isAccepted = selected ? acceptedDashes.some(d => d.id === selected.id) : false;
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
 
-  const openCard = (p: DashPerson) => {
-    setFlipped(false);
-    setSelected(p);
-    setTimeout(() => setFlipped(true), 60);
-  };
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
 
-  const closeCard = () => {
-    setFlipped(false);
-    setTimeout(() => setSelected(null), 650);
-  };
+  const calYear = viewMonth.getFullYear();
+  const calMonth = viewMonth.getMonth();
+  const firstDow = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const calCells: (number | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  const scheduleDates = new Set(SCHEDULES.map(s => s.date));
+  const upcomingSchedules = SCHEDULES
+    .filter(s => s.date >= todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
 
-  const handleAccept = () => {
-    if (!hasChance || isAccepted) return;
-    setShowChanceModal(true);
-  };
-
-  const confirmAccept = () => {
-    spend();
-    if (selected) {
-      addAccepted({ id: selected.id, name: selected.name, emoji: selected.emoji, requestMsg: selected.requestMsg ?? '' });
-    }
-    setShowChanceModal(false);
-    closeCard();
-    navigate('/chat');
-  };
+  const newDashCount = RECEIVED_DASHES.filter(p => !acceptedDashes.some(d => d.id === p.id)).length;
 
   return (
-    <div className="home-page">
-      {/* ── 오늘의 Dash ── */}
-      <section className="dash-header">
-        <span className="hash-label">#오늘의 Dash</span>
-        <div className="dash-energy-box">
-          <div className="dash-energy-card">
-            <div className="dash-energy-left">
-              <p className="dash-energy-label">⚡ 오늘의 기회</p>
-              <p className="dash-energy-msg">
-                {hasChance ? '오늘 사용할 수 있는 기회가 있어요' : '오늘의 기회를 이미 사용했어요'}
-              </p>
-            </div>
-            <span className="dash-energy-count" style={{ color: hasChance ? 'var(--primary)' : 'var(--text-muted)' }}>
-              {hasChance ? '1' : '0'}<span className="dash-energy-total">/1</span>
-            </span>
-          </div>
-          <div className="dash-energy-track">
-            <div className={`dash-energy-fill ${hasChance ? 'available' : 'spent'}`} />
-          </div>
-        </div>
-      </section>
+    <div style={{ background: 'var(--bg)', minHeight: '100vh', paddingBottom: 80 }}>
 
-      {/* ── 일정 카드 ── */}
-      <div className="home-card">
-        <p className="hash-label">#오늘 일정</p>
-        <div className="schedule-pills">
-          <span className="schedule-pill today">{TODAY_SCHEDULE}</span>
-        </div>
-        <p className="hash-label" style={{ marginTop: 16 }}>#다가오는 일정</p>
-        <div className="schedule-pills">
-          {UPCOMING_SCHEDULE.map(s => (
-            <span key={s} className="schedule-pill upcoming">{s}</span>
-          ))}
-        </div>
+      {/* ── 헤더 ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '20px 20px 14px',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--header-bg)',
+        backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+        position: 'sticky', top: 0, zIndex: 10,
+        boxShadow: '0 1px 0 var(--border), var(--shadow-sm)',
+      }}>
+        <span style={{
+          fontSize: 26, fontWeight: 900, letterSpacing: '-1px',
+          background: 'var(--gradient)', WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+        }}>DashTag</span>
+        <button style={{
+          width: 38, height: 38, borderRadius: '50%',
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 18, boxShadow: 'var(--shadow-sm)',
+        }}>🔔</button>
       </div>
 
-      {/* ── 받은 대쉬 ── */}
-      <div className="home-card received">
-        <p className="hash-label">#받은 대쉬</p>
-        <div className="dash-avatars">
-          {RECEIVED_DASHES.map(p => (
-            <button key={p.id} className="dash-avatar-btn" onClick={() => openCard(p)}>
-              <div className="dash-circle received-circle">{p.emoji}</div>
-              <span className="dash-name">#{p.name}</span>
-            </button>
-          ))}
-          {RECEIVED_DASHES.length === 0 && <p className="dash-empty">아직 받은 대쉬가 없어요</p>}
-        </div>
-      </div>
+      <div style={{ padding: '16px 20px 0' }}>
 
-      {/* ── 보낸 대쉬 ── */}
-      <div className="home-card">
-        <p className="hash-label">#보낸 대쉬</p>
-        <div className="dash-avatars">
-          {SENT_DASHES.map(p => (
-            <button key={p.id} className="dash-avatar-btn" onClick={() => openCard(p)}>
-              <div className="dash-circle sent-circle">{p.emoji}</div>
-              <span className="dash-name">#{p.name}</span>
-            </button>
-          ))}
-          {SENT_DASHES.length === 0 && <p className="dash-empty">아직 보낸 대쉬가 없어요</p>}
-        </div>
-      </div>
+        {/* ── 받은 대쉬 / 보낸 대쉬 카드 ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
 
-      <div className="bottom-spacer" />
-
-      {/* ── 기회 사용 확인 팝업 ── */}
-      {showChanceModal && (
-        <ChanceModal
-          label="정말 오늘의 기회를 사용하시겠습니까?"
-          onConfirm={confirmAccept}
-          onCancel={() => setShowChanceModal(false)}
-        />
-      )}
-
-      {/* ── 플립 카드 모달 ── */}
-      {selected && (
-        <div
-          className="fixed inset-0 flex items-center justify-center z-[200] px-5"
-          style={{ background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(8px)' }}
-          onClick={closeCard}
-        >
-          <div
-            style={{ perspective: '1200px', width: '100%', maxWidth: '340px' }}
-            onClick={e => e.stopPropagation()}
+          {/* 받은 대쉬 */}
+          <button
+            onClick={() => navigate('/received-dashes')}
+            style={{
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              borderRadius: 20, padding: '18px 16px', textAlign: 'left',
+              boxShadow: 'var(--shadow-card)', cursor: 'pointer',
+              position: 'relative',
+            }}
           >
-            <div
-              style={{
-                position: 'relative',
-                height: '520px',
-                transformStyle: 'preserve-3d',
-                transition: 'transform 0.65s cubic-bezier(0.4, 0, 0.2, 1)',
-                transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-              }}
-            >
-              {/* 앞면 */}
-              <div
+            {newDashCount > 0 && (
+              <div style={{
+                position: 'absolute', top: 14, right: 14,
+                width: 20, height: 20, borderRadius: '50%',
+                background: 'var(--gradient)', boxShadow: 'var(--shadow-primary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, fontWeight: 800, color: 'white',
+              }}>{newDashCount}</div>
+            )}
+            <div style={{
+              width: 40, height: 40, borderRadius: 13,
+              background: 'linear-gradient(135deg, rgba(255,128,171,0.22) 0%, rgba(255,179,204,0.12) 100%)',
+              border: '1.5px solid var(--primary-border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, marginBottom: 14,
+              boxShadow: 'var(--shadow-avatar-pink)',
+            }}>💌</div>
+            <p style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', marginBottom: 4, letterSpacing: '-1px' }}>
+              {RECEIVED_DASHES.length}
+            </p>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)' }}>받은 대쉬</p>
+            <p style={{ fontSize: 11, color: newDashCount > 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 600, marginTop: 3 }}>
+              {newDashCount > 0 ? `${newDashCount}개 새 요청` : '새 요청 없음'}
+            </p>
+          </button>
+
+          {/* 보낸 대쉬 */}
+          <button
+            onClick={() => navigate('/sent-dashes')}
+            style={{
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              borderRadius: 20, padding: '18px 16px', textAlign: 'left',
+              boxShadow: 'var(--shadow-card)', cursor: 'pointer',
+            }}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: 13,
+              background: 'var(--bg-card2)', border: '1.5px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, marginBottom: 14, boxShadow: 'var(--shadow-sm)',
+            }}>📤</div>
+            <p style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', marginBottom: 4, letterSpacing: '-1px' }}>
+              {SENT_DASHES.length}
+            </p>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)' }}>보낸 대쉬</p>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 3 }}>대기 중</p>
+          </button>
+        </div>
+
+        {/* ── 오늘의 기회 ── */}
+        <div style={{
+          background: hasChance
+            ? 'linear-gradient(135deg, rgba(255,128,171,0.15) 0%, rgba(255,179,204,0.08) 100%)'
+            : 'var(--bg-card)',
+          border: `1.5px solid ${hasChance ? 'var(--primary-border)' : 'var(--border)'}`,
+          borderRadius: 20, padding: '16px 20px', marginBottom: 12,
+          boxShadow: hasChance ? 'var(--shadow-primary)' : 'var(--shadow-card)',
+          display: 'flex', alignItems: 'center', gap: 16,
+        }}>
+          <div style={{
+            width: 54, height: 54, borderRadius: '50%', flexShrink: 0,
+            background: hasChance ? 'var(--gradient)' : 'var(--bg-card2)',
+            border: hasChance ? 'none' : '1.5px solid var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 24, boxShadow: hasChance ? 'var(--shadow-primary)' : 'var(--shadow-sm)',
+          }}>⚡</div>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)', marginBottom: 3 }}>오늘의 기회</p>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {hasChance ? '오늘 사용할 수 있는 기회가 있어요' : '오늘의 기회를 이미 사용했어요'}
+            </p>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <p style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-1px', lineHeight: 1, color: hasChance ? 'var(--primary)' : 'var(--text-muted)' }}>
+              {hasChance ? '1' : '0'}
+            </p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>/1 남음</p>
+          </div>
+        </div>
+
+        {/* ── 캘린더 ── */}
+        <div style={{
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          borderRadius: 20, padding: '18px', marginBottom: 12,
+          boxShadow: 'var(--shadow-card)',
+        }}>
+          {/* 헤더 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.3px' }}>
+              {calYear}년 {calMonth + 1}월 일정
+            </p>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => setViewMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
                 style={{
-                  position: 'absolute', inset: 0,
-                  backfaceVisibility: 'hidden',
-                  WebkitBackfaceVisibility: 'hidden',
-                  borderRadius: '28px',
-                  background: 'var(--primary-bg)',
-                  border: '2px solid var(--primary-border)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '16px',
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: 'var(--bg-card2)', border: '1px solid var(--border)',
+                  fontSize: 16, color: 'var(--text-sub)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}
-              >
-                <span style={{ fontSize: '90px', lineHeight: 1 }}>{selected.emoji}</span>
-                <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                  <p style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text)' }}>{selected.face}</p>
-                  <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', background: 'rgba(255,128,171,0.2)', padding: '4px 14px', borderRadius: '10px' }}>
-                    {selected.mbti}
-                  </span>
+              >‹</button>
+              <button
+                onClick={() => setViewMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+                style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: 'var(--bg-card2)', border: '1px solid var(--border)',
+                  fontSize: 16, color: 'var(--text-sub)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >›</button>
+            </div>
+          </div>
+
+          {/* 요일 헤더 */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 6 }}>
+            {['일', '월', '화', '수', '목', '금', '토'].map((d, i) => (
+              <div key={d} style={{
+                textAlign: 'center', fontSize: 11, fontWeight: 700, paddingBottom: 8,
+                color: i === 0 ? '#FF6B6B' : i === 6 ? '#5B8DEF' : 'var(--text-muted)',
+              }}>{d}</div>
+            ))}
+          </div>
+
+          {/* 날짜 그리드 */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: 4 }}>
+            {calCells.map((day, idx) => {
+              if (!day) return <div key={`e-${idx}`} />;
+              const ds = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const isToday = ds === todayStr;
+              const isSelected = ds === selectedDate;
+              const hasEvent = scheduleDates.has(ds);
+              const dow = idx % 7;
+              return (
+                <div
+                  key={ds}
+                  onClick={() => setSelectedDate(ds)}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}
+                >
+                  <div style={{
+                    width: 33, height: 33, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: isSelected ? 'var(--gradient)' : isToday ? 'var(--primary-bg)' : 'transparent',
+                    border: isToday && !isSelected ? '1.5px solid var(--primary-border)' : 'none',
+                    boxShadow: isSelected ? 'var(--shadow-primary)' : 'none',
+                    fontSize: 13,
+                    fontWeight: isSelected || isToday ? 700 : 400,
+                    color: isSelected ? 'white' : dow === 0 ? '#FF6B6B' : dow === 6 ? '#5B8DEF' : 'var(--text)',
+                  }}>{day}</div>
+                  {hasEvent
+                    ? <div style={{ width: 4, height: 4, borderRadius: '50%', marginTop: 2, background: isSelected ? 'white' : 'var(--primary)', opacity: isSelected ? 0.8 : 1 }} />
+                    : <div style={{ height: 6 }} />
+                  }
                 </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── 다가오는 일정 ── */}
+        <div style={{ marginBottom: 0 }}>
+          <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', marginBottom: 12, letterSpacing: '-0.3px' }}>
+            다가오는 일정
+          </p>
+          <div style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border)',
+            borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-card)',
+          }}>
+            {upcomingSchedules.length === 0 ? (
+              <div style={{ padding: '28px 16px', textAlign: 'center' }}>
+                <span style={{ fontSize: 28 }}>📅</span>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>다가오는 일정이 없어요</p>
               </div>
-
-              {/* 뒷면 */}
-              <div
-                style={{
-                  position: 'absolute', inset: 0,
-                  backfaceVisibility: 'hidden',
-                  WebkitBackfaceVisibility: 'hidden',
-                  transform: 'rotateY(180deg)',
-                  borderRadius: '28px',
-                  background: 'var(--bg-card)',
-                  border: '2px solid var(--primary-border)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden',
-                }}
-              >
-                {/* 닫기 */}
-                <button
-                  style={{
-                    position: 'absolute', top: '14px', right: '14px',
-                    width: '30px', height: '30px', borderRadius: '50%',
-                    background: 'var(--bg-card2)', color: 'var(--text-muted)',
-                    fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    border: '1px solid var(--border)', zIndex: 1,
-                  }}
-                  onClick={closeCard}
-                >✕</button>
-
-                {/* 스크롤 영역 */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '22px 20px 0', scrollbarWidth: 'none' }}>
-                  {/* 헤더 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
+            ) : (
+              upcomingSchedules.map((s, i) => {
+                const [y, mo, d] = s.date.split('-').map(Number);
+                const dateObj = new Date(y, mo - 1, d);
+                const dow = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
+                const isToday = s.date === todayStr;
+                return (
+                  <div key={s.date} style={{
+                    display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px',
+                    borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+                  }}>
                     <div style={{
-                      width: '60px', height: '60px', borderRadius: '18px',
-                      background: 'var(--primary-bg)', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '30px',
+                      width: 46, height: 46, borderRadius: 14, flexShrink: 0,
+                      background: isToday ? 'var(--gradient)' : 'var(--primary-bg)',
+                      border: `1.5px solid ${isToday ? 'transparent' : 'var(--primary-border)'}`,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: isToday ? 'var(--shadow-primary)' : 'none',
                     }}>
-                      {selected.emoji}
+                      <span style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.3, color: isToday ? 'rgba(255,255,255,0.85)' : 'var(--primary)' }}>{mo}월</span>
+                      <span style={{ fontSize: 17, fontWeight: 900, lineHeight: 1.2, color: isToday ? 'white' : 'var(--primary)' }}>{d}</span>
+                      <span style={{ fontSize: 9, fontWeight: 600, lineHeight: 1.3, color: isToday ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }}>{dow}</span>
                     </div>
                     <div>
-                      <p style={{ fontSize: '19px', fontWeight: 800, color: 'var(--text)', marginBottom: '5px' }}>
-                        {selected.name}
-                      </p>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-bg)', padding: '2px 9px', borderRadius: '7px' }}>
-                          {selected.mbti}
-                        </span>
-                        <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-sub)', background: 'var(--bg-card2)', padding: '2px 9px', borderRadius: '7px' }}>
-                          {selected.face}
-                        </span>
-                      </div>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{s.label}</p>
+                      {isToday
+                        ? <p style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600, marginTop: 2 }}>오늘</p>
+                        : <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>예정</p>
+                      }
                     </div>
                   </div>
-
-                  {/* 받은 메시지 */}
-                  {isReceived && selected.requestMsg && (
-                    <div style={{ marginBottom: '14px' }}>
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>💌 보낸 메시지</p>
-                      <div style={{
-                        background: 'var(--primary-bg)',
-                        border: '1.5px solid var(--primary-border)',
-                        borderRadius: '14px',
-                        padding: '12px 14px',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        color: 'var(--text)',
-                        lineHeight: 1.5,
-                      }}>
-                        {selected.requestMsg}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 매력포인트 */}
-                  {selected.charmPoints.length > 0 && (
-                    <div style={{ marginBottom: '14px' }}>
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>✨ 매력포인트</p>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {selected.charmPoints.map(c => (
-                          <span key={c} style={{
-                            fontSize: '13px', fontWeight: 700,
-                            color: 'var(--primary)', background: 'var(--primary-bg)',
-                            border: '1.5px solid var(--primary-border)',
-                            padding: '5px 12px', borderRadius: '20px',
-                          }}>#{c}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 정보 rows */}
-                  {DETAIL_ROWS(selected).map(row => (
-                    <div key={row.label} style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '10px 0',
-                      borderBottom: '1px solid var(--border)',
-                    }}>
-                      <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{row.label}</span>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{row.value}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* 하단 버튼 */}
-                <div style={{ padding: '14px 20px 20px', background: 'var(--bg-card)' }}>
-                  {isReceived ? (
-                    isAccepted ? (
-                      <button style={{
-                        width: '100%', padding: '14px', borderRadius: '16px',
-                        fontSize: '15px', fontWeight: 700,
-                        color: 'var(--primary)', background: 'var(--primary-bg)',
-                        border: '1.5px solid var(--primary-border)',
-                      }} disabled>
-                        💌 수락 완료
-                      </button>
-                    ) : (
-                      <>
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                          <button
-                            style={{
-                              flex: 1, padding: '14px', borderRadius: '16px',
-                              fontSize: '15px', fontWeight: 700,
-                              background: 'var(--bg-card2)', color: 'var(--text-muted)',
-                              border: '1px solid var(--border)',
-                            }}
-                            onClick={closeCard}
-                          >
-                            거절하기
-                          </button>
-                          <button
-                            style={{
-                              flex: 1, padding: '14px', borderRadius: '16px',
-                              fontSize: '15px', fontWeight: 700,
-                              color: !hasChance ? 'var(--text-muted)' : 'white',
-                              background: !hasChance ? 'var(--bg-card2)' : 'var(--gradient)',
-                              border: '1.5px solid transparent',
-                              cursor: !hasChance ? 'not-allowed' : 'pointer',
-                              boxShadow: hasChance ? '0 4px 16px rgba(255,128,171,0.35)' : 'none',
-                            }}
-                            disabled={!hasChance}
-                            onClick={handleAccept}
-                          >
-                            {!hasChance ? '기회 없음' : '수락하기'}
-                          </button>
-                        </div>
-                        {hasChance && (
-                          <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
-                            하루에 한 명에게만 수락할 수 있어요
-                          </p>
-                        )}
-                      </>
-                    )
-                  ) : (
-                    <button
-                      style={{
-                        width: '100%', padding: '14px', borderRadius: '16px',
-                        fontSize: '15px', fontWeight: 700,
-                        background: 'var(--gradient)', color: 'white',
-                        boxShadow: '0 4px 16px rgba(255,128,171,0.35)',
-                      }}
-                      onClick={() => { closeCard(); navigate('/chat'); }}
-                    >
-                      💬 채팅 보기
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
+                );
+              })
+            )}
           </div>
         </div>
-      )}
+
+      </div>
     </div>
   );
 }

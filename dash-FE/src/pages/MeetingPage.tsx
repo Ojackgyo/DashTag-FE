@@ -36,6 +36,7 @@ interface Meeting {
   day: string;
   joined: { f: number; m: number };
   participants: Participant[];
+  isOwner?: boolean;
 }
 
 const MEETINGS: Meeting[] = [
@@ -224,8 +225,38 @@ function MeetingCard({ m, onJoin }: { m: Meeting; onJoin: (m: Meeting) => void }
   );
 }
 
+/* ── 방장 초대 코드 배너 ── */
+function OwnerCodeBanner({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="rounded-[18px] p-4 border" style={{ background: 'var(--primary-bg)', borderColor: 'var(--primary-border)' }}>
+      <p className="text-[11px] font-bold mb-2.5" style={{ color: 'var(--primary)' }}>🎉 내가 만든 방 · 친구에게 코드를 공유해보세요</p>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[24px] font-extrabold tracking-[4px]" style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>
+          {code}
+        </span>
+        <button
+          className="text-[13px] font-bold px-4 py-2 rounded-[12px] min-w-[72px] shrink-0"
+          style={copied
+            ? { background: 'rgba(100,200,130,0.15)', color: '#4CAF50', border: '1px solid rgba(100,200,130,0.4)' }
+            : { background: 'var(--gradient)', color: 'white' }
+          }
+          onClick={handleCopy}
+        >
+          {copied ? '✓ 복사됨' : '코드 복사'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── 미팅 룸 뷰 ── */
-function MeetingRoomView({ meeting, onBack }: { meeting: Meeting; onBack: () => void }) {
+function MeetingRoomView({ meeting, ownerCode, onBack }: { meeting: Meeting; ownerCode?: string; onBack: () => void }) {
   const females = meeting.participants.filter(p => p.gender === 'f');
   const males   = meeting.participants.filter(p => p.gender === 'm');
 
@@ -287,6 +318,9 @@ function MeetingRoomView({ meeting, onBack }: { meeting: Meeting; onBack: () => 
       </div>
 
       <div className="px-[18px] pt-5 flex flex-col gap-5">
+        {/* 내가 만든 방 - 초대 코드 */}
+        {ownerCode && <OwnerCodeBanner code={ownerCode} />}
+
         {/* 키워드 + 날짜 */}
         <div className="flex items-center gap-2 flex-wrap">
           {meeting.keywords.map(k => (
@@ -350,7 +384,10 @@ function MeetingRoomView({ meeting, onBack }: { meeting: Meeting; onBack: () => 
 }
 
 /* ── 개설 폼 (바텀시트) ── */
-function CreateSheet({ onClose }: { onClose: () => void }) {
+function CreateSheet({ onClose, onSubmit }: {
+  onClose: () => void;
+  onSubmit: (data: { title: string; keywords: string[]; femaleCount: number; maleCount: number; day: string }) => void;
+}) {
   const weekDays = getWeekDays();
   const [title,        setTitle]        = useState('');
   const [keywordInput, setKeywordInput] = useState('');
@@ -358,19 +395,6 @@ function CreateSheet({ onClose }: { onClose: () => void }) {
   const [femaleCount,  setFemaleCount]  = useState(2);
   const [maleCount,    setMaleCount]    = useState(2);
   const [selectedDay,  setSelectedDay]  = useState(0);
-  const [createdCode,  setCreatedCode]  = useState('');
-  const [copied,       setCopied]       = useState(false);
-
-  const handleCreate = () => {
-    const code = 'DT-' + Math.random().toString(36).slice(2, 6).toUpperCase();
-    setCreatedCode(code);
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(createdCode).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const addKeyword = () => {
     const k = keywordInput.trim();
@@ -529,49 +553,17 @@ function CreateSheet({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        {createdCode ? (
-          /* 개설 완료 - 코드 표시 */
-          <div className="flex flex-col items-center gap-4 py-4">
-            <span className="text-[52px]">🎉</span>
-            <p className="text-[18px] font-extrabold" style={{ color: 'var(--text)' }}>방이 개설됐어요!</p>
-            <p className="text-[13px] text-center" style={{ color: 'var(--text-muted)' }}>
-              아래 코드를 친구에게 공유해서<br/>같이 입장할 수 있어요
-            </p>
-            <div
-              className="flex items-center justify-between w-full rounded-[16px] px-5 py-4 border"
-              style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)' }}
-            >
-              <span className="text-[26px] font-extrabold tracking-[4px]" style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>
-                {createdCode}
-              </span>
-              <button
-                className="text-[13px] font-bold px-3 py-2 rounded-[10px] min-w-[64px]"
-                style={copied
-                  ? { background: 'rgba(100,200,130,0.15)', color: '#4CAF50', border: '1px solid rgba(100,200,130,0.4)' }
-                  : { background: 'var(--gradient)', color: 'white' }
-                }
-                onClick={handleCopy}
-              >
-                {copied ? '✓ 복사됨' : '복사'}
-              </button>
-            </div>
-            <button
-              className="w-full text-[15px] font-bold py-[15px] rounded-[16px] min-h-[52px] text-white active:opacity-80"
-              style={{ background: 'var(--gradient)', boxShadow: '0 4px 16px rgba(255,128,171,0.35)' }}
-              onClick={onClose}
-            >
-              확인
-            </button>
-          </div>
-        ) : (
-          <button
-            className="w-full text-[15px] font-bold py-[15px] rounded-[16px] min-h-[52px] text-white active:opacity-80"
-            style={{ background: 'var(--gradient)', boxShadow: '0 4px 16px rgba(255,128,171,0.35)' }}
-            onClick={handleCreate}
-          >
-            개설하기 🎉
-          </button>
-        )}
+        <button
+          className="w-full text-[15px] font-bold py-[15px] rounded-[16px] min-h-[52px] text-white active:opacity-80"
+          style={title.trim()
+            ? { background: 'var(--gradient)', boxShadow: '0 4px 16px rgba(255,128,171,0.35)' }
+            : { background: 'var(--bg-card2)', color: 'var(--text-muted)' }
+          }
+          disabled={!title.trim()}
+          onClick={() => onSubmit({ title, keywords, femaleCount, maleCount, day: weekDays[selectedDay].label })}
+        >
+          개설하기 🎉
+        </button>
       </div>
     </div>
   );
@@ -644,17 +636,20 @@ function InviteSheet({ code, onClose }: { code: string; onClose: () => void }) {
 /* ── 기회 사용 페이지 (크레이지 아케이드 대기창 스타일) ── */
 function ChancePage({
   meeting,
+  ownerCode,
   onBack,
   onUse,
 }: {
   meeting: Meeting;
+  ownerCode?: string;
   onBack: () => void;
-  onUse: () => void;
+  onUse?: () => void;
 }) {
   const { hasChance } = useChance();
   const [showInvite,    setShowInvite]    = useState(false);
   const [friendInvited, setFriendInvited] = useState(false);
   const [inviteCode]                      = useState(() => 'DT-' + Math.random().toString(36).slice(2, 6).toUpperCase());
+  const codeForInvite = ownerCode ?? inviteCode;
 
   const females = meeting.participants.filter(p => p.gender === 'f');
   const males   = meeting.participants.filter(p => p.gender === 'm');
@@ -855,44 +850,68 @@ function ChancePage({
         className="shrink-0 px-4 pt-3 pb-8 border-t"
         style={{ background: 'var(--header-bg)', backdropFilter: 'blur(16px)', borderColor: 'var(--border)' }}
       >
-        {/* 친구 초대 버튼 */}
-        <button
-          className="w-full flex items-center justify-center gap-2 text-[14px] font-bold py-[13px] rounded-[16px] mb-2.5 active:opacity-75"
-          style={friendInvited
-            ? { background: 'rgba(100,200,130,0.12)', color: '#4CAF50', border: '1.5px solid rgba(100,200,130,0.4)' }
-            : { background: 'var(--bg-card2)', color: 'var(--text-sub)', border: '1.5px solid var(--border)' }
-          }
-          onClick={() => { setShowInvite(true); setFriendInvited(true); }}
-        >
-          <span className="text-[16px]">{friendInvited ? '✓' : '👫'}</span>
-          {friendInvited ? '친구 초대 완료 · 자리 예약됨' : '친구 초대하기'}
-        </button>
-
-        <button
-          className="w-full text-[16px] font-extrabold py-[16px] rounded-[18px] min-h-[56px] active:opacity-80"
-          style={{
-            background: hasChance ? 'var(--gradient)' : 'var(--bg-card2)',
-            color: hasChance ? 'white' : 'var(--text-muted)',
-            cursor: hasChance ? 'pointer' : 'not-allowed',
-            boxShadow: hasChance ? '0 4px 18px rgba(255,128,171,0.4)' : 'none',
-            letterSpacing: '0.3px',
-          }}
-          disabled={!hasChance}
-          onClick={onUse}
-        >
-          {hasChance ? '⚡ 기회 사용하고 참여하기' : '오늘의 기회를 이미 사용했어요'}
-        </button>
-        {hasChance && (
-          <p className="text-center text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
-            하루에 하나의 미팅에만 참여할 수 있어요
-          </p>
+        {ownerCode ? (
+          /* 방장 모드: 코드 표시 */
+          <>
+            <p className="text-[11px] font-bold mb-2" style={{ color: 'var(--primary)' }}>
+              🎉 내가 만든 방 · 친구에게 코드를 공유해보세요
+            </p>
+            <div className="flex items-center justify-between gap-3 rounded-[16px] px-4 py-3.5 mb-2.5 border"
+              style={{ background: 'var(--primary-bg)', borderColor: 'var(--primary-border)' }}>
+              <span className="text-[22px] font-extrabold tracking-[4px]"
+                style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>
+                {ownerCode}
+              </span>
+              <button
+                className="text-[13px] font-bold px-4 py-2 rounded-[12px] shrink-0"
+                style={{ background: 'var(--gradient)', color: 'white' }}
+                onClick={() => { setShowInvite(true); }}
+              >
+                초대하기
+              </button>
+            </div>
+          </>
+        ) : (
+          /* 일반 모드: 참여 버튼 */
+          <>
+            <button
+              className="w-full flex items-center justify-center gap-2 text-[14px] font-bold py-[13px] rounded-[16px] mb-2.5 active:opacity-75"
+              style={friendInvited
+                ? { background: 'rgba(100,200,130,0.12)', color: '#4CAF50', border: '1.5px solid rgba(100,200,130,0.4)' }
+                : { background: 'var(--bg-card2)', color: 'var(--text-sub)', border: '1.5px solid var(--border)' }
+              }
+              onClick={() => { setShowInvite(true); setFriendInvited(true); }}
+            >
+              <span className="text-[16px]">{friendInvited ? '✓' : '👫'}</span>
+              {friendInvited ? '친구 초대 완료 · 자리 예약됨' : '친구 초대하기'}
+            </button>
+            <button
+              className="w-full text-[16px] font-extrabold py-[16px] rounded-[18px] min-h-[56px] active:opacity-80"
+              style={{
+                background: hasChance ? 'var(--gradient)' : 'var(--bg-card2)',
+                color: hasChance ? 'white' : 'var(--text-muted)',
+                cursor: hasChance ? 'pointer' : 'not-allowed',
+                boxShadow: hasChance ? '0 4px 18px rgba(255,128,171,0.4)' : 'none',
+                letterSpacing: '0.3px',
+              }}
+              disabled={!hasChance}
+              onClick={onUse}
+            >
+              {hasChance ? '⚡ 기회 사용하고 참여하기' : '오늘의 기회를 이미 사용했어요'}
+            </button>
+            {hasChance && (
+              <p className="text-center text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
+                하루에 하나의 미팅에만 참여할 수 있어요
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>
     </div>
 
     {showInvite && (
-      <InviteSheet code={inviteCode} onClose={() => setShowInvite(false)} />
+      <InviteSheet code={codeForInvite} onClose={() => setShowInvite(false)} />
     )}
     </>
   );
@@ -905,12 +924,18 @@ export default function MeetingPage() {
   const [chanceRoom,    setChanceRoom]    = useState<Meeting | null>(null);
   const [showChanceModal, setShowChanceModal] = useState(false);
   const [activeRoom,    setActiveRoom]    = useState<Meeting | null>(null);
+  const [activeOwnerCode, setActiveOwnerCode] = useState<string | null>(null);
   const [codeInput,     setCodeInput]     = useState('');
   const [codeError,     setCodeError]     = useState(false);
-  const { spend } = useChance();
+  const [myMeetings,    setMyMeetings]    = useState<Meeting[]>([]);
+  const [showCreateChanceModal, setShowCreateChanceModal] = useState(false);
+  const [pendingCreate, setPendingCreate] = useState<{ title: string; keywords: string[]; femaleCount: number; maleCount: number; day: string } | null>(null);
+  const { spend, hasChance } = useChance();
+
+  const allMeetings = [...myMeetings, ...MEETINGS];
 
   const handleCodeEnter = () => {
-    const match = MEETINGS.find(m => m.code === codeInput.trim().toUpperCase());
+    const match = allMeetings.find(m => m.code === codeInput.trim().toUpperCase());
     if (match) {
       setCodeInput('');
       setChanceRoom(match);
@@ -920,17 +945,56 @@ export default function MeetingPage() {
     }
   };
 
-  if (activeRoom) return <MeetingRoomView meeting={activeRoom} onBack={() => setActiveRoom(null)} />;
+  const handleCreateSubmit = (data: { title: string; keywords: string[]; femaleCount: number; maleCount: number; day: string }) => {
+    if (!hasChance) return;
+    setPendingCreate(data);
+    setShowCreateChanceModal(true);
+  };
+
+  const confirmCreate = () => {
+    if (!pendingCreate) return;
+    const code = 'DT-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    // TODO: 실제 로그인 유저 프로필로 교체
+    const me: Participant = { nickname: '나', emoji: '🙂', face: '-', mbti: '-', charmPoints: [], gender: 'm' };
+    const newMeeting: Meeting = {
+      id: Date.now(),
+      code,
+      title: pendingCreate.title,
+      keywords: pendingCreate.keywords,
+      femaleCount: pendingCreate.femaleCount,
+      maleCount: pendingCreate.maleCount,
+      day: pendingCreate.day,
+      joined: { f: 0, m: 1 },
+      participants: [me],
+      isOwner: true,
+    };
+    spend();
+    setMyMeetings(prev => [newMeeting, ...prev]);
+    setPendingCreate(null);
+    setShowCreateChanceModal(false);
+    setShowCreate(false);
+    setActiveOwnerCode(code);
+    setChanceRoom(newMeeting);
+  };
+
+  if (activeRoom) return (
+    <MeetingRoomView
+      meeting={activeRoom}
+      ownerCode={activeOwnerCode ?? undefined}
+      onBack={() => { setActiveRoom(null); setActiveOwnerCode(null); }}
+    />
+  );
 
   if (chanceRoom) {
     return (
       <>
         <ChancePage
           meeting={chanceRoom}
-          onBack={() => setChanceRoom(null)}
+          ownerCode={activeOwnerCode ?? undefined}
+          onBack={() => { setChanceRoom(null); setActiveOwnerCode(null); }}
           onUse={() => setShowChanceModal(true)}
         />
-        {showChanceModal && (
+        {showChanceModal && !activeOwnerCode && (
           <ChanceModal
             label={`"${chanceRoom.title}"\n정말 오늘의 기회를 사용하시겠습니까?`}
             onConfirm={() => {
@@ -948,11 +1012,11 @@ export default function MeetingPage() {
   }
 
   const filtered = search.trim()
-    ? MEETINGS.filter(m =>
+    ? allMeetings.filter(m =>
         m.title.includes(search.trim()) ||
         m.keywords.some(k => k.includes(search.trim()))
       )
-    : MEETINGS;
+    : allMeetings;
 
   const handleJoin = (m: Meeting) => {
     setChanceRoom(m);
@@ -971,11 +1035,14 @@ export default function MeetingPage() {
         {/* 개설 버튼 */}
         <button
           className="flex items-center gap-1.5 text-[13px] font-bold px-[14px] py-[10px] rounded-[14px] shrink-0 mt-1 active:opacity-75"
-          style={{ background: 'var(--gradient)', color: 'white', boxShadow: '0 3px 12px rgba(255,128,171,0.35)' }}
-          onClick={() => setShowCreate(true)}
+          style={hasChance
+            ? { background: 'var(--gradient)', color: 'white', boxShadow: '0 3px 12px rgba(255,128,171,0.35)' }
+            : { background: 'var(--bg-card2)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
+          }
+          onClick={() => hasChance && setShowCreate(true)}
         >
           <span className="text-[15px]">＋</span>
-          개설
+          {hasChance ? '개설' : '기회 없음'}
         </button>
       </div>
 
@@ -1058,7 +1125,21 @@ export default function MeetingPage() {
       )}
 
       {/* 개설 바텀시트 */}
-      {showCreate && <CreateSheet onClose={() => setShowCreate(false)} />}
+      {showCreate && (
+        <CreateSheet
+          onClose={() => setShowCreate(false)}
+          onSubmit={handleCreateSubmit}
+        />
+      )}
+
+      {/* 개설 기회 사용 확인 */}
+      {showCreateChanceModal && (
+        <ChanceModal
+          label={`미팅을 개설하면\n오늘의 기회를 사용해요`}
+          onConfirm={confirmCreate}
+          onCancel={() => { setShowCreateChanceModal(false); setPendingCreate(null); }}
+        />
+      )}
     </div>
   );
 }

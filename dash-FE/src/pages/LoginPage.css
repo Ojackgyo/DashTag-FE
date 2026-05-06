@@ -2,32 +2,24 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(160deg, #FF6B9D 0%, #FF85B3 40%, #B06FEF 100%);
+  background: linear-gradient(160deg, #FF6B9D 0%, #FF85B3 35%, #B06FEF 100%);
   position: relative;
   overflow: hidden;
 }
 
-/* ── Floating decorations ── */
-@keyframes lFloat {
-  0%   { transform: translateY(0)   rotate(0deg);   opacity: 0.65; }
-  50%  { transform: translateY(-22px) rotate(12deg); opacity: 1;    }
-  100% { transform: translateY(0)   rotate(0deg);   opacity: 0.65; }
-}
-
-.login-decor {
+/* ── 배경 오브 ── */
+.login-bg-orb {
   position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 58%;
+  border-radius: 50%;
+  filter: blur(60px);
   pointer-events: none;
-  overflow: hidden;
+  opacity: 0.5;
 }
+.orb1 { width: 280px; height: 280px; background: rgba(255,255,255,0.25); top: -60px; left: -80px; }
+.orb2 { width: 220px; height: 220px; background: rgba(255,200,230,0.35); top: 30%; right: -60px; }
+.orb3 { width: 180px; height: 180px; background: rgba(192,132,252,0.3); bottom: 30%; left: -40px; }
 
-.login-float {
-  position: absolute;
-  animation: lFloat 3.2s ease-in-out infinite;
-}
-
-/* ── Branding ── */
+/* ── 브랜딩 ── */
 .login-brand {
   flex: 1;
   display: flex;
@@ -41,45 +33,50 @@
 }
 
 .login-logo {
-  width: 92px;
-  height: 92px;
-  border-radius: 30px;
-  background: rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(10px);
+  width: 96px;
+  height: 96px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 46px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.4);
+  border: 1px solid rgba(255,255,255,0.3);
 }
 
 .login-app-name {
-  font-size: 38px;
+  font-size: 40px;
   font-weight: 900;
   color: white;
-  letter-spacing: -1.5px;
-  text-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  letter-spacing: -2px;
+  text-shadow: 0 2px 16px rgba(0,0,0,0.15);
 }
 
 .login-tagline {
   font-size: 15px;
-  color: rgba(255, 255, 255, 0.88);
-  font-weight: 500;
-  text-align: center;
-  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  background: rgba(255,255,255,0.18);
+  padding: 6px 16px;
+  border-radius: 20px;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.25);
 }
 
-/* ── Card ── */
+/* ── 카드 ── */
 .login-card {
   background: var(--bg-card);
   border-radius: 32px 32px 0 0;
   padding: 28px 22px 48px;
-  box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 -12px 60px rgba(0,0,0,0.2);
   position: relative;
   z-index: 2;
 }
 
-/* ── Tabs ── */
+/* ── 탭 ── */
 .login-tabs {
   position: relative;
   display: flex;
@@ -108,17 +105,16 @@
 
 .login-tab-bar {
   position: absolute;
-  top: 4px;
-  bottom: 4px;
+  top: 4px; bottom: 4px;
   width: calc(50% - 4px);
   left: 4px;
   background: var(--bg-card);
   border-radius: 13px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ── Form ── */
+/* ── 폼 ── */
 .login-form {
   display: flex;
   flex-direction: column;
@@ -156,24 +152,121 @@
   box-shadow: 0 0 0 3px rgba(255, 128, 171, 0.15);
 }
 
-.login-input::placeholder {
-  color: var(--text-muted);
+.login-input::placeholder { color: var(--text-muted); }
+
+/* ── 비밀번호 토글 ── */
+.pw-wrap {
+  position: relative;
 }
 
-.login-forgot {
-  text-align: right;
+.pw-wrap .login-input {
+  padding-right: 48px;
+}
+
+.pw-toggle {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* ── 에러 ── */
+.login-error {
   font-size: 12px;
-  color: var(--text-muted);
+  color: #FF6B6B;
+  font-weight: 600;
+  padding-left: 2px;
   margin-top: -4px;
 }
 
+/* ── 비밀번호 찾기 ── */
+.login-forgot-btn {
+  text-align: right;
+  font-size: 12px;
+  color: var(--primary);
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-top: -4px;
+  padding: 0;
+  align-self: flex-end;
+}
+
+/* ── 빠른 로그인 ── */
+.quick-login-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(255,128,171,0.12) 0%, rgba(192,132,252,0.08) 100%);
+  border: 1.5px solid var(--primary-border);
+  border-radius: 16px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 12px rgba(255,128,171,0.15);
+}
+
+.quick-login-card:active {
+  transform: scale(0.98);
+}
+
+.quick-login-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.quick-login-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.quick-login-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.quick-login-email {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-login-arrow {
+  font-size: 18px;
+  color: var(--primary);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ── 제출 버튼 ── */
 .login-submit {
   width: 100%;
   padding: 16px;
   border-radius: 16px;
   font-size: 16px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255,255,255,0.45);
   background: var(--bg-card2);
   margin-top: 4px;
   transition: background 0.22s, color 0.22s, box-shadow 0.22s, transform 0.12s;
@@ -190,55 +283,29 @@
   opacity: 0.9;
 }
 
-/* ── Divider ── */
-.login-divider {
+/* ── 인하대 안내 ── */
+.inha-notice {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 4px 0;
+  gap: 8px;
+  padding: 12px 14px;
+  background: rgba(255,128,171,0.08);
+  border: 1px solid var(--primary-border);
+  border-radius: 12px;
 }
 
-.login-divider::before,
-.login-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
-
-.login-divider span {
+.inha-notice p {
   font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  font-weight: 500;
+  color: var(--primary);
+  font-weight: 600;
+  line-height: 1.4;
 }
 
-/* ── Kakao ── */
-.login-kakao {
-  width: 100%;
-  padding: 14px;
-  border-radius: 16px;
-  font-size: 15px;
-  font-weight: 700;
-  color: #391B1B;
-  background: #FEE500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  transition: opacity 0.15s, transform 0.12s;
-}
-
-.login-kakao:active {
-  opacity: 0.88;
-  transform: scale(0.97);
-}
-
-/* ── Signup promo (signup tab) ── */
+/* ── 회원가입 프로모 ── */
 .signup-promo {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
   margin-bottom: 4px;
 }
 
@@ -297,7 +364,7 @@
   opacity: 0.9;
 }
 
-/* ── Switch ── */
+/* ── 스위치 ── */
 .login-switch {
   text-align: center;
   margin-top: 18px;
@@ -312,5 +379,51 @@
   background: none;
   border: none;
   padding: 0;
+  cursor: pointer;
+}
+
+/* ── 비밀번호 찾기 모달 ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 500;
+  padding-bottom: 0;
+}
+
+.modal-card {
+  background: var(--bg-card);
+  border-radius: 28px 28px 0 0;
+  padding: 28px 22px 48px;
+  width: 100%;
+  max-width: 520px;
+  position: relative;
+  box-shadow: 0 -12px 60px rgba(0,0,0,0.2);
+  animation: slideUpModal 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes slideUpModal {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.modal-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
