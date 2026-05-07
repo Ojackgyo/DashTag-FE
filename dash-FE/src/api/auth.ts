@@ -38,3 +38,27 @@ export async function logout(): Promise<void> {
 export function getMe(): Promise<AuthUser> {
   return api.get<AuthUser>('/auth/me');
 }
+
+export interface SignupBody {
+  email: string;
+  password: string;
+}
+
+// POST /auth/signup
+export async function signup(body: SignupBody): Promise<LoginResponse> {
+  const res = await api.post<LoginResponse>('/auth/signup', body);
+  setToken(res.token);
+  return res;
+}
+
+// POST /auth/email/send
+// 이메일 인증코드 발송 (60초 재전송 제한은 서버에서도 강제)
+export function sendEmailCode(email: string): Promise<void> {
+  return api.post<void>('/auth/email/send', { email });
+}
+
+// POST /auth/email/verify
+// 인증코드 확인
+export function verifyEmailCode(email: string, code: string): Promise<{ verified: boolean }> {
+  return api.post<{ verified: boolean }>('/auth/email/verify', { email, code });
+}

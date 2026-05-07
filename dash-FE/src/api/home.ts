@@ -45,6 +45,18 @@ export function getHomeData(): Promise<HomeData> {
   return api.get<HomeData>('/home');
 }
 
+// GET /dashes/received
+// 받은 대쉬 전체 목록
+export function getReceivedDashes(): Promise<DashPerson[]> {
+  return api.get<DashPerson[]>('/dashes/received');
+}
+
+// GET /dashes/sent
+// 보낸 대쉬 전체 목록
+export function getSentDashes(): Promise<DashPerson[]> {
+  return api.get<DashPerson[]>('/dashes/sent');
+}
+
 // POST /dashes/:id/accept
 // 기회 사용 + 대쉬 수락 → 채팅방 생성
 export function acceptDash(dashId: string): Promise<AcceptDashResponse> {

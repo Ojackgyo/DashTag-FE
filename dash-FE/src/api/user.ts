@@ -49,3 +49,23 @@ export function getMyProfile(): Promise<UserProfile> {
 export function updateMyProfile(body: Partial<CreateProfileBody>): Promise<UserProfile> {
   return api.put<UserProfile>('/users/me', body);
 }
+
+export interface Review {
+  id: string;
+  emoji: string;
+  rating: number;        // 1~5
+  text: string;
+  createdAt: string;     // ISO 8601
+}
+
+// GET /users/me/reviews
+// 대쉬서클 — 매칭 상대가 남긴 리뷰 목록
+export function getMyReviews(): Promise<Review[]> {
+  return api.get<Review[]>('/users/me/reviews');
+}
+
+// POST /users/:id/review
+// 채팅 종료 후 상대방에게 리뷰 작성
+export function writeReview(userId: string, rating: number, text: string): Promise<Review> {
+  return api.post<Review>(`/users/${userId}/review`, { rating, text });
+}

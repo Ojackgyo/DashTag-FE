@@ -47,28 +47,6 @@ export default function HomePage() {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', paddingBottom: 80 }}>
 
-      {/* ── 헤더 ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '20px 20px 14px',
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--header-bg)',
-        backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-        position: 'sticky', top: 0, zIndex: 10,
-        boxShadow: '0 1px 0 var(--border), var(--shadow-sm)',
-      }}>
-        <span style={{
-          fontSize: 26, fontWeight: 900, letterSpacing: '-1px',
-          background: 'var(--gradient)', WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-        }}>DashTag</span>
-        <button style={{
-          width: 38, height: 38, borderRadius: '50%',
-          background: 'var(--bg-card)', border: '1px solid var(--border)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 18, boxShadow: 'var(--shadow-sm)',
-        }}>🔔</button>
-      </div>
 
       <div style={{ padding: '16px 20px 0' }}>
 

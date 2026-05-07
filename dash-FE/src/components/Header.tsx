@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { clearToken } from '../api/client';
 
 function ChatIcon() {
   return (
@@ -10,6 +12,13 @@ function ChatIcon() {
 
 export default function Header() {
   const navigate = useNavigate();
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('dashtag_token'));
+
+  const handleLogout = () => {
+    clearToken();
+    setIsLoggedIn(false);
+    navigate('/login');
+  };
 
   return (
     <header
@@ -38,13 +47,23 @@ export default function Header() {
             <ChatIcon />
             <span>채팅</span>
           </button>
-          <button
-            onClick={() => navigate('/signup')}
-            className="text-[13px] font-bold px-4 py-[7px] rounded-full min-h-[34px] text-white shrink-0 active:opacity-85 active:scale-95"
-            style={{ background: 'var(--gradient)' }}
-          >
-            시작하기
-          </button>
+          {isLoggedIn ? (
+            <button
+              onClick={handleLogout}
+              className="text-[13px] font-bold px-4 py-[7px] rounded-full min-h-[34px] shrink-0 active:opacity-85 active:scale-95"
+              style={{ background: 'var(--bg-card2)', border: '1px solid var(--border)', color: 'var(--text-sub)' }}
+            >
+              로그아웃
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              className="text-[13px] font-bold px-4 py-[7px] rounded-full min-h-[34px] text-white shrink-0 active:opacity-85 active:scale-95"
+              style={{ background: 'var(--gradient)' }}
+            >
+              로그인
+            </button>
+          )}
         </div>
       </div>
     </header>

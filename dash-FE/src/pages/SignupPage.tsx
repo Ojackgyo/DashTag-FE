@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './SignupPage.css';
 import rawNicknames from '../data/nicknames.csv?raw';
+import inhaMajorsRaw from '../data/inha_majors.json';
 
 /* ─── 닉네임 목록 (CSV) ─── */
 const NICKNAMES: string[] = rawNicknames
@@ -10,23 +11,9 @@ const NICKNAMES: string[] = rawNicknames
   .map(n => n.trim())
   .filter(Boolean);
 
-/* ─── 인하대 학과 목록 ─── */
-const INHA_DEPARTMENTS = [
-  '컴퓨터공학과', '정보통신공학과', '전기공학과', '전자공학과',
-  '기계공학과', '항공우주공학과', '조선해양공학과', '산업경영공학과',
-  '화학공학과', '신소재공학과', '환경공학과', '에너지자원공학과',
-  '건축학부', '사회인프라공학과',
-  '수학과', '통계학과', '물리학과', '화학과', '생명과학과', '해양과학과',
-  '경영학과', '국제통상학과', '글로벌금융학과',
-  '행정학과', '정치외교학과', '언론정보학과', '경제학과',
-  '소비자학과', '아동심리학과', '사회복지학과',
-  '한국어문학과', '영어영문학과', '일본어문학과', '중국어중국학과',
-  '프랑스어문학과', '철학과', '사학과', '교육학과', '문화콘텐츠문화경영학과',
-  '수학교육과', '체육교육과', '윤리교육과',
-  '의예과', '간호학과',
-  '디자인융합학과', '조형예술학과', '의류디자인학과', '연극영화학과', '스포츠과학과',
-  '국제학부', '첨단IT융합학부',
-];
+/* ─── 인하대 학과 목록 (inha_majors.json) ─── */
+const INHA_DEPARTMENTS: string[] = (inhaMajorsRaw as { college: string; majors?: string[]; major?: string[] }[])
+  .flatMap(c => c.majors ?? c.major ?? []);
 
 /* ─── 금지어 목록 ─── */
 const BLOCKED_WORDS = [
@@ -73,6 +60,7 @@ function isPasswordStrong(pw: string): boolean {
 type Step =
   | { type: 'text';            key: string; question: string; placeholder: string; sub?: string }
   | { type: 'password';        key: string; question: string; placeholder: string; sub?: string }
+  | { type: 'email-verify';    key: string; question: string; sub?: string }
   | { type: 'nickname-picker'; key: string; question: string; sub?: string }
   | { type: 'major-select';    key: string; question: string; sub?: string }
   | { type: 'choice';          key: string; question: string; options: { label: string; emoji: string }[]; sub?: string }
@@ -93,8 +81,12 @@ function getSteps(gender: string): Step[] {
     },
     {
       type: 'text', key: 'email', question: '인하대 이메일을 입력해주세요 📧',
-      placeholder: '22000000@inha.ac.kr',
-      sub: '포털 이메일(@inha.ac.kr)만 사용할 수 있어요',
+      placeholder: '22000000@inha.edu',
+      sub: '포털 이메일(@inha.edu)만 사용할 수 있어요',
+    },
+    {
+      type: 'email-verify', key: 'emailCode', question: '이메일 인증을 완료해주세요 📬',
+      sub: '인증번호 6자리를 입력해주세요',
     },
     {
       type: 'password', key: 'password', question: '비밀번호를 설정해주세요 🔒',
@@ -416,41 +408,161 @@ function NicknamePicker({ value, onChange }: { value: string; onChange: (v: stri
   );
 }
 
-/* ─── 학과 선택 ─── */
-function MajorSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [search, setSearch] = useState('');
-  const filtered = INHA_DEPARTMENTS.filter(d => d.includes(search));
+/* ─── SVG 눈 아이콘 ─── */
+const EyeIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+const EyeOffIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+);
+
+/* ─── 이메일 인증 입력 ─── */
+function EmailVerifyInput({ email, value, onChange }: {
+  email: string; value: string; onChange: (v: string) => void;
+}) {
+  const [cooldown, setCooldown] = useState(60);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    const interval = setInterval(() => {
+      setCooldown(c => {
+        if (c <= 1) { clearInterval(interval); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleResend = () => {
+    if (cooldown > 0) return;
+    setCooldown(60);
+    // TODO: API call to resend verification email
+  };
 
   return (
     <div style={{ marginTop: 20 }}>
+      <div style={{
+        background: 'rgba(255,128,171,0.08)', border: '1px solid var(--primary-border)',
+        borderRadius: 14, padding: '12px 14px', marginBottom: 16,
+      }}>
+        <p style={{ fontSize: 13, color: 'var(--text-sub)', lineHeight: 1.7 }}>
+          📧 <b style={{ color: 'var(--text)' }}>{email}</b>으로<br />인증번호를 발송했어요
+        </p>
+      </div>
+      <input
+        ref={inputRef}
+        className="signup-input"
+        style={{ marginTop: 0, letterSpacing: 8, fontSize: 22, textAlign: 'center', fontWeight: 800 }}
+        type="text"
+        inputMode="numeric"
+        placeholder="000000"
+        value={value}
+        maxLength={6}
+        onChange={e => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
+      />
+      <button
+        onClick={handleResend}
+        disabled={cooldown > 0}
+        style={{
+          marginTop: 12, width: '100%', padding: '12px',
+          borderRadius: 14, border: '1.5px solid var(--border)',
+          background: 'var(--bg-card)',
+          color: cooldown > 0 ? 'var(--text-muted)' : 'var(--primary)',
+          fontSize: 14, fontWeight: 600,
+          opacity: cooldown > 0 ? 0.7 : 1,
+          cursor: cooldown > 0 ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {cooldown > 0 ? `재전송 (${cooldown}초 후 가능)` : '인증번호 재전송'}
+      </button>
+    </div>
+  );
+}
+
+/* ─── 학과 선택 (자동완성) ─── */
+function MajorSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [search, setSearch] = useState(value || '');
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const filtered = search.trim()
+    ? INHA_DEPARTMENTS.filter(d => d.includes(search.trim())).slice(0, 10)
+    : [];
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleSelect = (dept: string) => {
+    onChange(dept);
+    setSearch(dept);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={wrapRef} style={{ marginTop: 20, position: 'relative' }}>
       <input
         className="signup-input"
-        style={{ marginTop: 0, marginBottom: 12 }}
-        placeholder="학과 검색…"
+        style={{ marginTop: 0 }}
+        placeholder="학과 검색 (예: 컴퓨터)"
         value={search}
-        onChange={e => setSearch(e.target.value)}
+        onChange={e => {
+          setSearch(e.target.value);
+          setOpen(true);
+          if (value && value !== e.target.value) onChange('');
+        }}
+        onFocus={() => { if (search.trim()) setOpen(true); }}
       />
-      <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, scrollbarWidth: 'none' }}>
-        {filtered.map(dept => (
-          <button
-            key={dept}
-            onClick={() => onChange(dept)}
-            style={{
-              padding: '13px 16px', borderRadius: 14, textAlign: 'left',
-              background: value === dept ? 'var(--primary-bg)' : 'var(--bg-card)',
-              border: `1.5px solid ${value === dept ? 'var(--primary-border)' : 'var(--border)'}`,
-              color: value === dept ? 'var(--primary)' : 'var(--text)',
-              fontSize: 15, fontWeight: value === dept ? 700 : 500,
-              flexShrink: 0,
-            }}
-          >
-            {dept}
-          </button>
-        ))}
-        {filtered.length === 0 && (
-          <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, padding: '20px 0' }}>검색 결과가 없어요</p>
-        )}
-      </div>
+      {open && filtered.length > 0 && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 100,
+          background: 'var(--bg-card)', border: '1.5px solid var(--border)',
+          borderRadius: 16, overflow: 'hidden', maxHeight: 260, overflowY: 'auto',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.18)', scrollbarWidth: 'none',
+        }}>
+          {filtered.map((dept, i) => (
+            <button
+              key={dept}
+              onMouseDown={e => { e.preventDefault(); handleSelect(dept); }}
+              style={{
+                width: '100%', padding: '13px 16px', textAlign: 'left',
+                background: value === dept ? 'var(--primary-bg)' : 'transparent',
+                borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none',
+                color: value === dept ? 'var(--primary)' : 'var(--text)',
+                fontSize: 15, fontWeight: value === dept ? 700 : 500,
+              }}
+            >
+              {dept}
+            </button>
+          ))}
+        </div>
+      )}
+      {open && search.trim() && filtered.length === 0 && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 100,
+          background: 'var(--bg-card)', border: '1.5px solid var(--border)',
+          borderRadius: 16, padding: '16px', textAlign: 'center',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+        }}>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>검색 결과가 없어요</p>
+        </div>
+      )}
+      {value && (
+        <p style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 700, marginTop: 10 }}>
+          ✓ {value}
+        </p>
+      )}
     </div>
   );
 }
@@ -558,7 +670,10 @@ export default function SignupPage() {
 
   const validate = (): string | null => {
     if (step.key === 'email') {
-      if (!currentValue.endsWith('@inha.ac.kr')) return '인하대 이메일(@inha.ac.kr)만 사용할 수 있어요';
+      if (!currentValue.endsWith('@inha.edu')) return '인하대 이메일(@inha.edu)만 사용할 수 있어요';
+    }
+    if (step.key === 'emailCode') {
+      if (currentValue.length !== 6) return '6자리 인증번호를 입력해주세요';
     }
     if (step.type === 'password') {
       if (!isPasswordStrong(currentValue)) return '비밀번호 요건을 모두 충족해주세요';
@@ -585,7 +700,7 @@ export default function SignupPage() {
     if (step.type === 'mbti-selector') {
       const ideal = 'ideal' in step ? step.ideal : false;
       if (!mbtiAllSelected(currentValue, ideal)) return;
-    } else if (step.type !== 'intro' && step.type !== 'tags' && step.type !== 'nickname-picker' && step.type !== 'major-select' && !currentValue) {
+    } else if (step.type !== 'intro' && step.type !== 'tags' && step.type !== 'nickname-picker' && step.type !== 'major-select' && step.type !== 'email-verify' && !currentValue) {
       return;
     }
     const err = validate();
@@ -621,6 +736,7 @@ export default function SignupPage() {
   const showFooter =
     step.type === 'text' ||
     step.type === 'password' ||
+    step.type === 'email-verify' ||
     step.type === 'nickname-picker' ||
     step.type === 'major-select' ||
     step.type === 'range' ||
@@ -631,6 +747,7 @@ export default function SignupPage() {
   const isNextEnabled = (() => {
     if (step.type === 'intro') return true;
     if (step.type === 'tags') return true;
+    if (step.type === 'email-verify') return currentValue.length === 6;
     if (step.type === 'nickname-picker') return !!currentValue;
     if (step.type === 'major-select') return !!currentValue;
     if (step.type === 'mbti-selector') return mbtiAllSelected(currentValue, 'ideal' in step ? step.ideal : false);
@@ -665,9 +782,9 @@ export default function SignupPage() {
           }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', marginBottom: 6 }}>📌 인하대 포털 이메일 확인 방법</p>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-              1. 인하대 포털 <b style={{ color: 'var(--text)' }}>portal.inha.ac.kr</b> 로그인<br />
+              1. 인하대 포털 <b style={{ color: 'var(--text)' }}>portal.inha.edu</b> 로그인<br />
               2. 마이페이지 → 기본정보 → 이메일 확인<br />
-              3. 형식: <b style={{ color: 'var(--primary)' }}>학번@inha.ac.kr</b>
+              3. 형식: <b style={{ color: 'var(--primary)' }}>학번@inha.edu</b>
             </p>
           </div>
         )}
@@ -687,29 +804,41 @@ export default function SignupPage() {
 
         {/* 비밀번호 입력 */}
         {step.type === 'password' && (
-          <div style={{ position: 'relative', marginTop: 24 }}>
-            <input
-              ref={inputRef}
-              className="signup-input"
-              style={{ marginTop: 0, paddingRight: 50 }}
-              type={showPw ? 'text' : 'password'}
-              placeholder={'placeholder' in step ? step.placeholder : ''}
-              value={currentValue}
-              onChange={e => { setAnswers(prev => ({ ...prev, [step.key]: e.target.value })); setError(''); }}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleNext(); }}
-            />
-            <button
-              onClick={() => setShowPw(v => !v)}
-              style={{
-                position: 'absolute', right: 16, top: '50%',
-                transform: 'translateY(-50%)', fontSize: 18,
-                background: 'none', border: 'none', cursor: 'pointer',
-              }}
-            >
-              {showPw ? '🙈' : '👁️'}
-            </button>
+          <div style={{ marginTop: 24 }}>
+            <div style={{ position: 'relative' }}>
+              <input
+                ref={inputRef}
+                className="signup-input"
+                style={{ marginTop: 0, paddingRight: 50 }}
+                type={showPw ? 'text' : 'password'}
+                placeholder={'placeholder' in step ? step.placeholder : ''}
+                value={currentValue}
+                onChange={e => { setAnswers(prev => ({ ...prev, [step.key]: e.target.value })); setError(''); }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleNext(); }}
+              />
+              <button
+                onClick={() => setShowPw(v => !v)}
+                style={{
+                  position: 'absolute', right: 16, top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
+                }}
+              >
+                {showPw ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
             <PasswordStrengthBar pw={currentValue} />
           </div>
+        )}
+
+        {/* 이메일 인증 */}
+        {step.type === 'email-verify' && (
+          <EmailVerifyInput
+            email={answers['email'] || ''}
+            value={currentValue}
+            onChange={v => { setAnswers(prev => ({ ...prev, [step.key]: v })); setError(''); }}
+          />
         )}
 
         {/* 닉네임 피커 */}

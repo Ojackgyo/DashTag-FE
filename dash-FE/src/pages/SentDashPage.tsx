@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SENT_DASHES, DashPerson, DETAIL_ROWS } from '../data/dashes';
+import { SENT_DASHES, DETAIL_ROWS } from '../data/dashes';
+import type { DashPerson } from '../data/dashes';
 
 export default function SentDashPage() {
   const navigate = useNavigate();

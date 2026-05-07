@@ -3,28 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { useChance } from '../hooks/useChance';
 import ChanceModal from '../components/ChanceModal';
 import { useAcceptedDashes } from '../context/AcceptedDashContext';
-import { RECEIVED_DASHES, DashPerson, DETAIL_ROWS } from '../data/dashes';
+import { RECEIVED_DASHES, DETAIL_ROWS } from '../data/dashes';
+import type { DashPerson } from '../data/dashes';
 
 export default function ReceivedDashPage() {
   const navigate = useNavigate();
   const { hasChance, spend } = useChance();
   const { acceptedDashes, addAccepted } = useAcceptedDashes();
   const [selected, setSelected] = useState<DashPerson | null>(null);
-  const [flipped, setFlipped] = useState(false);
   const [showChanceModal, setShowChanceModal] = useState(false);
 
   const isAccepted = selected ? acceptedDashes.some(d => d.id === selected.id) : false;
 
-  const openCard = (p: DashPerson) => {
-    setFlipped(false);
-    setSelected(p);
-    setTimeout(() => setFlipped(true), 60);
-  };
-
-  const closeCard = () => {
-    setFlipped(false);
-    setTimeout(() => setSelected(null), 650);
-  };
+  const openCard = (p: DashPerson) => setSelected(p);
+  const closeCard = () => setSelected(null);
 
   const confirmAccept = () => {
     spend();
@@ -142,149 +134,139 @@ export default function ReceivedDashPage() {
         />
       )}
 
-      {/* 플립 카드 모달 */}
+      {/* 바텀시트 모달 */}
       {selected && (
         <div
-          className="fixed inset-0 flex items-center justify-center z-[200] px-5"
-          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)' }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
           onClick={closeCard}
         >
           <div
-            style={{ perspective: '1200px', width: '100%', maxWidth: '340px' }}
+            style={{
+              background: 'var(--bg-card)',
+              borderRadius: '28px 28px 0 0',
+              width: '100%', maxWidth: 520,
+              maxHeight: '88vh',
+              display: 'flex', flexDirection: 'column',
+              animation: 'slideUpSheet 0.35s cubic-bezier(0.22,1,0.36,1)',
+            }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{
-              position: 'relative', height: '540px',
-              transformStyle: 'preserve-3d',
-              transition: 'transform 0.65s cubic-bezier(0.4, 0, 0.2, 1)',
-              transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-              filter: 'drop-shadow(0 24px 48px rgba(0,0,0,0.5))',
-            }}>
-              {/* 앞면 */}
-              <div style={{
-                position: 'absolute', inset: 0,
-                backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
-                borderRadius: 28, background: 'var(--primary-bg)',
-                border: '2px solid var(--primary-border)',
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center', gap: 16,
-              }}>
-                <span style={{ fontSize: 90, lineHeight: 1 }}>{selected.emoji}</span>
-                <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                  <p style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>{selected.face}</p>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--primary)', background: 'rgba(255,128,171,0.2)', padding: '4px 14px', borderRadius: 10 }}>
-                    {selected.mbti}
-                  </span>
-                </div>
-              </div>
+            {/* 드래그 핸들 */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0 0' }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)' }} />
+            </div>
 
-              {/* 뒷면 */}
-              <div style={{
-                position: 'absolute', inset: 0,
-                backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
-                transform: 'rotateY(180deg)', borderRadius: 28,
-                background: 'var(--bg-card)', border: '2px solid var(--primary-border)',
-                display: 'flex', flexDirection: 'column', overflow: 'hidden',
-              }}>
-                <button style={{
-                  position: 'absolute', top: 14, right: 14,
-                  width: 30, height: 30, borderRadius: '50%',
-                  background: 'var(--bg-card2)', color: 'var(--text-muted)',
-                  fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: '1px solid var(--border)', zIndex: 1,
-                }} onClick={closeCard}>✕</button>
-
-                <div style={{ flex: 1, overflowY: 'auto', padding: '22px 20px 0', scrollbarWidth: 'none' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-                    <div style={{
-                      width: 60, height: 60, borderRadius: 18,
-                      background: 'var(--primary-bg)', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30,
-                    }}>{selected.emoji}</div>
-                    <div>
-                      <p style={{ fontSize: 19, fontWeight: 800, color: 'var(--text)', marginBottom: 5 }}>{selected.name}</p>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-bg)', padding: '2px 9px', borderRadius: 7 }}>{selected.mbti}</span>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-sub)', background: 'var(--bg-card2)', padding: '2px 9px', borderRadius: 7 }}>{selected.face}</span>
-                      </div>
-                    </div>
+            {/* 프로필 헤더 */}
+            <div style={{ padding: '16px 20px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{
+                  width: 68, height: 68, borderRadius: 20, flexShrink: 0,
+                  background: isAccepted ? 'var(--bg-card2)' : 'var(--primary-bg)',
+                  border: `2px solid ${isAccepted ? 'var(--border)' : 'var(--primary-border)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 34,
+                }}>{selected.emoji}</div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', marginBottom: 6 }}>{selected.name}</p>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-bg)', padding: '3px 10px', borderRadius: 8, border: '1px solid var(--primary-border)' }}>{selected.mbti}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-sub)', background: 'var(--bg-card2)', padding: '3px 10px', borderRadius: 8 }}>{selected.face}</span>
                   </div>
-
-                  {selected.requestMsg && (
-                    <div style={{ marginBottom: 14 }}>
-                      <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>💌 보낸 메시지</p>
-                      <div style={{
-                        background: 'var(--primary-bg)', border: '1.5px solid var(--primary-border)',
-                        borderRadius: 14, padding: '12px 14px',
-                        fontSize: 14, fontWeight: 500, color: 'var(--text)', lineHeight: 1.5,
-                      }}>{selected.requestMsg}</div>
-                    </div>
-                  )}
-
-                  {selected.charmPoints.length > 0 && (
-                    <div style={{ marginBottom: 14 }}>
-                      <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>✨ 매력포인트</p>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {selected.charmPoints.map(c => (
-                          <span key={c} style={{
-                            fontSize: 13, fontWeight: 700, color: 'var(--primary)',
-                            background: 'var(--primary-bg)', border: '1.5px solid var(--primary-border)',
-                            padding: '5px 12px', borderRadius: 20,
-                          }}>#{c}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {DETAIL_ROWS(selected).map(row => (
-                    <div key={row.label} style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '10px 0', borderBottom: '1px solid var(--border)',
-                    }}>
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{row.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{row.value}</span>
-                    </div>
-                  ))}
                 </div>
-
-                <div style={{ padding: '14px 20px 20px', background: 'var(--bg-card)' }}>
-                  {isAccepted ? (
-                    <button style={{
-                      width: '100%', padding: 14, borderRadius: 16,
-                      fontSize: 15, fontWeight: 700,
-                      color: 'var(--primary)', background: 'var(--primary-bg)',
-                      border: '1.5px solid var(--primary-border)',
-                    }} disabled>💌 수락 완료</button>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', gap: 10 }}>
-                        <button style={{
-                          flex: 1, padding: 14, borderRadius: 16,
-                          fontSize: 15, fontWeight: 700,
-                          background: 'var(--bg-card2)', color: 'var(--text-muted)',
-                          border: '1px solid var(--border)',
-                        }} onClick={closeCard}>거절하기</button>
-                        <button style={{
-                          flex: 1, padding: 14, borderRadius: 16,
-                          fontSize: 15, fontWeight: 700,
-                          color: !hasChance ? 'var(--text-muted)' : 'white',
-                          background: !hasChance ? 'var(--bg-card2)' : 'var(--gradient)',
-                          border: '1.5px solid transparent',
-                          cursor: !hasChance ? 'not-allowed' : 'pointer',
-                          boxShadow: hasChance ? '0 4px 16px rgba(255,128,171,0.35)' : 'none',
-                        }} disabled={!hasChance} onClick={() => hasChance && setShowChanceModal(true)}>
-                          {!hasChance ? '기회 없음' : '수락하기'}
-                        </button>
-                      </div>
-                      {hasChance && (
-                        <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-                          하루에 한 명에게만 수락할 수 있어요
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
+                <button
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                    background: 'var(--bg-card2)', color: 'var(--text-muted)',
+                    fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: '1px solid var(--border)', alignSelf: 'flex-start',
+                  }}
+                  onClick={closeCard}
+                >✕</button>
               </div>
+            </div>
+
+            {/* 스크롤 콘텐츠 */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 8px', scrollbarWidth: 'none' }}>
+              {selected.requestMsg && (
+                <div style={{ marginBottom: 14 }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600 }}>💌 보낸 메시지</p>
+                  <div style={{
+                    background: 'var(--primary-bg)', border: '1.5px solid var(--primary-border)',
+                    borderRadius: 14, padding: '12px 14px',
+                    fontSize: 14, fontWeight: 500, color: 'var(--text)', lineHeight: 1.6,
+                  }}>{selected.requestMsg}</div>
+                </div>
+              )}
+
+              {selected.charmPoints.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600 }}>✨ 매력포인트</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {selected.charmPoints.map(c => (
+                      <span key={c} style={{
+                        fontSize: 13, fontWeight: 700, color: 'var(--primary)',
+                        background: 'var(--primary-bg)', border: '1.5px solid var(--primary-border)',
+                        padding: '5px 12px', borderRadius: 20,
+                      }}>#{c}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--bg-card2)' }}>
+                {DETAIL_ROWS(selected).map((row, i) => (
+                  <div key={row.label} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '12px 16px',
+                    borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+                  }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{row.label}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 액션 버튼 */}
+            <div style={{ padding: '12px 20px 36px', borderTop: '1px solid var(--border)' }}>
+              {isAccepted ? (
+                <button style={{
+                  width: '100%', padding: 14, borderRadius: 16,
+                  fontSize: 15, fontWeight: 700,
+                  color: 'var(--primary)', background: 'var(--primary-bg)',
+                  border: '1.5px solid var(--primary-border)',
+                }} disabled>💌 수락 완료</button>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button style={{
+                      flex: 1, padding: 14, borderRadius: 16,
+                      fontSize: 15, fontWeight: 700,
+                      background: 'var(--bg-card2)', color: 'var(--text-muted)',
+                      border: '1px solid var(--border)',
+                    }} onClick={closeCard}>거절하기</button>
+                    <button style={{
+                      flex: 1, padding: 14, borderRadius: 16,
+                      fontSize: 15, fontWeight: 700,
+                      color: !hasChance ? 'var(--text-muted)' : 'white',
+                      background: !hasChance ? 'var(--bg-card2)' : 'var(--gradient)',
+                      border: '1.5px solid transparent',
+                      cursor: !hasChance ? 'not-allowed' : 'pointer',
+                      boxShadow: hasChance ? '0 4px 16px rgba(255,128,171,0.35)' : 'none',
+                    }} disabled={!hasChance} onClick={() => hasChance && setShowChanceModal(true)}>
+                      {!hasChance ? '기회 없음' : '수락하기'}
+                    </button>
+                  </div>
+                  {hasChance && (
+                    <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+                      하루에 한 명에게만 수락할 수 있어요
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
