@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clearToken } from '../api/client';
+import { useTheme } from '../context/ThemeContext';
 
 function ChatIcon() {
   return (
@@ -10,9 +11,34 @@ function ChatIcon() {
   );
 }
 
+function SunIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="5" />
+      <line x1="12" y1="1" x2="12" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="3" y2="12" />
+      <line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+    </svg>
+  );
+}
+
 export default function Header() {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('dashtag_token'));
+  const { isDark, setMode } = useTheme();
 
   const handleLogout = () => {
     clearToken();
@@ -39,6 +65,15 @@ export default function Header() {
 
         {/* 우측 버튼 */}
         <div className="flex items-center gap-2">
+          {/* 테마 토글 */}
+          <button
+            onClick={() => setMode(isDark ? 'light' : 'dark')}
+            className="w-[34px] h-[34px] rounded-full flex items-center justify-center active:scale-95"
+            style={{ background: 'var(--bg-card2)', border: '1px solid var(--border)', color: 'var(--text-sub)' }}
+          >
+            {isDark ? <SunIcon /> : <MoonIcon />}
+          </button>
+
           <button
             onClick={() => navigate('/chat')}
             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-[6px] rounded-full min-h-[34px] active:scale-95"
@@ -47,6 +82,7 @@ export default function Header() {
             <ChatIcon />
             <span>채팅</span>
           </button>
+
           {isLoggedIn ? (
             <button
               onClick={handleLogout}

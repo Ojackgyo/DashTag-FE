@@ -158,7 +158,7 @@ export default function DatePage() {
       {showMsgSheet && selectedProfile && (
         <div
           className="fixed inset-0 z-[250] flex items-end justify-center"
-          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          style={{ background: 'rgba(0,0,0,0.5)' }}
           onClick={() => setShowMsgSheet(false)}
         >
           <div
@@ -212,39 +212,32 @@ export default function DatePage() {
 
       {/* 카드 플립 모달 */}
       {selectedId !== null && selectedProfile && (
-        <div
-          className="fixed inset-0 flex items-center justify-center z-[200] px-5"
-          style={{ background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(8px)' }}
-          onClick={handleClose}
-        >
+        <div className="fixed inset-0 z-[200]" onClick={handleClose}>
+          {/* 블러 오버레이 */}
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(8px)' }} />
+
           {/* 카드 컨테이너 */}
           <div
-            style={{ perspective: '1200px', width: '100%', maxWidth: '340px' }}
+            className="absolute inset-0 flex items-center justify-center px-5"
             onClick={e => e.stopPropagation()}
           >
-            <div
-              style={{
-                position: 'relative',
-                height: '520px',
-                transformStyle: 'preserve-3d',
-                transition: 'transform 0.65s cubic-bezier(0.4, 0, 0.2, 1)',
-                transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-              }}
-            >
-              {/* ── 앞면 ── */}
+            <div style={{ position: 'relative', width: '100%', maxWidth: '340px', height: '520px' }}>
+
+              {/* ── 앞면 — preserve-3d 없이 개별 rotateY ── */}
               <div
                 style={{
                   position: 'absolute', inset: 0,
-                  backfaceVisibility: 'hidden',
-                  WebkitBackfaceVisibility: 'hidden',
                   borderRadius: '28px',
-                  background: 'var(--primary-bg)',
+                  background: 'var(--bg-card)',
                   border: '2px solid var(--primary-border)',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '16px',
+                  transition: flipped ? 'transform 0.3s ease-in' : 'transform 0.3s ease-out 0.3s',
+                  transform: flipped ? 'perspective(1200px) rotateY(90deg)' : 'perspective(1200px) rotateY(0deg)',
+                  pointerEvents: flipped ? 'none' : 'auto',
                 }}
               >
                 <span style={{ fontSize: '90px', lineHeight: 1 }}>{selectedProfile.emoji}</span>
@@ -260,15 +253,15 @@ export default function DatePage() {
               <div
                 style={{
                   position: 'absolute', inset: 0,
-                  backfaceVisibility: 'hidden',
-                  WebkitBackfaceVisibility: 'hidden',
-                  transform: 'rotateY(180deg)',
                   borderRadius: '28px',
                   background: 'var(--bg-card)',
                   border: '2px solid var(--primary-border)',
                   display: 'flex',
                   flexDirection: 'column',
                   overflow: 'hidden',
+                  transition: flipped ? 'transform 0.3s ease-out 0.3s' : 'transform 0.3s ease-in',
+                  transform: flipped ? 'perspective(1200px) rotateY(0deg)' : 'perspective(1200px) rotateY(-90deg)',
+                  pointerEvents: flipped ? 'auto' : 'none',
                 }}
               >
                 {/* 닫기 */}

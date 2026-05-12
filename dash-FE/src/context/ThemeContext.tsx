@@ -38,7 +38,7 @@ function loadMode(): ThemeMode {
   } catch {
     // ignore
   }
-  return 'auto';
+  return 'light';
 }
 
 function resolveTheme(mode: ThemeMode): ThemeValue {
