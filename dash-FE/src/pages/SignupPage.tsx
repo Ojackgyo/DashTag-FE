@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import './SignupPage.css';
 import rawNicknames from '../data/nicknames.csv?raw';
 import inhaMajorsRaw from '../data/inha_majors.json';
+import { signup as apiSignup, verifyEmail as apiVerifyEmail, resendVerification } from '../api/auth';
+import { updateMe } from '../api/user';
 
 /* ─── 닉네임 목록 (CSV) ─── */
 const NICKNAMES: string[] = rawNicknames
@@ -85,16 +87,16 @@ function getSteps(gender: string): Step[] {
       sub: '포털 이메일(@inha.edu)만 사용할 수 있어요',
     },
     {
-      type: 'email-verify', key: 'emailCode', question: '이메일 인증을 완료해주세요 📬',
-      sub: '인증번호 6자리를 입력해주세요',
-    },
-    {
       type: 'password', key: 'password', question: '비밀번호를 설정해주세요 🔒',
       placeholder: '8자 이상, 대/소문자·숫자·특수문자 포함',
       sub: '보안을 위해 강력한 비밀번호를 설정해주세요',
     },
-    { type: 'text', key: 'name', question: '이름이 뭐예요? 👋', placeholder: '실명을 입력해주세요' },
     { type: 'nickname-picker', key: 'nickname', question: '영어 닉네임을 골라봐요 ✨', sub: '앱에서 사용할 닉네임이에요' },
+    {
+      type: 'email-verify', key: 'emailCode', question: '이메일 인증을 완료해주세요 📬',
+      sub: '인증번호 6자리를 입력해주세요',
+    },
+    { type: 'text', key: 'name', question: '이름이 뭐예요? 👋', placeholder: '실명을 입력해주세요' },
     {
       type: 'choice', key: 'faceType', question: '내 얼굴상은? 🐾',
       options: [
@@ -443,7 +445,7 @@ function EmailVerifyInput({ email, value, onChange }: {
   const handleResend = () => {
     if (cooldown > 0) return;
     setCooldown(60);
-    // TODO: API call to resend verification email
+    resendVerification(email).catch(() => {});
   };
 
   return (
@@ -633,6 +635,7 @@ export default function SignupPage() {
   const [exiting, setExiting] = useState(false);
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const advancingRef = useRef(false);
 
@@ -648,6 +651,20 @@ export default function SignupPage() {
     const t = setTimeout(() => setVisible(true), 40);
     return () => clearTimeout(t);
   }, [currentStep]);
+
+  // 이메일 인증 단계 진입 시 회원가입 API 호출
+  useEffect(() => {
+    if (step.key === 'emailCode') {
+      const email = answers['email'] ?? '';
+      const password = answers['password'] ?? '';
+      const nickname = answers['nickname'] ?? '';
+      const g = answers['gender'] === '남성' ? 'male' : 'female';
+      if (email && password && nickname) {
+        apiSignup(email, password, nickname, g).catch(() => {});
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.key]);
 
   useEffect(() => {
     if (step.type === 'text' || step.type === 'password') {
@@ -695,8 +712,8 @@ export default function SignupPage() {
       p === 'T' || p === 'F' || p === 'J' || p === 'P' || (ideal && p === '?'));
   };
 
-  const handleNext = () => {
-    if (advancingRef.current) return;
+  const handleNext = async () => {
+    if (advancingRef.current || submitting) return;
     if (step.type === 'mbti-selector') {
       const ideal = 'ideal' in step ? step.ideal : false;
       if (!mbtiAllSelected(currentValue, ideal)) return;
@@ -705,7 +722,58 @@ export default function SignupPage() {
     }
     const err = validate();
     if (err) { setError(err); return; }
-    if (isLast) { navigate('/'); return; }
+
+    // 이메일 인증 코드 확인
+    if (step.key === 'emailCode') {
+      setSubmitting(true);
+      try {
+        await apiVerifyEmail(answers['email'] ?? '', currentValue);
+        advance();
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : '인증코드가 올바르지 않아요');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // 마지막 스텝: 프로필 저장
+    if (isLast) {
+      setSubmitting(true);
+      try {
+        const mbtiStr = (answers['mbti'] ?? '').replace(/,/g, '');
+        const idealMbtiStr = (answers['idealMbti'] ?? '').replace(/,/g, '');
+        await updateMe({
+          name: answers['name'] || null,
+          age: parseInt(answers['age'] ?? '0') || null,
+          major: answers['major'] || null,
+          face_type: answers['faceType'] || null,
+          height: parseInt(answers['height'] ?? '0') || null,
+          weight: parseInt(answers['weight'] ?? '0') || null,
+          skin_tone: answers['skinTone'] || null,
+          mbti: mbtiStr || null,
+          tattoo: answers['tattoo'] ? answers['tattoo'] !== '없어요' : null,
+          smoking: answers['smoking'] ? answers['smoking'] !== '비흡연' : null,
+          charm_points: answers['charmPoints']?.split(',').filter(Boolean) ?? [],
+          ideal_type: {
+            face_type: answers['idealFaceType'],
+            skin_tone: answers['idealSkinTone'],
+            mbti: idealMbtiStr,
+            age_diff: answers['idealAge'],
+            tattoo: answers['idealTattoo'],
+            smoking: answers['idealSmoking'],
+            military: answers['idealMilitary'],
+          },
+        });
+        navigate('/');
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : '프로필 저장에 실패했어요');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     advance();
   };
 
@@ -921,9 +989,9 @@ export default function SignupPage() {
           <button
             className={`next-btn ${isNextEnabled ? 'active' : ''}`}
             onClick={handleNext}
-            disabled={!isNextEnabled}
+            disabled={!isNextEnabled || submitting}
           >
-            {step.type === 'intro' ? '시작하기! 💕' : isLast ? '완료! 시작하기 🎉' : '다음으로 →'}
+            {submitting ? '처리 중...' : step.type === 'intro' ? '시작하기! 💕' : isLast ? '완료! 시작하기 🎉' : '다음으로 →'}
           </button>
         </div>
       )}

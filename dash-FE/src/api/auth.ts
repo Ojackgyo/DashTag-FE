@@ -1,64 +1,47 @@
-import { api, setToken, clearToken } from './client';
+import { api, setTokens, clearTokens } from './client';
 
-export interface AuthUser {
-  id: string;
-  email: string;
-  nickname: string;
-  profileComplete: boolean;
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type?: string;
 }
 
-export interface LoginResponse {
-  token: string;
-  user: AuthUser;
+interface AuthMsg { message: string; }
+
+// POST /auth/signup
+// 계정 생성 + 인증 메일 발송
+export function signup(email: string, password: string, nickname: string, gender: string): Promise<AuthMsg> {
+  return api.post<AuthMsg>('/auth/signup', { email, password, nickname, gender });
+}
+
+// POST /auth/verify-email
+// 인증코드 확인 → 토큰 발급
+export async function verifyEmail(email: string, code: string): Promise<TokenResponse> {
+  const res = await api.post<TokenResponse>('/auth/verify-email', { email, code });
+  setTokens(res.access_token, res.refresh_token);
+  return res;
+}
+
+// POST /auth/resend-verification
+// 인증코드 재발송
+export function resendVerification(email: string): Promise<AuthMsg> {
+  return api.post<AuthMsg>('/auth/resend-verification', { email });
 }
 
 // POST /auth/login
-// body: { email, password }
-export async function login(email: string, password: string): Promise<LoginResponse> {
-  const res = await api.post<LoginResponse>('/auth/login', { email, password });
-  setToken(res.token);
+export async function login(email: string, password: string): Promise<TokenResponse> {
+  const res = await api.post<TokenResponse>('/auth/login', { email, password });
+  setTokens(res.access_token, res.refresh_token);
   return res;
 }
 
-// POST /auth/login/kakao
-// body: { code } — 카카오 OAuth authorization code
-export async function loginKakao(code: string): Promise<LoginResponse> {
-  const res = await api.post<LoginResponse>('/auth/login/kakao', { code });
-  setToken(res.token);
+// POST /auth/refresh
+export async function refreshToken(refresh_token: string): Promise<TokenResponse> {
+  const res = await api.post<TokenResponse>('/auth/refresh', { refresh_token });
+  setTokens(res.access_token, res.refresh_token);
   return res;
 }
 
-// POST /auth/logout
-export async function logout(): Promise<void> {
-  await api.post('/auth/logout');
-  clearToken();
-}
-
-// GET /auth/me
-export function getMe(): Promise<AuthUser> {
-  return api.get<AuthUser>('/auth/me');
-}
-
-export interface SignupBody {
-  email: string;
-  password: string;
-}
-
-// POST /auth/signup
-export async function signup(body: SignupBody): Promise<LoginResponse> {
-  const res = await api.post<LoginResponse>('/auth/signup', body);
-  setToken(res.token);
-  return res;
-}
-
-// POST /auth/email/send
-// 이메일 인증코드 발송 (60초 재전송 제한은 서버에서도 강제)
-export function sendEmailCode(email: string): Promise<void> {
-  return api.post<void>('/auth/email/send', { email });
-}
-
-// POST /auth/email/verify
-// 인증코드 확인
-export function verifyEmailCode(email: string, code: string): Promise<{ verified: boolean }> {
-  return api.post<{ verified: boolean }>('/auth/email/verify', { email, code });
+export function logout() {
+  clearTokens();
 }

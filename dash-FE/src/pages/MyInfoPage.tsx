@@ -1,116 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-/* ── 리뷰 목 데이터 ── */
-const REVIEWS = [
-  { id: 1, emoji: '🐱', rating: 5, text: '대화가 정말 즐거웠어요 😊 또 얘기하고 싶어요!', daysAgo: 2 },
-  { id: 2, emoji: '🦊', rating: 4, text: '매너가 좋고 배려심이 넘쳐요', daysAgo: 7 },
-  { id: 3, emoji: '🐶', rating: 5, text: '시간 가는 줄 몰랐어요! 재밌었어요', daysAgo: 14 },
-];
-
-/* ── 별점 표시 ── */
-function Stars({ rating, size = 14 }: { rating: number; size?: number }) {
-  return (
-    <span style={{ display: 'inline-flex', gap: 1 }}>
-      {[1, 2, 3, 4, 5].map(i => (
-        <span key={i} style={{ fontSize: size, color: i <= rating ? '#FFCC00' : 'var(--border)', lineHeight: 1 }}>★</span>
-      ))}
-    </span>
-  );
-}
-
-/* ── 대쉬서클 (리뷰) ── */
-function ReviewSection() {
-  const [showAll, setShowAll] = useState(false);
-  const avg = REVIEWS.length > 0
-    ? REVIEWS.reduce((s, r) => s + r.rating, 0) / REVIEWS.length
-    : 0;
-  const R = 56, STROKE = 9, C = 2 * Math.PI * R;
-  const offset = C * (1 - avg / 5);
-  const displayed = showAll ? REVIEWS : REVIEWS.slice(0, 2);
-
-  if (REVIEWS.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '28px 0' }}>
-        <span style={{ fontSize: 40 }}>💌</span>
-        <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-sub)', marginTop: 10 }}>아직 받은 리뷰가 없어요</p>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>매칭 상대가 리뷰를 남기면 여기에 표시돼요</p>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {/* 원형 평점 */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 16 }}>
-        <svg width="140" height="140" viewBox="0 0 140 140">
-          <circle cx="70" cy="70" r={R} fill="none" stroke="var(--bg-card2)" strokeWidth={STROKE} />
-          <circle
-            cx="70" cy="70" r={R} fill="none"
-            stroke="url(#ratingGrad)" strokeWidth={STROKE}
-            strokeLinecap="round"
-            strokeDasharray={C} strokeDashoffset={offset}
-            transform="rotate(-90 70 70)"
-            style={{ transition: 'stroke-dashoffset 0.7s ease' }}
-          />
-          <defs>
-            <linearGradient id="ratingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#FFCC00" />
-              <stop offset="100%" stopColor="#FF80AB" />
-            </linearGradient>
-          </defs>
-          <text x="70" y="63" textAnchor="middle" fontSize="26" fontWeight="800" fill="var(--text)">{avg.toFixed(1)}</text>
-          <text x="70" y="81" textAnchor="middle" fontSize="10" fill="var(--text-muted)">평균 별점</text>
-        </svg>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-          <Stars rating={Math.round(avg)} size={16} />
-          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>({REVIEWS.length}개 리뷰)</span>
-        </div>
-      </div>
-
-      {/* 리뷰 카드 목록 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {displayed.map(r => (
-          <div key={r.id} style={{
-            padding: '12px 14px', borderRadius: 14,
-            background: 'var(--bg-card2)', border: '1px solid var(--border)',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <Stars rating={r.rating} size={13} />
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.daysAgo}일 전</span>
-            </div>
-            <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.55 }}>
-              <span style={{ marginRight: 4 }}>{r.emoji}</span>{r.text}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {REVIEWS.length > 2 && (
-        <button
-          onClick={() => setShowAll(v => !v)}
-          style={{
-            width: '100%', marginTop: 10, padding: '10px',
-            borderRadius: 12, border: '1px solid var(--border)',
-            background: 'transparent', fontSize: 13, fontWeight: 600,
-            color: 'var(--text-muted)',
-          }}
-        >
-          {showAll ? '접기' : `리뷰 ${REVIEWS.length - 2}개 더보기 ›`}
-        </button>
-      )}
-    </div>
-  );
-}
+import { getMe } from '../api/user';
+import { faceTypeToEmoji } from '../api/user';
+import { clearTokens } from '../api/client';
+import type { UserResponse } from '../api/user';
 
 /* ── 내 정보 상세 시트 ── */
-function MyProfileSheet({ onClose }: { onClose: () => void }) {
+function MyProfileSheet({ user, onClose }: { user: UserResponse | null; onClose: () => void }) {
   const navigate = useNavigate();
   const INFO_GROUPS = [
-    { title: '기본 정보', rows: ['닉네임', '나이', '학과', 'MBTI'] },
-    { title: '외모 정보', rows: ['얼굴상', '키 / 몸무게', '피부톤'] },
-    { title: '라이프스타일', rows: ['흡연', '연애 스타일', '매력포인트'] },
-    { title: '이상형', rows: ['이상형 얼굴상', '선호 MBTI', '나이차', '흡연 여부'] },
+    {
+      title: '기본 정보',
+      rows: [
+        { label: '닉네임',  value: user?.nickname ?? '미설정' },
+        { label: '나이',    value: user?.age != null ? `${user.age}세` : '미설정' },
+        { label: '학과',    value: user?.major ?? '미설정' },
+        { label: 'MBTI',   value: user?.mbti ?? '미설정' },
+      ],
+    },
+    {
+      title: '외모 정보',
+      rows: [
+        { label: '얼굴상',      value: user?.face_type ?? '미설정' },
+        { label: '키 / 몸무게', value: (user?.height != null && user?.weight != null) ? `${user.height}cm / ${user.weight}kg` : '미설정' },
+        { label: '피부톤',      value: user?.skin_tone ?? '미설정' },
+        { label: '헤어스타일',  value: user?.hair_style ?? '미설정' },
+      ],
+    },
+    {
+      title: '라이프스타일',
+      rows: [
+        { label: '흡연',     value: user?.smoking != null ? (user.smoking ? '흡연' : '비흡연') : '미설정' },
+        { label: '타투',     value: user?.tattoo != null ? (user.tattoo ? '있어요' : '없어요') : '미설정' },
+        { label: '매력포인트', value: user?.charm_points?.join(', ') ?? '미설정' },
+      ],
+    },
   ];
 
   return (
@@ -137,7 +61,7 @@ function MyProfileSheet({ onClose }: { onClose: () => void }) {
             fontSize: 20, color: 'var(--text)',
           }}
         >‹</button>
-        <p style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)' }}>내 정보 수정</p>
+        <p style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)' }}>내 정보</p>
       </div>
 
       {/* 스크롤 콘텐츠 */}
@@ -148,9 +72,9 @@ function MyProfileSheet({ onClose }: { onClose: () => void }) {
             width: 80, height: 80, borderRadius: 24,
             background: 'var(--bg-card2)', border: '2px solid var(--border)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38,
-          }}>🙂</div>
-          <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>닉네임 미설정</p>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>미설정 · 인하대학교</p>
+          }}>{faceTypeToEmoji(user?.face_type)}</div>
+          <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>{user?.nickname ?? '닉네임 미설정'}</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{user?.email ?? ''}</p>
         </div>
 
         {/* 정보 그룹 */}
@@ -166,14 +90,14 @@ function MyProfileSheet({ onClose }: { onClose: () => void }) {
               borderBottom: '1px solid var(--border)',
               color: 'var(--text-muted)', background: 'var(--bg-card2)',
             }}>{group.title}</div>
-            {group.rows.map((label, i) => (
-              <div key={label} style={{
+            {group.rows.map((row, i) => (
+              <div key={row.label} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 padding: '13px 16px', minHeight: 48,
                 borderTop: i > 0 ? '1px solid var(--border)' : 'none',
               }}>
-                <span style={{ fontSize: 14, color: 'var(--text-sub)' }}>{label}</span>
-                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>미설정</span>
+                <span style={{ fontSize: 14, color: 'var(--text-sub)' }}>{row.label}</span>
+                <span style={{ fontSize: 13, color: row.value === '미설정' ? 'var(--text-muted)' : 'var(--text)', fontWeight: row.value === '미설정' ? 400 : 600 }}>{row.value}</span>
               </div>
             ))}
           </div>
@@ -197,7 +121,13 @@ function MyProfileSheet({ onClose }: { onClose: () => void }) {
 
 /* ── 메인 ── */
 export default function MyInfoPage() {
+  const navigate = useNavigate();
   const [showProfile, setShowProfile] = useState(false);
+  const [user, setUser] = useState<UserResponse | null>(null);
+
+  useEffect(() => {
+    getMe().then(setUser).catch(() => {});
+  }, []);
 
   const MENU_ITEMS = [
     { section: '고객지원', items: [
@@ -211,6 +141,11 @@ export default function MyInfoPage() {
       { label: '개인정보 처리방침', icon: '🔒' },
     ]},
   ];
+
+  const handleLogout = () => {
+    clearTokens();
+    navigate('/login');
+  };
 
   return (
     <div className="px-[18px] pb-6">
@@ -230,10 +165,10 @@ export default function MyInfoPage() {
           width: 60, height: 60, borderRadius: 18, flexShrink: 0,
           background: 'var(--bg-card2)', border: '2px solid var(--border)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
-        }}>🙂</div>
+        }}>{faceTypeToEmoji(user?.face_type)}</div>
         <div style={{ flex: 1 }}>
-          <p style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', marginBottom: 3 }}>닉네임 미설정</p>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>인하대학교</p>
+          <p style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', marginBottom: 3 }}>{user?.nickname ?? '닉네임 미설정'}</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{user?.major ?? '인하대학교'}</p>
         </div>
         <button
           style={{
@@ -242,20 +177,23 @@ export default function MyInfoPage() {
             border: '1px solid var(--primary-border)', padding: '7px 14px', borderRadius: 20,
           }}
           onClick={() => setShowProfile(true)}
-        >내 정보 수정</button>
+        >내 정보</button>
       </div>
 
-      {/* 대쉬서클 (리뷰) */}
+      {/* 대쉬서클 영역 (리뷰 - 백엔드 미지원, 향후 추가 예정) */}
       <div style={{
         borderRadius: 20, padding: '18px 18px 20px',
         border: '1px solid var(--border)', background: 'var(--bg-card)',
         marginBottom: 12,
       }}>
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', marginBottom: 3 }}>대쉬서클</p>
           <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>매칭 상대가 남긴 솔직한 리뷰예요</p>
         </div>
-        <ReviewSection />
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <span style={{ fontSize: 36 }}>💌</span>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>아직 받은 리뷰가 없어요</p>
+        </div>
       </div>
 
       {/* 고객지원 + 약관 */}
@@ -289,9 +227,21 @@ export default function MyInfoPage() {
         </div>
       ))}
 
-      <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', padding: '12px 0 24px' }}>DashTag v1.0.0</p>
+      {/* 로그아웃 */}
+      <button
+        style={{
+          width: '100%', padding: '14px', borderRadius: 16, marginTop: 4, marginBottom: 12,
+          fontSize: 14, fontWeight: 700, color: '#FF6B6B',
+          background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.25)',
+        }}
+        onClick={handleLogout}
+      >
+        로그아웃
+      </button>
 
-      {showProfile && <MyProfileSheet onClose={() => setShowProfile(false)} />}
+      <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', padding: '4px 0 24px' }}>DashTag v1.0.0</p>
+
+      {showProfile && <MyProfileSheet user={user} onClose={() => setShowProfile(false)} />}
     </div>
   );
 }

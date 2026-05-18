@@ -1,17 +1,30 @@
-const QA_MODE = true; // QA 완료 후 false로 변경
-
-const todayKey = () => `dashtag_chance_${new Date().toDateString()}`;
-
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { getChance, spendChance } from '../api/chance';
+import { isLoggedIn } from '../api/client';
 
 export function useChance() {
-  const [used, setUsed] = useState(() => localStorage.getItem(todayKey()) === '1');
+  const [hasChance, setHasChance] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  const spend = () => {
-    if (QA_MODE) return;
-    localStorage.setItem(todayKey(), '1');
-    setUsed(true);
-  };
+  useEffect(() => {
+    if (!isLoggedIn()) return;
+    getChance()
+      .then(res => setHasChance(res.has_chance))
+      .catch(() => {});
+  }, []);
 
-  return { hasChance: QA_MODE ? true : !used, spend };
+  const spend = useCallback(async () => {
+    if (!hasChance) return;
+    setLoading(true);
+    try {
+      const res = await spendChance();
+      setHasChance(res.has_chance);
+    } catch {
+      // 실패해도 UI는 유지
+    } finally {
+      setLoading(false);
+    }
+  }, [hasChance]);
+
+  return { hasChance, spend, loading };
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { clearToken } from '../api/client';
+import { clearTokens } from '../api/client';
 import { useTheme } from '../context/ThemeContext';
 
 function ChatIcon() {
@@ -41,7 +41,7 @@ export default function Header() {
   const { isDark, setMode } = useTheme();
 
   const handleLogout = () => {
-    clearToken();
+    clearTokens();
     setIsLoggedIn(false);
     navigate('/login');
   };

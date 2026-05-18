@@ -1,15 +1,21 @@
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'https://dashtag-be-production.up.railway.app';
 
-function getToken() {
-  return localStorage.getItem('dashtag_token');
+export function getToken() {
+  return localStorage.getItem('dashtag_access_token');
 }
 
-export function setToken(token: string) {
-  localStorage.setItem('dashtag_token', token);
+export function setTokens(accessToken: string, refreshToken: string) {
+  localStorage.setItem('dashtag_access_token', accessToken);
+  localStorage.setItem('dashtag_refresh_token', refreshToken);
 }
 
-export function clearToken() {
-  localStorage.removeItem('dashtag_token');
+export function clearTokens() {
+  localStorage.removeItem('dashtag_access_token');
+  localStorage.removeItem('dashtag_refresh_token');
+}
+
+export function isLoggedIn() {
+  return !!getToken();
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -25,7 +31,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(error.message ?? '서버 오류가 발생했어요');
+    throw new Error(error.detail ?? error.message ?? '서버 오류가 발생했어요');
   }
 
   if (res.status === 204) return undefined as T;

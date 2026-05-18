@@ -1,69 +1,24 @@
 import { api } from './client';
+import type { UserProfileResponse } from './user';
 
-export interface DashPerson {
-  id: string;
-  name: string;
-  nickname: string;
-  emoji: string;
-  mbti: string;
-  faceType: string;
-  major: string;
-  age: number;
-  studentId: string;    // ex. "21학번"
-  height: number;
-  weight: number;
-  skinTone: string;
-  hairStyle: string;
-  tattoo: string;
-  smoking: string;
-  charmPoints: string[];
-  requestMsg: string;   // 상대방이 보낸 한 줄 메시지
-  sentAt: string;       // ISO 8601
+export interface DatingRequestResponse {
+  id: number;
+  from_user_id: number;
+  to_user_id: number;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+  from_user?: UserProfileResponse | null;
+  to_user?: UserProfileResponse | null;
 }
 
-export interface ScheduleItem {
-  id: string;
-  title: string;
-  date: string;         // ex. "4/30 (목)"
-  type: 'meeting' | 'date' | 'group';
+// GET /api/dating/requests
+// 받은 대쉬 + 보낸 대쉬 모두 포함
+export function getDatingRequests(): Promise<DatingRequestResponse[]> {
+  return api.get<DatingRequestResponse[]>('/api/dating/requests');
 }
 
-export interface HomeData {
-  receivedDashes: DashPerson[];
-  sentDashes: DashPerson[];
-  todaySchedule: ScheduleItem | null;
-  upcomingSchedules: ScheduleItem[];
-}
-
-export interface AcceptDashResponse {
-  chatRoomId: string;   // 수락 시 생성된 채팅방 ID
-}
-
-// GET /home
-// 홈화면에 필요한 데이터 한번에
-export function getHomeData(): Promise<HomeData> {
-  return api.get<HomeData>('/home');
-}
-
-// GET /dashes/received
-// 받은 대쉬 전체 목록
-export function getReceivedDashes(): Promise<DashPerson[]> {
-  return api.get<DashPerson[]>('/dashes/received');
-}
-
-// GET /dashes/sent
-// 보낸 대쉬 전체 목록
-export function getSentDashes(): Promise<DashPerson[]> {
-  return api.get<DashPerson[]>('/dashes/sent');
-}
-
-// POST /dashes/:id/accept
-// 기회 사용 + 대쉬 수락 → 채팅방 생성
-export function acceptDash(dashId: string): Promise<AcceptDashResponse> {
-  return api.post<AcceptDashResponse>(`/dashes/${dashId}/accept`);
-}
-
-// POST /dashes/:id/reject
-export function rejectDash(dashId: string): Promise<void> {
-  return api.post<void>(`/dashes/${dashId}/reject`);
+// PATCH /api/dating/requests/{id}
+// status: 'accepted' | 'rejected'
+export function updateDatingRequest(requestId: number, status: 'accepted' | 'rejected'): Promise<DatingRequestResponse> {
+  return api.patch<DatingRequestResponse>(`/api/dating/requests/${requestId}`, { status });
 }

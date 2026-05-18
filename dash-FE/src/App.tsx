@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AcceptedDashProvider } from './context/AcceptedDashContext';
+import { isLoggedIn } from './api/client';
 import Header from './components/Header';
 import GNB from './components/GNB';
 import HomePage from './pages/HomePage';
@@ -13,6 +14,11 @@ import SignupPage from './pages/SignupPage';
 import LoginPage from './pages/LoginPage';
 import ReceivedDashPage from './pages/ReceivedDashPage';
 import SentDashPage from './pages/SentDashPage';
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  if (!isLoggedIn()) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -34,21 +40,23 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
-          <Route path="/received-dashes" element={<ReceivedDashPage />} />
-          <Route path="/sent-dashes" element={<SentDashPage />} />
+          <Route path="/received-dashes" element={<ProtectedRoute><ReceivedDashPage /></ProtectedRoute>} />
+          <Route path="/sent-dashes" element={<ProtectedRoute><SentDashPage /></ProtectedRoute>} />
           <Route
             path="/*"
             element={
-              <Layout>
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/date" element={<DatePage />} />
-                  <Route path="/meeting" element={<MeetingPage />} />
-                  <Route path="/community" element={<CommunityPage />} />
-                  <Route path="/myinfo" element={<MyInfoPage />} />
-                  <Route path="/chat" element={<ChatPage />} />
-                </Routes>
-              </Layout>
+              <ProtectedRoute>
+                <Layout>
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/date" element={<DatePage />} />
+                    <Route path="/meeting" element={<MeetingPage />} />
+                    <Route path="/community" element={<CommunityPage />} />
+                    <Route path="/myinfo" element={<MyInfoPage />} />
+                    <Route path="/chat" element={<ChatPage />} />
+                  </Routes>
+                </Layout>
+              </ProtectedRoute>
             }
           />
         </Routes>
