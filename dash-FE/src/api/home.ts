@@ -7,6 +7,7 @@ export interface DatingRequestResponse {
   to_user_id: number;
   status: 'pending' | 'accepted' | 'rejected';
   created_at: string;
+  message?: string | null;
   from_user?: UserProfileResponse | null;
   to_user?: UserProfileResponse | null;
 }
@@ -17,8 +18,7 @@ export function getDatingRequests(): Promise<DatingRequestResponse[]> {
   return api.get<DatingRequestResponse[]>('/api/dating/requests');
 }
 
-// PATCH /api/dating/requests/{id}
-// status: 'accepted' | 'rejected'
+// PUT /api/dating/requests/{id}
 export function updateDatingRequest(requestId: number, status: 'accepted' | 'rejected'): Promise<DatingRequestResponse> {
-  return api.patch<DatingRequestResponse>(`/api/dating/requests/${requestId}`, { status });
+  return api.put<DatingRequestResponse>(`/api/dating/requests/${requestId}`, { status });
 }

@@ -285,7 +285,7 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
       <div className="flex items-center gap-2.5 px-[18px] py-3 shrink-0 border-b" style={{ background: 'var(--header-bg)', backdropFilter: 'blur(16px)', borderColor: 'var(--border)' }}>
         <button className="w-8 h-8 rounded-[9px] flex items-center justify-center text-[16px] font-semibold shrink-0 border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-sub)' }} onClick={onBack}>←</button>
         <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-bold truncate" style={{ color: 'var(--text)' }}>{room.name ?? '채팅방'}</p>
+          <p className="text-[15px] font-bold truncate" style={{ color: 'var(--text)' }}>{roomCategory(room.room_type)} #{room.id}</p>
         </div>
         <button
           className="text-[11px] font-bold px-2.5 py-1.5 rounded-[10px] border shrink-0 whitespace-nowrap active:opacity-75"
@@ -369,7 +369,7 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
       </div>
 
       {showDateModal && <DateModal roomId={room.id} onConfirm={handleConfirmDate} onClose={() => setShowDateModal(false)} />}
-      {showReport && <ReportModal roomId={room.id} roomName={room.name ?? '채팅방'} reportedUserId={reportedUserId} onClose={() => setShowReport(false)} />}
+      {showReport && <ReportModal roomId={room.id} roomName={`${roomCategory(room.room_type)} #${room.id}`} reportedUserId={reportedUserId} onClose={() => setShowReport(false)} />}
     </div>
   );
 }
@@ -403,7 +403,7 @@ export default function ChatPage() {
 
   if (activeRoom) return <ChatRoomView room={activeRoom} userId={userId} onBack={() => setActiveRoom(null)} />;
 
-  const filtered = rooms.filter(r => roomCategory(r.type) === category);
+  const filtered = rooms.filter(r => roomCategory(r.room_type) === category);
 
   return (
     <div className="px-[18px] pb-6">
@@ -445,15 +445,15 @@ export default function ChatPage() {
               <div
                 className="w-[50px] h-[50px] rounded-[16px] flex items-center justify-center text-[24px] shrink-0"
                 style={{ background: 'var(--bg-card2)' }}
-              >{CATEGORY_EMOJI[roomCategory(room.type)]}</div>
+              >{CATEGORY_EMOJI[roomCategory(room.room_type)]}</div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start mb-1 gap-2">
-                  <span className="text-[15px] font-bold" style={{ color: 'var(--text)' }}>{room.name ?? '채팅방'}</span>
-                  <span className="text-[11px] shrink-0 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{formatRoomTime(room.last_message?.created_at ?? room.created_at)}</span>
+                  <span className="text-[15px] font-bold" style={{ color: 'var(--text)' }}>{roomCategory(room.room_type)} #{room.id}</span>
+                  <span className="text-[11px] shrink-0 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{formatRoomTime(room.last_message_at ?? room.created_at)}</span>
                 </div>
                 <div className="flex justify-between items-center gap-2">
                   <span className="text-[13px] truncate" style={{ color: 'var(--text-muted)' }}>
-                    {room.last_message?.content ?? '새 채팅방'}
+                    {room.last_message ?? '새 채팅방'}
                   </span>
                   {(room.unread_count ?? 0) > 0 && (
                     <span className="text-[10px] font-bold min-w-5 h-5 rounded-full flex items-center justify-center px-1.5 text-white shrink-0" style={{ background: 'var(--primary)' }}>{room.unread_count}</span>

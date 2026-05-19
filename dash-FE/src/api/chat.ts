@@ -2,11 +2,12 @@ import { api } from './client';
 
 export interface ChatRoomResponse {
   id: number;
-  type: string;
-  name?: string | null;
+  room_type: string;
+  related_id?: number | null;
   created_at: string;
-  last_message?: MessageResponse | null;
-  unread_count?: number;
+  last_message?: string | null;
+  last_message_at?: string | null;
+  unread_count: number;
 }
 
 export interface MessageResponse {

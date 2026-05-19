@@ -7,7 +7,6 @@ export function getDateProfiles(): Promise<UserProfileResponse[]> {
 }
 
 // POST /api/dating/requests
-// 대화 신청 (기회 사용 필요)
-export function sendDateRequest(to_user_id: number): Promise<{ id: number; status: string }> {
-  return api.post<{ id: number; status: string }>('/api/dating/requests', { to_user_id });
+export function sendDateRequest(to_user_id: number, message?: string): Promise<{ id: number; status: string }> {
+  return api.post<{ id: number; status: string }>('/api/dating/requests', { to_user_id, message: message || null });
 }

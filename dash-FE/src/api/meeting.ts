@@ -10,7 +10,10 @@ export interface MeetingResponse {
   scheduled_at?: string | null;
   is_active: boolean;
   created_at: string;
+  invite_code?: string | null;
   participant_count: number;
+  male_count: number;
+  female_count: number;
   is_joined: boolean;
 }
 
@@ -40,6 +43,11 @@ export function createMeeting(body: MeetingCreate): Promise<MeetingResponse> {
 // POST /api/meetings/{id}/join
 export function joinMeeting(id: number): Promise<MeetingResponse> {
   return api.post<MeetingResponse>(`/api/meetings/${id}/join`);
+}
+
+// POST /api/meetings/join-by-code
+export function joinMeetingByCode(invite_code: string): Promise<MeetingResponse> {
+  return api.post<MeetingResponse>('/api/meetings/join-by-code', { invite_code });
 }
 
 // DELETE /api/meetings/{id}/leave

@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { getMe } from '../api/user';
 import { faceTypeToEmoji } from '../api/user';
 import { clearTokens } from '../api/client';
+import { getReceivedReviews } from '../api/review';
 import type { UserResponse } from '../api/user';
+import type { ReviewResponse } from '../api/review';
 
 /* ── 내 정보 상세 시트 ── */
 function MyProfileSheet({ user, onClose }: { user: UserResponse | null; onClose: () => void }) {
@@ -119,14 +121,26 @@ function MyProfileSheet({ user, onClose }: { user: UserResponse | null; onClose:
   );
 }
 
+function Stars({ rating }: { rating: number }) {
+  return (
+    <span style={{ display: 'inline-flex', gap: 1 }}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <span key={i} style={{ fontSize: 13, color: i <= rating ? '#FFCC00' : 'var(--border)', lineHeight: 1 }}>★</span>
+      ))}
+    </span>
+  );
+}
+
 /* ── 메인 ── */
 export default function MyInfoPage() {
   const navigate = useNavigate();
   const [showProfile, setShowProfile] = useState(false);
   const [user, setUser] = useState<UserResponse | null>(null);
+  const [reviews, setReviews] = useState<ReviewResponse[]>([]);
 
   useEffect(() => {
     getMe().then(setUser).catch(() => {});
+    getReceivedReviews().then(setReviews).catch(() => {});
   }, []);
 
   const MENU_ITEMS = [
@@ -180,7 +194,7 @@ export default function MyInfoPage() {
         >내 정보</button>
       </div>
 
-      {/* 대쉬서클 영역 (리뷰 - 백엔드 미지원, 향후 추가 예정) */}
+      {/* 대쉬서클 - 받은 리뷰 */}
       <div style={{
         borderRadius: 20, padding: '18px 18px 20px',
         border: '1px solid var(--border)', background: 'var(--bg-card)',
@@ -190,10 +204,24 @@ export default function MyInfoPage() {
           <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', marginBottom: 3 }}>대쉬서클</p>
           <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>매칭 상대가 남긴 솔직한 리뷰예요</p>
         </div>
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <span style={{ fontSize: 36 }}>💌</span>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>아직 받은 리뷰가 없어요</p>
-        </div>
+        {reviews.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <span style={{ fontSize: 36 }}>💌</span>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>아직 받은 리뷰가 없어요</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {reviews.map(r => (
+              <div key={r.id} style={{ borderRadius: 14, padding: '12px 14px', background: 'var(--bg-card2)', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: r.content ? 6 : 0 }}>
+                  <Stars rating={r.rating} />
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(r.created_at).toLocaleDateString('ko-KR')}</span>
+                </div>
+                {r.content && <p style={{ fontSize: 13, color: 'var(--text-sub)', lineHeight: 1.5 }}>{r.content}</p>}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 고객지원 + 약관 */}

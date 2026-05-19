@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { getCommunities, createCommunity, joinCommunity } from '../api/community';
-import type { CommunityResponse } from '../api/community';
+import { getCommunities, createCommunity, joinCommunity, getCommunityDashboard, removeCommunityMember } from '../api/community';
+import { getMe } from '../api/user';
+import type { CommunityResponse, CommunityDashboard, CommunityMemberInfo } from '../api/community';
 
 type GenderFilter = '전체' | '남' | '여';
 
@@ -27,10 +28,80 @@ function genderKey(g: string): string {
   return g; // '남', '여', '혼성' already Korean
 }
 
+/* ── 호스트 대시보드 ── */
+function DashboardSheet({ communityId, onClose }: { communityId: number; onClose: () => void }) {
+  const [dashboard, setDashboard] = useState<CommunityDashboard | null>(null);
+  const [removing, setRemoving] = useState<number | null>(null);
+
+  useEffect(() => {
+    getCommunityDashboard(communityId).then(setDashboard).catch(() => {});
+  }, [communityId]);
+
+  const handleRemove = async (member: CommunityMemberInfo) => {
+    if (removing) return;
+    setRemoving(member.user_id);
+    try {
+      await removeCommunityMember(communityId, member.user_id);
+      setDashboard(prev => prev ? { ...prev, members: prev.members.filter(m => m.user_id !== member.user_id), member_count: prev.member_count - 1 } : prev);
+    } catch { /* ignore */ }
+    setRemoving(null);
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'var(--bg)', display: 'flex', flexDirection: 'column', animation: 'slideInFromRight 0.3s cubic-bezier(0.22,1,0.36,1)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', background: 'var(--header-bg)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--text)' }}>‹</button>
+        <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>호스트 대시보드</p>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', scrollbarWidth: 'none' }}>
+        {!dashboard ? (
+          <p style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 14 }}>불러오는 중...</p>
+        ) : (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-around', padding: '16px', borderRadius: 18, background: 'var(--bg-card)', border: '1px solid var(--border)', marginBottom: 16 }}>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>{dashboard.member_count}</p>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>전체</p>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: 22, fontWeight: 800, color: '#FF80AB' }}>{dashboard.female_count}</p>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>여성</p>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: 22, fontWeight: 800, color: '#5B8DEF' }}>{dashboard.male_count}</p>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>남성</p>
+              </div>
+            </div>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)', marginBottom: 10 }}>멤버 목록</p>
+            <div style={{ borderRadius: 18, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+              {dashboard.members.length === 0 ? (
+                <p style={{ textAlign: 'center', padding: '20px', fontSize: 13, color: 'var(--text-muted)' }}>멤버가 없어요</p>
+              ) : dashboard.members.map((m, i) => (
+                <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{m.nickname}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{[m.age ? `${m.age}세` : null, m.major, m.gender].filter(Boolean).join(' · ')}</p>
+                  </div>
+                  <button
+                    style={{ fontSize: 12, fontWeight: 700, color: '#FF6B6B', background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.25)', padding: '6px 12px', borderRadius: 10, opacity: removing === m.user_id ? 0.5 : 1 }}
+                    disabled={removing === m.user_id}
+                    onClick={() => handleRemove(m)}
+                  >내보내기</button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── 그룹 상세 뷰 ── */
-function GroupDetailView({ group, onClose, onJoin }: { group: CommunityResponse; onClose: () => void; onJoin: (id: number) => Promise<void> }) {
+function GroupDetailView({ group, onClose, onJoin, isCreator }: { group: CommunityResponse; onClose: () => void; onJoin: (id: number) => Promise<void>; isCreator: boolean }) {
   const [joined, setJoined] = useState(group.is_joined);
   const [joining, setJoining] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
   const gc = genderColor(group.gender);
 
   const handleJoin = async () => {
@@ -57,7 +128,11 @@ function GroupDetailView({ group, onClose, onJoin }: { group: CommunityResponse;
       }}>
         <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--text)' }}>‹</button>
         <p style={{ flex: 1, fontSize: 16, fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{group.title}</p>
+        {isCreator && (
+          <button onClick={() => setShowDashboard(true)} style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-bg)', border: '1px solid var(--primary-border)', padding: '6px 12px', borderRadius: 10 }}>대시보드</button>
+        )}
       </div>
+      {showDashboard && <DashboardSheet communityId={group.id} onClose={() => setShowDashboard(false)} />}
 
       {/* 스크롤 콘텐츠 */}
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 100, scrollbarWidth: 'none' }}>
@@ -311,9 +386,11 @@ export default function CommunityPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [groups, setGroups] = useState<CommunityResponse[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<CommunityResponse | null>(null);
+  const [userId, setUserId] = useState<number | null>(null);
 
   useEffect(() => {
     getCommunities().then(setGroups).catch(() => {});
+    getMe().then(u => setUserId(u.id)).catch(() => {});
   }, []);
 
   const handleCreate = async (data: { emoji: string; title: string; description: string; tags: string[]; gender: string }) => {
@@ -398,7 +475,7 @@ export default function CommunityPage() {
       </button>
 
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreate={handleCreate} />}
-      {selectedGroup && <GroupDetailView group={selectedGroup} onClose={() => setSelectedGroup(null)} onJoin={handleJoin} />}
+      {selectedGroup && <GroupDetailView group={selectedGroup} onClose={() => setSelectedGroup(null)} onJoin={handleJoin} isCreator={userId === selectedGroup.creator_id} />}
     </div>
   );
 }

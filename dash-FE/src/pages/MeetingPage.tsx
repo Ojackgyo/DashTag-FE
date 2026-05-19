@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useChance } from '../hooks/useChance';
 import ChanceModal from '../components/ChanceModal';
-import { getMeetings, createMeeting, joinMeeting } from '../api/meeting';
+import { getMeetings, createMeeting, joinMeeting, joinMeetingByCode } from '../api/meeting';
 import type { MeetingResponse } from '../api/meeting';
 
 const DAYS_KR = ['일', '월', '화', '수', '목', '금', '토'];
@@ -71,8 +71,8 @@ function Battery({ filled, total }: { filled: number; total: number }) {
 /* ── 미팅 카드 ── */
 function MeetingCard({ m, onJoin }: { m: MeetingResponse; onJoin: (m: MeetingResponse) => void }) {
   const total = m.required_male + m.required_female;
-  const filledF = Math.min(Math.ceil(m.participant_count / 2), m.required_female);
-  const filledM = Math.min(m.participant_count - filledF, m.required_male);
+  const filledF = Math.min(m.female_count, m.required_female);
+  const filledM = Math.min(m.male_count, m.required_male);
   const fFull = filledF >= m.required_female;
   const mFull = filledM >= m.required_male;
   const full = !m.is_active || m.participant_count >= total;
@@ -120,6 +120,13 @@ function MeetingCard({ m, onJoin }: { m: MeetingResponse; onJoin: (m: MeetingRes
           </div>
         </div>
       </div>
+
+      {m.is_joined && m.invite_code && (
+        <div className="flex items-center justify-between rounded-[12px] px-4 py-3 mb-2 border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--primary-border)' }}>
+          <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>초대코드</span>
+          <span className="text-[14px] font-extrabold tracking-widest" style={{ color: 'var(--primary)' }}>{m.invite_code}</span>
+        </div>
+      )}
 
       <button
         className="w-full text-[14px] font-bold py-[12px] rounded-[14px] min-h-[44px] active:opacity-80"
@@ -269,6 +276,8 @@ export default function MeetingPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [codeInput, setCodeInput] = useState('');
   const [pendingJoin, setPendingJoin] = useState<MeetingResponse | null>(null);
   const [pendingCreate, setPendingCreate] = useState<{ title: string; keywords: string[]; femaleCount: number; maleCount: number; dayOffset: number } | null>(null);
   const { spend, hasChance } = useChance();
@@ -297,6 +306,20 @@ export default function MeetingPage() {
     setPendingCreate(data);
     setShowCreateModal(true);
     setShowCreate(false);
+  };
+
+  const handleJoinByCode = async () => {
+    const code = codeInput.trim();
+    if (!code) return;
+    try {
+      const joined = await joinMeetingByCode(code);
+      setMeetings(prev => {
+        const exists = prev.find(m => m.id === joined.id);
+        return exists ? prev.map(m => m.id === joined.id ? joined : m) : [joined, ...prev];
+      });
+    } catch { /* ignore */ }
+    setShowCodeModal(false);
+    setCodeInput('');
   };
 
   const confirmCreate = async () => {
@@ -328,17 +351,26 @@ export default function MeetingPage() {
           <h1 className="text-[clamp(20px,6vw,24px)] font-extrabold tracking-tight mb-1" style={{ color: 'var(--text)' }}>미팅 / 과팅 🎉</h1>
           <p className="text-[13px]" style={{ color: 'var(--text-sub)' }}>마음 맞는 사람들과 함께해요</p>
         </div>
-        <button
-          className="flex items-center gap-1.5 text-[13px] font-bold px-[14px] py-[10px] rounded-[14px] shrink-0 mt-1 active:opacity-75"
-          style={hasChance
-            ? { background: 'var(--gradient)', color: 'white', boxShadow: '0 3px 12px rgba(255,128,171,0.35)' }
-            : { background: 'var(--bg-card2)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
-          }
-          onClick={() => hasChance && setShowCreate(true)}
-        >
-          <span className="text-[15px]">＋</span>
-          {hasChance ? '개설' : '기회 없음'}
-        </button>
+        <div className="flex gap-2 mt-1">
+          <button
+            className="flex items-center gap-1 text-[13px] font-bold px-3 py-[10px] rounded-[14px] shrink-0 active:opacity-75 border"
+            style={{ background: 'var(--bg-card2)', color: 'var(--text-sub)', borderColor: 'var(--border)' }}
+            onClick={() => setShowCodeModal(true)}
+          >
+            🔑 코드입장
+          </button>
+          <button
+            className="flex items-center gap-1.5 text-[13px] font-bold px-[14px] py-[10px] rounded-[14px] shrink-0 active:opacity-75"
+            style={hasChance
+              ? { background: 'var(--gradient)', color: 'white', boxShadow: '0 3px 12px rgba(255,128,171,0.35)' }
+              : { background: 'var(--bg-card2)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
+            }
+            onClick={() => hasChance && setShowCreate(true)}
+          >
+            <span className="text-[15px]">＋</span>
+            {hasChance ? '개설' : '기회 없음'}
+          </button>
+        </div>
       </div>
 
       {/* 검색 */}
@@ -367,6 +399,27 @@ export default function MeetingPage() {
 
       {showCreate && (
         <CreateSheet onClose={() => setShowCreate(false)} onSubmit={handleCreateSubmit} />
+      )}
+
+      {showCodeModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center px-5" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }} onClick={() => { setShowCodeModal(false); setCodeInput(''); }}>
+          <div className="w-full max-w-[340px] rounded-[24px] p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
+            <p className="text-[17px] font-extrabold mb-1.5" style={{ color: 'var(--text)' }}>🔑 코드로 입장하기</p>
+            <p className="text-[13px] mb-5" style={{ color: 'var(--text-muted)' }}>친구에게 받은 초대코드를 입력하세요</p>
+            <input
+              className="w-full rounded-[14px] px-4 py-3 text-[16px] font-bold text-center tracking-widest border mb-4"
+              style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)' }}
+              placeholder="초대코드 입력"
+              value={codeInput}
+              onChange={e => setCodeInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleJoinByCode()}
+            />
+            <div className="flex gap-2">
+              <button className="flex-1 py-3 rounded-[14px] text-[14px] font-bold border" style={{ background: 'var(--bg-card2)', color: 'var(--text-muted)', borderColor: 'var(--border)' }} onClick={() => { setShowCodeModal(false); setCodeInput(''); }}>취소</button>
+              <button className="flex-1 py-3 rounded-[14px] text-[14px] font-bold text-white" style={{ background: codeInput.trim() ? 'var(--gradient)' : 'var(--bg-card2)', color: codeInput.trim() ? 'white' : 'var(--text-muted)' }} disabled={!codeInput.trim()} onClick={handleJoinByCode}>입장하기</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showJoinModal && pendingJoin && (

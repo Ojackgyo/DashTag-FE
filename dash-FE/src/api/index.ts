@@ -6,3 +6,4 @@ export * from './date';
 export * from './chat';
 export * from './meeting';
 export * from './community';
+export * from './review';

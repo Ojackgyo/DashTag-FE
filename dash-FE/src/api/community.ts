@@ -55,3 +55,33 @@ export function updateCommunity(id: number, body: CommunityUpdate): Promise<Comm
 export function joinCommunity(id: number): Promise<CommunityResponse> {
   return api.post<CommunityResponse>(`/api/communities/${id}/join`);
 }
+
+export interface CommunityMemberInfo {
+  user_id: number;
+  nickname: string;
+  age?: number | null;
+  major?: string | null;
+  gender?: string | null;
+  joined_at: string;
+}
+
+export interface CommunityDashboard {
+  id: number;
+  title: string;
+  emoji: string;
+  member_count: number;
+  male_count: number;
+  female_count: number;
+  is_active: boolean;
+  members: CommunityMemberInfo[];
+}
+
+// GET /api/communities/{id}/dashboard
+export function getCommunityDashboard(id: number): Promise<CommunityDashboard> {
+  return api.get<CommunityDashboard>(`/api/communities/${id}/dashboard`);
+}
+
+// DELETE /api/communities/{id}/members/{userId}
+export function removeCommunityMember(communityId: number, userId: number): Promise<void> {
+  return api.delete<void>(`/api/communities/${communityId}/members/${userId}`);
+}
