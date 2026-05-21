@@ -5,10 +5,17 @@ import rawNicknames from '../data/nicknames.csv?raw';
 import inhaMajorsRaw from '../data/inha_majors.json';
 import { signup as apiSignup, verifyEmail as apiVerifyEmail, resendVerification } from '../api/auth';
 import { updateMe } from '../api/user';
+import StudentIdVerify from '../components/StudentIdVerify';
 
 /* ─── 닉네임 목록 (CSV) ─── */
-const NICKNAMES: string[] = rawNicknames
-  .split('\n')
+const _nicknameLines = rawNicknames.split('\n');
+const MALE_NICKNAMES: string[] = _nicknameLines
+  .slice(0, 11)
+  .flatMap(line => line.split(','))
+  .map(n => n.trim())
+  .filter(Boolean);
+const FEMALE_NICKNAMES: string[] = _nicknameLines
+  .slice(11)
   .flatMap(line => line.split(','))
   .map(n => n.trim())
   .filter(Boolean);
@@ -67,9 +74,10 @@ type Step =
   | { type: 'major-select';    key: string; question: string; sub?: string }
   | { type: 'choice';          key: string; question: string; options: { label: string; emoji: string }[]; sub?: string }
   | { type: 'range';           key: string; question: string; sub?: string }
-  | { type: 'intro';           key: string; question: string }
-  | { type: 'tags';            key: string; question: string; placeholder: string; sub?: string; max: number }
-  | { type: 'mbti-selector';   key: string; question: string; ideal?: boolean; sub?: string };
+  | { type: 'intro';             key: string; question: string }
+  | { type: 'tags';              key: string; question: string; placeholder: string; sub?: string; max: number }
+  | { type: 'mbti-selector';     key: string; question: string; ideal?: boolean; sub?: string }
+  | { type: 'student-id-verify'; key: string; question: string; sub?: string };
 
 /* ─── Steps ─── */
 function getSteps(gender: string): Step[] {
@@ -156,6 +164,7 @@ function getSteps(gender: string): Step[] {
     },
   );
 
+  steps.push({ type: 'student-id-verify', key: 'studentId', question: '학생증으로 인증해봐요 🪪', sub: '학번·이름·생년월일을 자동으로 인식해요. 건너뛰기도 가능해요' });
   steps.push({ type: 'intro', key: 'idealIntro', question: '이상형' });
 
   steps.push(
@@ -360,13 +369,14 @@ function TagsInput({ value, onChange, placeholder, max }: { value: string; onCha
 }
 
 /* ─── 닉네임 피커 ─── */
-function NicknamePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function NicknamePicker({ value, onChange, gender }: { value: string; onChange: (v: string) => void; gender: string }) {
   const [pool, setPool] = useState<string[]>([]);
   const shuffle = () => {
-    const shuffled = [...NICKNAMES].sort(() => Math.random() - 0.5);
+    const namePool = gender === '여성' ? FEMALE_NICKNAMES : MALE_NICKNAMES;
+    const shuffled = [...namePool].sort(() => Math.random() - 0.5);
     setPool(shuffled.slice(0, 8));
   };
-  useEffect(() => { shuffle(); }, []);
+  useEffect(() => { shuffle(); }, [gender]);
 
   return (
     <div style={{ marginTop: 24 }}>
@@ -810,11 +820,13 @@ export default function SignupPage() {
     step.type === 'range' ||
     step.type === 'tags' ||
     step.type === 'intro' ||
-    step.type === 'mbti-selector';
+    step.type === 'mbti-selector' ||
+    step.type === 'student-id-verify';
 
   const isNextEnabled = (() => {
     if (step.type === 'intro') return true;
     if (step.type === 'tags') return true;
+    if (step.type === 'student-id-verify') return true; // 건너뛰기 허용
     if (step.type === 'email-verify') return currentValue.length === 6;
     if (step.type === 'nickname-picker') return !!currentValue;
     if (step.type === 'major-select') return !!currentValue;
@@ -914,6 +926,23 @@ export default function SignupPage() {
           <NicknamePicker
             value={currentValue}
             onChange={v => setAnswers(prev => ({ ...prev, [step.key]: v }))}
+            gender={gender}
+          />
+        )}
+
+        {/* 학생증 인증 */}
+        {step.type === 'student-id-verify' && (
+          <StudentIdVerify
+            onChange={v => setAnswers(prev => ({ ...prev, [step.key]: v }))}
+            onPreFill={(ocrName, birthDate) => {
+              const birthYear = parseInt(birthDate?.split('.')?.[0] ?? '0');
+              const age = birthYear > 1900 ? new Date().getFullYear() - birthYear : 0;
+              setAnswers(prev => ({
+                ...prev,
+                ...(ocrName ? { name: ocrName } : {}),
+                ...(age >= 18 && age <= 35 ? { age: String(age) } : {}),
+              }));
+            }}
           />
         )}
 

@@ -30,7 +30,8 @@ export function createReview(body: ReviewCreate): Promise<ReviewResponse> {
 
 // GET /api/reviews/received
 export function getReceivedReviews(): Promise<ReviewResponse[]> {
-  return api.get<ReviewResponse[]>('/api/reviews/received');
+  return api.get<ReviewSummary | ReviewResponse[]>('/api/reviews/received')
+    .then(data => Array.isArray(data) ? data : (data.reviews ?? []));
 }
 
 // GET /api/reviews/users/{userId}
