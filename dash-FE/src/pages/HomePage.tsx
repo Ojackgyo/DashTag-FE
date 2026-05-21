@@ -7,12 +7,12 @@ import { isLoggedIn } from '../api/client';
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { hasChance } = useChance();
+  const { hasChance, chanceLoading } = useChance();
 
   const [receivedCount, setReceivedCount] = useState(0);
   const [sentCount, setSentCount] = useState(0);
   const [newCount, setNewCount] = useState(0);
-  const [userId, setUserId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const [viewMonth, setViewMonth] = useState(() => {
     const d = new Date();
@@ -26,16 +26,17 @@ export default function HomePage() {
   useEffect(() => {
     if (!isLoggedIn()) { navigate('/login'); return; }
 
-    getMe().then(u => setUserId(u.id)).catch(() => {});
-
-    getDatingRequests().then(requests => {
-      const received = requests.filter(r => r.status === 'pending');
-      const sent = requests.filter(r => r.from_user_id === userId);
-      setReceivedCount(received.length);
-      setSentCount(sent.length);
-      setNewCount(received.length);
-    }).catch(() => {});
-  }, [navigate, userId]);
+    Promise.all([getMe(), getDatingRequests()])
+      .then(([user, requests]) => {
+        const received = requests.filter(r => r.status === 'pending');
+        const sent = requests.filter(r => r.from_user_id === user.id);
+        setReceivedCount(received.length);
+        setSentCount(sent.length);
+        setNewCount(received.length);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [navigate]);
 
   const todayStr = (() => {
     const d = new Date();
@@ -86,11 +87,11 @@ export default function HomePage() {
               boxShadow: 'var(--shadow-avatar-pink)',
             }}>💌</div>
             <p style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', marginBottom: 4, letterSpacing: '-1px' }}>
-              {receivedCount}
+              {loading ? '—' : receivedCount}
             </p>
             <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)' }}>받은 대쉬</p>
             <p style={{ fontSize: 11, color: newCount > 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 600, marginTop: 3 }}>
-              {newCount > 0 ? `${newCount}개 새 요청` : '새 요청 없음'}
+              {loading ? '불러오는 중...' : newCount > 0 ? `${newCount}개 새 요청` : '새 요청 없음'}
             </p>
           </button>
 
@@ -110,7 +111,7 @@ export default function HomePage() {
               fontSize: 20, marginBottom: 14, boxShadow: 'var(--shadow-sm)',
             }}>📤</div>
             <p style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', marginBottom: 4, letterSpacing: '-1px' }}>
-              {sentCount}
+              {loading ? '—' : sentCount}
             </p>
             <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)' }}>보낸 대쉬</p>
             <p style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 3 }}>대기 중</p>
@@ -119,30 +120,30 @@ export default function HomePage() {
 
         {/* ── 오늘의 기회 ── */}
         <div style={{
-          background: hasChance
+          background: (!chanceLoading && hasChance)
             ? 'linear-gradient(135deg, rgba(255,128,171,0.15) 0%, rgba(255,179,204,0.08) 100%)'
             : 'var(--bg-card)',
-          border: `1.5px solid ${hasChance ? 'var(--primary-border)' : 'var(--border)'}`,
+          border: `1.5px solid ${(!chanceLoading && hasChance) ? 'var(--primary-border)' : 'var(--border)'}`,
           borderRadius: 20, padding: '16px 20px', marginBottom: 12,
-          boxShadow: hasChance ? 'var(--shadow-primary)' : 'var(--shadow-card)',
+          boxShadow: (!chanceLoading && hasChance) ? 'var(--shadow-primary)' : 'var(--shadow-card)',
           display: 'flex', alignItems: 'center', gap: 16,
         }}>
           <div style={{
             width: 54, height: 54, borderRadius: '50%', flexShrink: 0,
-            background: hasChance ? 'var(--gradient)' : 'var(--bg-card2)',
-            border: hasChance ? 'none' : '1.5px solid var(--border)',
+            background: (!chanceLoading && hasChance) ? 'var(--gradient)' : 'var(--bg-card2)',
+            border: (!chanceLoading && hasChance) ? 'none' : '1.5px solid var(--border)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24, boxShadow: hasChance ? 'var(--shadow-primary)' : 'var(--shadow-sm)',
+            fontSize: 24, boxShadow: (!chanceLoading && hasChance) ? 'var(--shadow-primary)' : 'var(--shadow-sm)',
           }}>⚡</div>
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)', marginBottom: 3 }}>오늘의 기회</p>
             <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {hasChance ? '오늘 사용할 수 있는 기회가 있어요' : '오늘의 기회를 이미 사용했어요'}
+              {chanceLoading ? '확인 중...' : hasChance ? '오늘 사용할 수 있는 기회가 있어요' : '오늘의 기회를 이미 사용했어요'}
             </p>
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <p style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-1px', lineHeight: 1, color: hasChance ? 'var(--primary)' : 'var(--text-muted)' }}>
-              {hasChance ? '1' : '0'}
+            <p style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-1px', lineHeight: 1, color: (!chanceLoading && hasChance) ? 'var(--primary)' : 'var(--text-muted)' }}>
+              {chanceLoading ? '—' : hasChance ? '1' : '0'}
             </p>
             <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>/1 남음</p>
           </div>

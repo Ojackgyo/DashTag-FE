@@ -3,14 +3,16 @@ import { getChance, spendChance } from '../api/chance';
 import { isLoggedIn } from '../api/client';
 
 export function useChance() {
-  const [hasChance, setHasChance] = useState(true);
+  const [hasChance, setHasChance] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [chanceLoading, setChanceLoading] = useState(true);
 
   useEffect(() => {
-    if (!isLoggedIn()) return;
+    if (!isLoggedIn()) { setChanceLoading(false); return; }
     getChance()
       .then(res => setHasChance(res.has_chance))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setChanceLoading(false));
   }, []);
 
   const spend = useCallback(async () => {
@@ -26,5 +28,5 @@ export function useChance() {
     }
   }, [hasChance]);
 
-  return { hasChance, spend, loading };
+  return { hasChance, spend, loading, chanceLoading };
 }

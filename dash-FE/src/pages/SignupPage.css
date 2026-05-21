@@ -149,8 +149,9 @@
 }
 
 .choice-btn.selected {
-  border-color: var(--primary);
-  background: var(--primary-bg);
+  border-color: transparent;
+  background: var(--gradient);
+  box-shadow: 0 4px 14px rgba(255, 128, 171, 0.35);
 }
 
 .choice-emoji {
@@ -164,7 +165,7 @@
 }
 
 .choice-btn.selected .choice-label {
-  color: var(--primary-light);
+  color: white;
 }
 
 /* Range slider */

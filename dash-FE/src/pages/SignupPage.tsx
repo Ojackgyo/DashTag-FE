@@ -118,7 +118,7 @@ function getSteps(gender: string): Step[] {
       ],
     },
     { type: 'mbti-selector', key: 'mbti', question: 'MBTI가 뭐예요? 🧠', sub: '각 항목에서 해당하는 쪽을 선택해주세요' },
-    { type: 'text', key: 'age', question: '몇 살이에요? 🎂', placeholder: '나이를 숫자로 입력 (ex. 24)' },
+    { type: 'text', key: 'age', question: '몇 살이에요? 🎂', placeholder: '만 나이를 숫자로 입력 (ex. 24)', sub: '만 나이 기준으로 입력해주세요' },
     { type: 'major-select', key: 'major', question: '학과가 어떻게 돼요? 🎓', sub: '인하대학교 학과를 선택해주세요' },
   ];
 
@@ -263,9 +263,9 @@ function MbtiSelector({ value, onChange, ideal }: { value: string; onChange: (v:
                     style={{
                       flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
                       padding: '10px 4px', borderRadius: 12, gap: 3,
-                      background: sel === '?' ? 'var(--primary-bg)' : 'var(--bg-card2)',
-                      border: sel === '?' ? '1.5px solid var(--primary-border)' : '1.5px solid var(--border)',
-                      color: sel === '?' ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer',
+                      background: sel === '?' ? 'var(--gradient)' : 'var(--bg-card2)',
+                      border: sel === '?' ? 'none' : '1.5px solid var(--border)',
+                      color: sel === '?' ? 'white' : 'var(--text-muted)', cursor: 'pointer',
                     }}
                     onClick={() => pick(idx, '?')}
                   >

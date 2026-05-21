@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getCommunities, createCommunity, joinCommunity, getCommunityDashboard, removeCommunityMember } from '../api/community';
 import { getMe } from '../api/user';
 import type { CommunityResponse, CommunityDashboard, CommunityMemberInfo } from '../api/community';
@@ -29,7 +30,7 @@ function genderKey(g: string): string {
 }
 
 /* ── 호스트 대시보드 ── */
-function DashboardSheet({ communityId, onClose }: { communityId: number; onClose: () => void }) {
+function DashboardSheet({ communityId, myUserId, onClose }: { communityId: number; myUserId: number; onClose: () => void }) {
   const [dashboard, setDashboard] = useState<CommunityDashboard | null>(null);
   const [removing, setRemoving] = useState<number | null>(null);
 
@@ -79,14 +80,16 @@ function DashboardSheet({ communityId, onClose }: { communityId: number; onClose
               ) : dashboard.members.map((m, i) => (
                 <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{m.nickname}</p>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{m.nickname}{m.user_id === myUserId ? ' (나)' : ''}</p>
                     <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{[m.age ? `${m.age}세` : null, m.major, m.gender].filter(Boolean).join(' · ')}</p>
                   </div>
-                  <button
-                    style={{ fontSize: 12, fontWeight: 700, color: '#FF6B6B', background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.25)', padding: '6px 12px', borderRadius: 10, opacity: removing === m.user_id ? 0.5 : 1 }}
-                    disabled={removing === m.user_id}
-                    onClick={() => handleRemove(m)}
-                  >내보내기</button>
+                  {m.user_id !== myUserId && (
+                    <button
+                      style={{ fontSize: 12, fontWeight: 700, color: '#FF6B6B', background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.25)', padding: '6px 12px', borderRadius: 10, opacity: removing === m.user_id ? 0.5 : 1 }}
+                      disabled={removing === m.user_id}
+                      onClick={() => handleRemove(m)}
+                    >내보내기</button>
+                  )}
                 </div>
               ))}
             </div>
@@ -98,11 +101,21 @@ function DashboardSheet({ communityId, onClose }: { communityId: number; onClose
 }
 
 /* ── 그룹 상세 뷰 ── */
-function GroupDetailView({ group, onClose, onJoin, isCreator }: { group: CommunityResponse; onClose: () => void; onJoin: (id: number) => Promise<void>; isCreator: boolean }) {
+function GroupDetailView({ group, onClose, onJoin, isCreator, userId, userGender }: { group: CommunityResponse; onClose: () => void; onJoin: (id: number) => Promise<void>; isCreator: boolean; userId: number; userGender: string | null }) {
+  const navigate = useNavigate();
   const [joined, setJoined] = useState(group.is_joined);
   const [joining, setJoining] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const gc = genderColor(group.gender);
+
+  const genderAllowed = (() => {
+    const g = group.gender;
+    if (g === '혼성') return true;
+    if (!userGender) return true;
+    if (g === '남' && userGender !== 'male') return false;
+    if (g === '여' && userGender !== 'female') return false;
+    return true;
+  })();
 
   const handleJoin = async () => {
     if (joining || joined) return;
@@ -132,7 +145,7 @@ function GroupDetailView({ group, onClose, onJoin, isCreator }: { group: Communi
           <button onClick={() => setShowDashboard(true)} style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-bg)', border: '1px solid var(--primary-border)', padding: '6px 12px', borderRadius: 10 }}>대시보드</button>
         )}
       </div>
-      {showDashboard && <DashboardSheet communityId={group.id} onClose={() => setShowDashboard(false)} />}
+      {showDashboard && <DashboardSheet communityId={group.id} myUserId={userId} onClose={() => setShowDashboard(false)} />}
 
       {/* 스크롤 콘텐츠 */}
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 100, scrollbarWidth: 'none' }}>
@@ -200,9 +213,20 @@ function GroupDetailView({ group, onClose, onJoin, isCreator }: { group: Communi
         width: '100%', maxWidth: 520,
         padding: '12px 20px 36px',
         background: 'linear-gradient(to top, var(--bg) 70%, transparent)',
+        display: 'flex', flexDirection: 'column', gap: 8,
       }}>
         {joined ? (
-          <button style={{ width: '100%', padding: '16px', borderRadius: 18, fontSize: 16, fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-bg)', border: '2px solid var(--primary-border)' }} disabled>✓ 가입 완료</button>
+          <>
+            <button
+              style={{ width: '100%', padding: '14px', borderRadius: 18, fontSize: 15, fontWeight: 800, color: 'white', background: 'var(--gradient)', boxShadow: '0 5px 20px rgba(255,128,171,0.4)' }}
+              onClick={() => navigate('/chat')}
+            >💬 채팅방으로 이동</button>
+            <button style={{ width: '100%', padding: '14px', borderRadius: 18, fontSize: 15, fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-bg)', border: '2px solid var(--primary-border)' }} disabled>✓ 가입 완료</button>
+          </>
+        ) : !genderAllowed ? (
+          <button style={{ width: '100%', padding: '16px', borderRadius: 18, fontSize: 15, fontWeight: 800, color: 'var(--text-muted)', background: 'var(--bg-card2)', cursor: 'not-allowed' }} disabled>
+            {group.gender === '남' ? '👨 남성 전용 소모임이에요' : '👩 여성 전용 소모임이에요'}
+          </button>
         ) : (
           <button
             style={{
@@ -386,11 +410,12 @@ export default function CommunityPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [groups, setGroups] = useState<CommunityResponse[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<CommunityResponse | null>(null);
-  const [userId, setUserId] = useState<number | null>(null);
+  const [userId, setUserId] = useState<number>(0);
+  const [userGender, setUserGender] = useState<string | null>(null);
 
   useEffect(() => {
     getCommunities().then(setGroups).catch(() => {});
-    getMe().then(u => setUserId(u.id)).catch(() => {});
+    getMe().then(u => { setUserId(u.id); setUserGender(u.gender ?? null); }).catch(() => {});
   }, []);
 
   const handleCreate = async (data: { emoji: string; title: string; description: string; tags: string[]; gender: string }) => {
@@ -475,7 +500,7 @@ export default function CommunityPage() {
       </button>
 
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreate={handleCreate} />}
-      {selectedGroup && <GroupDetailView group={selectedGroup} onClose={() => setSelectedGroup(null)} onJoin={handleJoin} isCreator={userId === selectedGroup.creator_id} />}
+      {selectedGroup && <GroupDetailView group={selectedGroup} onClose={() => setSelectedGroup(null)} onJoin={handleJoin} isCreator={userId === selectedGroup.creator_id} userId={userId} userGender={userGender} />}
     </div>
   );
 }

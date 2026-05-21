@@ -68,8 +68,8 @@ function Battery({ filled, total }: { filled: number; total: number }) {
   );
 }
 
-/* ── 미팅 카드 ── */
-function MeetingCard({ m, onJoin }: { m: MeetingResponse; onJoin: (m: MeetingResponse) => void }) {
+/* ── 미팅 카드 (클릭 시 상세 시트 열림) ── */
+function MeetingCard({ m, onOpen }: { m: MeetingResponse; onOpen: () => void }) {
   const total = m.required_male + m.required_female;
   const filledF = Math.min(m.female_count, m.required_female);
   const filledM = Math.min(m.male_count, m.required_male);
@@ -79,8 +79,9 @@ function MeetingCard({ m, onJoin }: { m: MeetingResponse; onJoin: (m: MeetingRes
 
   return (
     <div
-      className="rounded-[20px] p-4 border"
+      className="rounded-[20px] p-4 border cursor-pointer active:opacity-85"
       style={{ background: 'var(--bg-card)', borderColor: full ? 'var(--primary-border)' : 'var(--border)' }}
+      onClick={onOpen}
     >
       <p className="text-[14px] font-bold leading-snug mb-2.5" style={{ color: 'var(--text)' }}>{m.title}</p>
 
@@ -121,27 +122,119 @@ function MeetingCard({ m, onJoin }: { m: MeetingResponse; onJoin: (m: MeetingRes
         </div>
       </div>
 
-      {m.is_joined && m.invite_code && (
-        <div className="flex items-center justify-between rounded-[12px] px-4 py-3 mb-2 border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--primary-border)' }}>
-          <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>초대코드</span>
-          <span className="text-[14px] font-extrabold tracking-widest" style={{ color: 'var(--primary)' }}>{m.invite_code}</span>
-        </div>
-      )}
-
-      <button
-        className="w-full text-[14px] font-bold py-[12px] rounded-[14px] min-h-[44px] active:opacity-80"
+      <div
+        className="w-full text-[14px] font-bold py-[12px] rounded-[14px] min-h-[44px] flex items-center justify-center"
         style={{
           background: full ? 'var(--bg-card2)' : m.is_joined ? 'var(--primary-bg)' : 'var(--gradient)',
           color: full ? 'var(--text-muted)' : m.is_joined ? 'var(--primary)' : 'white',
-          cursor: full ? 'not-allowed' : 'pointer',
           boxShadow: (!full && !m.is_joined) ? '0 3px 12px rgba(255,128,171,0.3)' : 'none',
           border: m.is_joined ? '1.5px solid var(--primary-border)' : 'none',
         }}
-        disabled={full}
-        onClick={() => !full && !m.is_joined && onJoin(m)}
       >
-        {full ? '🔒 마감된 미팅이에요' : m.is_joined ? '✓ 참여 중' : '참여하기'}
-      </button>
+        {full ? '🔒 마감된 미팅이에요' : m.is_joined ? '✓ 참여 중' : '자세히 보기 →'}
+      </div>
+    </div>
+  );
+}
+
+/* ── 미팅 상세 시트 ── */
+function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
+  m: MeetingResponse;
+  onClose: () => void;
+  onJoin: (m: MeetingResponse) => void;
+  hasChance: boolean;
+  chanceLoading: boolean;
+}) {
+  const total = m.required_male + m.required_female;
+  const filledF = Math.min(m.female_count, m.required_female);
+  const filledM = Math.min(m.male_count, m.required_male);
+  const fFull = filledF >= m.required_female;
+  const mFull = filledM >= m.required_male;
+  const full = !m.is_active || m.participant_count >= total;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--bg)', display: 'flex', flexDirection: 'column', animation: 'slideInFromRight 0.3s cubic-bezier(0.22,1,0.36,1)' }}>
+      {/* 헤더 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', background: 'var(--header-bg)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--text)' }}>‹</button>
+        <p style={{ flex: 1, fontSize: 16, fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</p>
+      </div>
+
+      {/* 스크롤 콘텐츠 */}
+      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 110, scrollbarWidth: 'none' }}>
+        {/* 배너 */}
+        <div style={{ background: 'linear-gradient(160deg, var(--primary-bg) 0%, var(--bg-card2) 100%)', padding: '24px 20px', borderBottom: '1px solid var(--border)' }}>
+          <p style={{ fontSize: 21, fontWeight: 900, color: 'var(--text)', marginBottom: 10 }}>{m.title}</p>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+            {m.keywords.map(k => (
+              <span key={k} style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-bg)', border: '1px solid var(--primary-border)', padding: '3px 9px', borderRadius: 20 }}>#{k}</span>
+            ))}
+          </div>
+          <span style={{ fontSize: 14, fontWeight: 700, padding: '6px 14px', borderRadius: 10, background: 'var(--gradient)', color: 'white', display: 'inline-block' }}>
+            📅 {formatScheduledAt(m.scheduled_at)}
+          </span>
+        </div>
+
+        {/* 인원 현황 */}
+        <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)', marginBottom: 16 }}>인원 현황</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 32 }}>🩷</span>
+              <Battery filled={filledF} total={m.required_female} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <span style={{ fontSize: 26, fontWeight: 800, color: fFull ? 'var(--primary)' : 'var(--text)', lineHeight: 1 }}>
+                  {filledF}<span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-muted)' }}>/{m.required_female}</span>
+                </span>
+                {fFull && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 5, background: 'var(--primary-bg)', color: 'var(--primary)' }}>FULL</span>}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--text-muted)' }}>VS</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 32 }}>🩵</span>
+              <Battery filled={filledM} total={m.required_male} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <span style={{ fontSize: 26, fontWeight: 800, color: mFull ? 'var(--primary)' : 'var(--text)', lineHeight: 1 }}>
+                  {filledM}<span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-muted)' }}>/{m.required_male}</span>
+                </span>
+                {mFull && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 5, background: 'var(--primary-bg)', color: 'var(--primary)' }}>FULL</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 초대코드 */}
+        {m.is_joined && m.invite_code && (
+          <div style={{ padding: '16px 20px' }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)', marginBottom: 10 }}>초대코드</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: 14, padding: '14px 18px', background: 'var(--bg-card2)', border: '1px solid var(--primary-border)' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>친구에게 공유하세요</span>
+              <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: 6, color: 'var(--primary)' }}>{m.invite_code}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 하단 고정 버튼 */}
+      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 520, padding: '12px 20px 36px', background: 'linear-gradient(to top, var(--bg) 70%, transparent)' }}>
+        {full ? (
+          <button style={{ width: '100%', padding: '16px', borderRadius: 18, fontSize: 15, fontWeight: 800, color: 'var(--text-muted)', background: 'var(--bg-card2)', cursor: 'not-allowed' }} disabled>🔒 마감된 미팅이에요</button>
+        ) : m.is_joined ? (
+          <button style={{ width: '100%', padding: '16px', borderRadius: 18, fontSize: 15, fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-bg)', border: '2px solid var(--primary-border)' }} disabled>✓ 참여 중</button>
+        ) : !chanceLoading && !hasChance ? (
+          <button style={{ width: '100%', padding: '16px', borderRadius: 18, fontSize: 15, fontWeight: 800, color: 'var(--text-muted)', background: 'var(--bg-card2)', cursor: 'not-allowed' }} disabled>⚡ 오늘의 기회를 이미 사용했어요</button>
+        ) : (
+          <button
+            style={{ width: '100%', padding: '16px', borderRadius: 18, fontSize: 16, fontWeight: 800, color: 'white', background: 'var(--gradient)', boxShadow: '0 5px 20px rgba(255,128,171,0.45)', cursor: chanceLoading ? 'not-allowed' : 'pointer', opacity: chanceLoading ? 0.7 : 1 }}
+            disabled={chanceLoading}
+            onClick={() => onJoin(m)}
+          >
+            {chanceLoading ? '확인 중...' : '⚡ 기회 사용하여 참여하기'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -169,7 +262,7 @@ function CreateSheet({ onClose, onSubmit }: {
 
   const Counter = ({ count, set }: { count: number; set: React.Dispatch<React.SetStateAction<number>> }) => (
     <div className="flex items-center gap-3">
-      <button className="w-8 h-8 rounded-[9px] flex items-center justify-center text-[18px] font-bold border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)' }} onClick={() => set(c => Math.max(1, c - 1))}>−</button>
+      <button className="w-8 h-8 rounded-[9px] flex items-center justify-center text-[18px] font-bold border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)' }} onClick={() => set(c => Math.max(2, c - 1))}>−</button>
       <span className="text-[20px] font-extrabold min-w-[24px] text-center" style={{ color: 'var(--text)' }}>{count}</span>
       <button className="w-8 h-8 rounded-[9px] flex items-center justify-center text-[18px] font-bold border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)' }} onClick={() => set(c => Math.min(5, c + 1))}>+</button>
     </div>
@@ -280,7 +373,8 @@ export default function MeetingPage() {
   const [codeInput, setCodeInput] = useState('');
   const [pendingJoin, setPendingJoin] = useState<MeetingResponse | null>(null);
   const [pendingCreate, setPendingCreate] = useState<{ title: string; keywords: string[]; femaleCount: number; maleCount: number; dayOffset: number } | null>(null);
-  const { spend, hasChance } = useChance();
+  const [selectedMeeting, setSelectedMeeting] = useState<MeetingResponse | null>(null);
+  const { spend, hasChance, chanceLoading } = useChance();
 
   useEffect(() => {
     getMeetings().then(setMeetings).catch(() => {});
@@ -296,6 +390,7 @@ export default function MeetingPage() {
     try {
       const updated = await joinMeeting(pendingJoin.id);
       setMeetings(prev => prev.map(m => m.id === updated.id ? updated : m));
+      setSelectedMeeting(updated);
       spend();
     } catch { /* ignore */ }
     setShowJoinModal(false);
@@ -361,14 +456,14 @@ export default function MeetingPage() {
           </button>
           <button
             className="flex items-center gap-1.5 text-[13px] font-bold px-[14px] py-[10px] rounded-[14px] shrink-0 active:opacity-75"
-            style={hasChance
+            style={(!chanceLoading && hasChance)
               ? { background: 'var(--gradient)', color: 'white', boxShadow: '0 3px 12px rgba(255,128,171,0.35)' }
               : { background: 'var(--bg-card2)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
             }
             onClick={() => hasChance && setShowCreate(true)}
           >
             <span className="text-[15px]">＋</span>
-            {hasChance ? '개설' : '기회 없음'}
+            {chanceLoading ? '...' : hasChance ? '개설' : '기회 없음'}
           </button>
         </div>
       </div>
@@ -391,7 +486,7 @@ export default function MeetingPage() {
         <div className="flex flex-col gap-3">
           {filtered.map((m, idx) => (
             <div key={m.id} className="slot-reel" style={{ animationDelay: `${idx * 0.1}s` }}>
-              <MeetingCard m={m} onJoin={handleJoin} />
+              <MeetingCard m={m} onOpen={() => setSelectedMeeting(m)} />
             </div>
           ))}
         </div>
@@ -399,6 +494,16 @@ export default function MeetingPage() {
 
       {showCreate && (
         <CreateSheet onClose={() => setShowCreate(false)} onSubmit={handleCreateSubmit} />
+      )}
+
+      {selectedMeeting && (
+        <MeetingDetailSheet
+          m={selectedMeeting}
+          onClose={() => setSelectedMeeting(null)}
+          onJoin={handleJoin}
+          hasChance={hasChance}
+          chanceLoading={chanceLoading}
+        />
       )}
 
       {showCodeModal && (

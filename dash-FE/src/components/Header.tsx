@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clearTokens } from '../api/client';
 import { useTheme } from '../context/ThemeContext';
@@ -37,8 +37,18 @@ function MoonIcon() {
 
 export default function Header() {
   const navigate = useNavigate();
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('dashtag_token'));
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('dashtag_access_token'));
   const { isDark, setMode } = useTheme();
+
+  useEffect(() => {
+    const sync = () => setIsLoggedIn(!!localStorage.getItem('dashtag_access_token'));
+    window.addEventListener('storage', sync);
+    window.addEventListener('dashtag-auth', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('dashtag-auth', sync);
+    };
+  }, []);
 
   const handleLogout = () => {
     clearTokens();

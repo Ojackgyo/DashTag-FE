@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AcceptedDashProvider } from './context/AcceptedDashContext';
 import { isLoggedIn } from './api/client';
@@ -16,6 +17,12 @@ import ReceivedDashPage from './pages/ReceivedDashPage';
 import SentDashPage from './pages/SentDashPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const check = () => { if (!isLoggedIn()) navigate('/login', { replace: true }); };
+    window.addEventListener('dashtag-auth', check);
+    return () => window.removeEventListener('dashtag-auth', check);
+  }, [navigate]);
   if (!isLoggedIn()) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
