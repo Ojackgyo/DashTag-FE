@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getDatingRequests } from '../api/home';
-import { getMe } from '../api/user';
+import { useMe } from '../hooks/useMe';
+import { useDatingRequests } from '../hooks/useDatingRequests';
 import { faceTypeToEmoji } from '../api/user';
 import type { DatingRequestResponse } from '../api/home';
 import type { UserProfileResponse } from '../api/user';
@@ -52,17 +52,12 @@ function statusLabel(status: string): string {
 
 export default function SentDashPage() {
   const navigate = useNavigate();
-  const [sent, setSent] = useState<DatingRequestResponse[]>([]);
   const [selected, setSelected] = useState<DatingRequestResponse | null>(null);
   const [flipped, setFlipped] = useState(false);
 
-  useEffect(() => {
-    getMe().then(u => {
-      return getDatingRequests().then(all => {
-        setSent(all.filter(r => r.from_user_id === u.id));
-      });
-    }).catch(() => {});
-  }, []);
+  const { data: me } = useMe();
+  const { data: allRequests = [] } = useDatingRequests();
+  const sent = allRequests.filter(r => r.from_user_id === me?.id);
 
   const openCard = (r: DatingRequestResponse) => {
     setFlipped(false);

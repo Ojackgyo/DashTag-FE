@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useChance } from '../hooks/useChance';
+import { useThrottle } from '../lib/hooks';
 import ChanceModal from '../components/ChanceModal';
 import { getDateProfiles, sendDateRequest } from '../api/date';
 import { faceTypeToEmoji } from '../api/user';
+import { isLoggedIn } from '../api/client';
+import { queryKeys } from '../lib/queryKeys';
 import type { UserProfileResponse } from '../api/user';
 
 function detailRows(p: UserProfileResponse) {
@@ -19,7 +23,6 @@ function detailRows(p: UserProfileResponse) {
 }
 
 export default function DatePage() {
-  const [profiles, setProfiles] = useState<UserProfileResponse[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [flipped, setFlipped] = useState(false);
   const [chatSentId, setChatSentId] = useState<number | null>(null);
@@ -28,9 +31,14 @@ export default function DatePage() {
   const [introMsg, setIntroMsg] = useState('');
   const { hasChance, spend } = useChance();
 
-  useEffect(() => {
-    getDateProfiles().then(setProfiles).catch(() => {});
-  }, []);
+  const { data: profiles = [], isLoading: profilesLoading } = useQuery({
+    queryKey: queryKeys.dateProfiles,
+    queryFn: getDateProfiles,
+    enabled: isLoggedIn(),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const { mutateAsync: doSendRequest } = useMutation({ mutationFn: (id: number) => sendDateRequest(id) });
 
   const selectedProfile = profiles.find(p => p.id === selectedId) ?? null;
 
@@ -50,15 +58,15 @@ export default function DatePage() {
     setShowMsgSheet(true);
   };
 
-  const confirmChat = async () => {
+  const confirmChat = useThrottle(async () => {
     if (!selectedId) return;
-    try { await sendDateRequest(selectedId); } catch { /* ignore */ }
+    try { await doSendRequest(selectedId); } catch { /* ignore */ }
     spend();
     setChatSentId(selectedId);
     setShowChanceModal(false);
     setShowMsgSheet(false);
     setIntroMsg('');
-  };
+  }, 2000);
 
   const isChatSent = selectedId !== null && chatSentId === selectedId;
   const chatDisabled = (chatSentId !== null && chatSentId !== selectedId) || (!hasChance && chatSentId === null);
@@ -72,7 +80,12 @@ export default function DatePage() {
         <p className="text-[13px]" style={{ color: 'var(--text-sub)' }}>나랑 꼭 맞는 한 사람을 만나보세요</p>
       </div>
 
-      {profiles.length === 0 ? (
+      {profilesLoading ? (
+        <div className="flex flex-col items-center py-16 gap-2.5">
+          <span className="text-[52px]">💘</span>
+          <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>불러오는 중이에요...</p>
+        </div>
+      ) : profiles.length === 0 ? (
         <div className="flex flex-col items-center py-16 gap-2.5">
           <span className="text-[52px]" style={{ animation: 'float 2.8s ease-in-out infinite' }}>💘</span>
           <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>아직 소개팅 프로필이 없어요</p>

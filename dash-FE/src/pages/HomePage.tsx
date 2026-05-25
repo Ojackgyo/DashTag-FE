@@ -1,18 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChance } from '../hooks/useChance';
-import { getDatingRequests } from '../api/home';
-import { getMe } from '../api/user';
-import { isLoggedIn } from '../api/client';
+import { useMe } from '../hooks/useMe';
+import { useDatingRequests } from '../hooks/useDatingRequests';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { hasChance, chanceLoading } = useChance();
+  const { data: user } = useMe();
+  const { data: requests, isLoading } = useDatingRequests();
 
-  const [receivedCount, setReceivedCount] = useState(0);
-  const [sentCount, setSentCount] = useState(0);
-  const [newCount, setNewCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const myId = user?.id;
+  const received = requests?.filter(r => r.status === 'pending' && r.to_user_id === myId) ?? [];
+  const sent     = requests?.filter(r => r.from_user_id === myId) ?? [];
 
   const [viewMonth, setViewMonth] = useState(() => {
     const d = new Date();
@@ -23,27 +23,12 @@ export default function HomePage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
 
-  useEffect(() => {
-    if (!isLoggedIn()) { navigate('/login'); return; }
-
-    Promise.all([getMe(), getDatingRequests()])
-      .then(([user, requests]) => {
-        const received = requests.filter(r => r.status === 'pending');
-        const sent = requests.filter(r => r.from_user_id === user.id);
-        setReceivedCount(received.length);
-        setSentCount(sent.length);
-        setNewCount(received.length);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [navigate]);
-
   const todayStr = (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   })();
 
-  const calYear = viewMonth.getFullYear();
+  const calYear  = viewMonth.getFullYear();
   const calMonth = viewMonth.getMonth();
   const firstDow = new Date(calYear, calMonth, 1).getDay();
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
@@ -69,14 +54,14 @@ export default function HomePage() {
               position: 'relative',
             }}
           >
-            {newCount > 0 && (
+            {received.length > 0 && (
               <div style={{
                 position: 'absolute', top: 14, right: 14,
                 width: 20, height: 20, borderRadius: '50%',
                 background: 'var(--gradient)', boxShadow: 'var(--shadow-primary)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 11, fontWeight: 800, color: 'white',
-              }}>{newCount}</div>
+              }}>{received.length}</div>
             )}
             <div style={{
               width: 40, height: 40, borderRadius: 13,
@@ -87,11 +72,11 @@ export default function HomePage() {
               boxShadow: 'var(--shadow-avatar-pink)',
             }}>💌</div>
             <p style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', marginBottom: 4, letterSpacing: '-1px' }}>
-              {loading ? '—' : receivedCount}
+              {isLoading ? '—' : received.length}
             </p>
             <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)' }}>받은 대쉬</p>
-            <p style={{ fontSize: 11, color: newCount > 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 600, marginTop: 3 }}>
-              {loading ? '불러오는 중...' : newCount > 0 ? `${newCount}개 새 요청` : '새 요청 없음'}
+            <p style={{ fontSize: 11, color: received.length > 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 600, marginTop: 3 }}>
+              {isLoading ? '불러오는 중...' : received.length > 0 ? `${received.length}개 새 요청` : '새 요청 없음'}
             </p>
           </button>
 
@@ -111,7 +96,7 @@ export default function HomePage() {
               fontSize: 20, marginBottom: 14, boxShadow: 'var(--shadow-sm)',
             }}>📤</div>
             <p style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', marginBottom: 4, letterSpacing: '-1px' }}>
-              {loading ? '—' : sentCount}
+              {isLoading ? '—' : sent.length}
             </p>
             <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)' }}>보낸 대쉬</p>
             <p style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 3 }}>대기 중</p>
@@ -181,7 +166,7 @@ export default function HomePage() {
             {calCells.map((day, idx) => {
               if (!day) return <div key={`e-${idx}`} />;
               const ds = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const isToday = ds === todayStr;
+              const isToday    = ds === todayStr;
               const isSelected = ds === selectedDate;
               const dow = idx % 7;
               return (

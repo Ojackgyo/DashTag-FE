@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useChance } from '../hooks/useChance';
+import { useMe } from '../hooks/useMe';
+import { useDatingRequests } from '../hooks/useDatingRequests';
+import { useThrottle } from '../lib/hooks';
 import ChanceModal from '../components/ChanceModal';
-import { getDatingRequests, updateDatingRequest } from '../api/home';
-import { getMe } from '../api/user';
+import { updateDatingRequest } from '../api/home';
 import { faceTypeToEmoji } from '../api/user';
+import { queryKeys } from '../lib/queryKeys';
 import type { DatingRequestResponse } from '../api/home';
 import type { UserProfileResponse } from '../api/user';
 
@@ -48,35 +52,28 @@ function timeAgo(iso: string): string {
 
 export default function ReceivedDashPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { hasChance, spend } = useChance();
-  const [requests, setRequests] = useState<DatingRequestResponse[]>([]);
-  const [userId, setUserId] = useState<number | null>(null);
+  const { data: me } = useMe();
+  const { data: allRequests = [] } = useDatingRequests();
   const [selected, setSelected] = useState<DatingRequestResponse | null>(null);
   const [showChanceModal, setShowChanceModal] = useState(false);
   const [acceptedIds, setAcceptedIds] = useState<Set<number>>(new Set());
 
-  useEffect(() => {
-    getMe().then(u => {
-      setUserId(u.id);
-      return getDatingRequests();
-    }).then(all => {
-      // Show only pending requests received by current user
-      setRequests(all.filter(r => r.status === 'pending'));
-    }).catch(() => {});
-  }, []);
+  const received = allRequests.filter(r => r.status === 'pending' && r.to_user_id === me?.id);
 
-  const received = userId != null
-    ? requests.filter(r => r.to_user_id === userId)
-    : requests;
+  const { mutateAsync: doUpdate } = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: 'accepted' | 'rejected' }) => updateDatingRequest(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.datingRequests }),
+  });
 
   const isAccepted = (r: DatingRequestResponse) => acceptedIds.has(r.id);
-
   const closeCard = () => setSelected(null);
 
-  const confirmAccept = async () => {
+  const confirmAccept = useThrottle(async () => {
     if (!selected) return;
     try {
-      await updateDatingRequest(selected.id, 'accepted');
+      await doUpdate({ id: selected.id, status: 'accepted' as const });
       spend();
       setAcceptedIds(prev => new Set([...prev, selected.id]));
       setShowChanceModal(false);
@@ -85,15 +82,12 @@ export default function ReceivedDashPage() {
     } catch {
       setShowChanceModal(false);
     }
-  };
+  }, 2000);
 
-  const handleReject = async (r: DatingRequestResponse) => {
-    try {
-      await updateDatingRequest(r.id, 'rejected');
-      setRequests(prev => prev.filter(req => req.id !== r.id));
-    } catch { /* ignore */ }
+  const handleReject = useThrottle(async (r: DatingRequestResponse) => {
+    try { await doUpdate({ id: r.id, status: 'rejected' as const }); } catch { /* ignore */ }
     closeCard();
-  };
+  }, 1000);
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', paddingBottom: 40 }}>

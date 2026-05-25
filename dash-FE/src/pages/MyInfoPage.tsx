@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getMe } from '../api/user';
+import { useQuery } from '@tanstack/react-query';
 import { faceTypeToEmoji } from '../api/user';
-import { clearTokens } from '../api/client';
+import { clearTokens, isLoggedIn } from '../api/client';
 import { getReceivedReviews } from '../api/review';
+import { useMe } from '../hooks/useMe';
+import { queryKeys } from '../lib/queryKeys';
 import type { UserResponse } from '../api/user';
-import type { ReviewResponse } from '../api/review';
 
 /* ── 내 정보 상세 시트 ── */
 function MyProfileSheet({ user, onClose }: { user: UserResponse | null; onClose: () => void }) {
@@ -135,13 +136,14 @@ function Stars({ rating }: { rating: number }) {
 export default function MyInfoPage() {
   const navigate = useNavigate();
   const [showProfile, setShowProfile] = useState(false);
-  const [user, setUser] = useState<UserResponse | null>(null);
-  const [reviews, setReviews] = useState<ReviewResponse[]>([]);
 
-  useEffect(() => {
-    getMe().then(setUser).catch(() => {});
-    getReceivedReviews().then(setReviews).catch(() => {});
-  }, []);
+  const { data: user = null } = useMe();
+  const { data: reviews = [] } = useQuery({
+    queryKey: queryKeys.reviews,
+    queryFn: getReceivedReviews,
+    enabled: isLoggedIn(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const MENU_ITEMS = [
     { section: '고객지원', items: [

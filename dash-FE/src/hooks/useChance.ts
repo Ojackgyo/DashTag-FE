@@ -1,32 +1,29 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getChance, spendChance } from '../api/chance';
 import { isLoggedIn } from '../api/client';
+import { queryKeys } from '../lib/queryKeys';
 
 export function useChance() {
-  const [hasChance, setHasChance] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [chanceLoading, setChanceLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!isLoggedIn()) { setChanceLoading(false); return; }
-    getChance()
-      .then(res => setHasChance(res.has_chance))
-      .catch(() => {})
-      .finally(() => setChanceLoading(false));
-  }, []);
+  const { data, isLoading: chanceLoading } = useQuery({
+    queryKey: queryKeys.chance,
+    queryFn: getChance,
+    enabled: isLoggedIn(),
+    staleTime: 30 * 1000,
+  });
 
-  const spend = useCallback(async () => {
-    if (!hasChance) return;
-    setLoading(true);
-    try {
-      const res = await spendChance();
-      setHasChance(res.has_chance);
-    } catch {
-      // 실패해도 UI는 유지
-    } finally {
-      setLoading(false);
-    }
-  }, [hasChance]);
+  const { mutateAsync: spend, isPending: loading } = useMutation({
+    mutationFn: spendChance,
+    onSuccess: (res) => {
+      queryClient.setQueryData(queryKeys.chance, res);
+    },
+  });
 
-  return { hasChance, spend, loading, chanceLoading };
+  return {
+    hasChance: data?.has_chance ?? false,
+    chanceLoading,
+    spend,
+    loading,
+  };
 }

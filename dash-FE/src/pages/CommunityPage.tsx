@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCommunities, createCommunity, joinCommunity, getCommunityDashboard, removeCommunityMember } from '../api/community';
-import { getMe } from '../api/user';
+import { isLoggedIn } from '../api/client';
+import { useMe } from '../hooks/useMe';
+import { useDebounce, useThrottle } from '../lib/hooks';
+import { queryKeys } from '../lib/queryKeys';
 import type { CommunityResponse, CommunityDashboard, CommunityMemberInfo } from '../api/community';
 
 type GenderFilter = '전체' | '남' | '여';
@@ -101,7 +105,7 @@ function DashboardSheet({ communityId, myUserId, onClose }: { communityId: numbe
 }
 
 /* ── 그룹 상세 뷰 ── */
-function GroupDetailView({ group, onClose, onJoin, isCreator, userId, userGender }: { group: CommunityResponse; onClose: () => void; onJoin: (id: number) => Promise<void>; isCreator: boolean; userId: number; userGender: string | null }) {
+function GroupDetailView({ group, onClose, onJoin, isCreator, userId, userGender }: { group: CommunityResponse; onClose: () => void; onJoin: (id: number) => void | Promise<void>; isCreator: boolean; userId: number; userGender: string | null }) {
   const navigate = useNavigate();
   const [joined, setJoined] = useState(group.is_joined);
   const [joining, setJoining] = useState(false);
@@ -404,35 +408,50 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (da
 
 /* ── 메인 ── */
 export default function CommunityPage() {
+  const queryClient = useQueryClient();
   const [genderFilter, setGenderFilter] = useState<GenderFilter>('전체');
   const [tagFilter, setTagFilter] = useState('전체');
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [groups, setGroups] = useState<CommunityResponse[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<CommunityResponse | null>(null);
-  const [userId, setUserId] = useState<number>(0);
-  const [userGender, setUserGender] = useState<string | null>(null);
 
-  useEffect(() => {
-    getCommunities().then(setGroups).catch(() => {});
-    getMe().then(u => { setUserId(u.id); setUserGender(u.gender ?? null); }).catch(() => {});
-  }, []);
+  const { data: me } = useMe();
+  const userId   = me?.id ?? 0;
+  const userGender = me?.gender ?? null;
+
+  const { data: groups = [], isLoading: groupsLoading } = useQuery({
+    queryKey: queryKeys.communities,
+    queryFn: getCommunities,
+    enabled: isLoggedIn(),
+    staleTime: 60 * 1000,
+  });
+
+  const { mutateAsync: doJoin } = useMutation({
+    mutationFn: joinCommunity,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.communities }),
+  });
+
+  const { mutateAsync: doCreate } = useMutation({
+    mutationFn: createCommunity,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.communities }),
+  });
+
+  const debouncedSetSearch = useDebounce((v: string) => setSearch(v), 300);
 
   const handleCreate = async (data: { emoji: string; title: string; description: string; tags: string[]; gender: string }) => {
-    const created = await createCommunity({
+    await doCreate({
       emoji: data.emoji,
       title: data.title,
       description: data.description || null,
       tags: data.tags,
       gender: data.gender,
     });
-    setGroups(prev => [created, ...prev]);
   };
 
-  const handleJoin = async (id: number) => {
-    const updated = await joinCommunity(id);
-    setGroups(prev => prev.map(g => g.id === id ? updated : g));
-  };
+  const handleJoin = useThrottle(async (id: number) => {
+    await doJoin(id);
+  }, 2000);
 
   const filtered = groups.filter(g => {
     const gk = genderKey(g.gender);
@@ -453,8 +472,8 @@ export default function CommunityPage() {
       {/* 검색 */}
       <div className="flex items-center gap-2 rounded-[14px] px-[14px] py-[11px] mb-3 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
         <span className="text-[15px] shrink-0">🔍</span>
-        <input className="flex-1 bg-transparent text-[14px] min-w-0" style={{ color: 'var(--text)' }} placeholder="소모임 검색" value={search} onChange={e => setSearch(e.target.value)} />
-        {search && <button className="text-[12px] px-1" style={{ color: 'var(--text-muted)' }} onClick={() => setSearch('')}>✕</button>}
+        <input className="flex-1 bg-transparent text-[14px] min-w-0" style={{ color: 'var(--text)' }} placeholder="소모임 검색" value={searchInput} onChange={e => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }} />
+        {searchInput && <button className="text-[12px] px-1" style={{ color: 'var(--text-muted)' }} onClick={() => { setSearchInput(''); setSearch(''); }}>✕</button>}
       </div>
 
       {/* 성별 필터 */}
@@ -477,11 +496,13 @@ export default function CommunityPage() {
 
       {/* 목록 */}
       <div className="flex flex-col gap-2.5">
-        {filtered.length === 0
-          ? <p className="text-center py-12 text-[14px]" style={{ color: 'var(--text-muted)' }}>{search || genderFilter !== '전체' || tagFilter !== '전체' ? '검색 결과가 없어요' : '아직 소모임이 없어요'}</p>
-          : filtered.map(g => (
-            <GroupCard key={g.id} g={g} onOpen={() => setSelectedGroup(g)} />
-          ))
+        {groupsLoading
+          ? <p className="text-center py-12 text-[14px]" style={{ color: 'var(--text-muted)' }}>불러오는 중이에요...</p>
+          : filtered.length === 0
+            ? <p className="text-center py-12 text-[14px]" style={{ color: 'var(--text-muted)' }}>{search || genderFilter !== '전체' || tagFilter !== '전체' ? '검색 결과가 없어요' : '아직 소모임이 없어요'}</p>
+            : filtered.map(g => (
+              <GroupCard key={g.id} g={g} onOpen={() => setSelectedGroup(g)} />
+            ))
         }
       </div>
 

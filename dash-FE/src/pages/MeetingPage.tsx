@@ -1,5 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useChance } from '../hooks/useChance';
+import { useDebounce, useThrottle } from '../lib/hooks';
+import { isLoggedIn } from '../api/client';
+import { queryKeys } from '../lib/queryKeys';
 import ChanceModal from '../components/ChanceModal';
 import { getMeetings, createMeeting, joinMeeting, joinMeetingByCode } from '../api/meeting';
 import type { MeetingResponse } from '../api/meeting';
@@ -364,8 +368,9 @@ function CreateSheet({ onClose, onSubmit }: {
 
 /* ── 메인 ── */
 export default function MeetingPage() {
+  const queryClient = useQueryClient();
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const [meetings, setMeetings] = useState<MeetingResponse[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -376,26 +381,45 @@ export default function MeetingPage() {
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingResponse | null>(null);
   const { spend, hasChance, chanceLoading } = useChance();
 
-  useEffect(() => {
-    getMeetings().then(setMeetings).catch(() => {});
-  }, []);
+  const { data: meetings = [], isLoading: meetingsLoading } = useQuery({
+    queryKey: queryKeys.meetings,
+    queryFn: getMeetings,
+    enabled: isLoggedIn(),
+    staleTime: 60 * 1000,
+  });
+
+  const { mutateAsync: doJoinMeeting } = useMutation({
+    mutationFn: joinMeeting,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.meetings }),
+  });
+
+  const { mutateAsync: doJoinByCode } = useMutation({
+    mutationFn: joinMeetingByCode,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.meetings }),
+  });
+
+  const { mutateAsync: doCreateMeeting } = useMutation({
+    mutationFn: createMeeting,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.meetings }),
+  });
+
+  const debouncedSetSearch = useDebounce((v: string) => setSearch(v), 300);
 
   const handleJoin = (m: MeetingResponse) => {
     setPendingJoin(m);
     setShowJoinModal(true);
   };
 
-  const confirmJoin = async () => {
+  const confirmJoin = useThrottle(async () => {
     if (!pendingJoin) return;
     try {
-      const updated = await joinMeeting(pendingJoin.id);
-      setMeetings(prev => prev.map(m => m.id === updated.id ? updated : m));
+      const updated = await doJoinMeeting(pendingJoin.id);
       setSelectedMeeting(updated);
       spend();
     } catch { /* ignore */ }
     setShowJoinModal(false);
     setPendingJoin(null);
-  };
+  }, 2000);
 
   const handleCreateSubmit = (data: { title: string; keywords: string[]; femaleCount: number; maleCount: number; dayOffset: number }) => {
     setPendingCreate(data);
@@ -403,36 +427,29 @@ export default function MeetingPage() {
     setShowCreate(false);
   };
 
-  const handleJoinByCode = async () => {
+  const handleJoinByCode = useThrottle(async () => {
     const code = codeInput.trim();
     if (!code) return;
-    try {
-      const joined = await joinMeetingByCode(code);
-      setMeetings(prev => {
-        const exists = prev.find(m => m.id === joined.id);
-        return exists ? prev.map(m => m.id === joined.id ? joined : m) : [joined, ...prev];
-      });
-    } catch { /* ignore */ }
+    try { await doJoinByCode(code); } catch { /* ignore */ }
     setShowCodeModal(false);
     setCodeInput('');
-  };
+  }, 2000);
 
-  const confirmCreate = async () => {
+  const confirmCreate = useThrottle(async () => {
     if (!pendingCreate) return;
     try {
-      const newMeeting = await createMeeting({
+      await doCreateMeeting({
         title: pendingCreate.title,
         keywords: pendingCreate.keywords,
         required_female: pendingCreate.femaleCount,
         required_male: pendingCreate.maleCount,
         scheduled_at: dayToISO(pendingCreate.dayOffset),
       });
-      setMeetings(prev => [newMeeting, ...prev]);
       spend();
     } catch { /* ignore */ }
     setShowCreateModal(false);
     setPendingCreate(null);
-  };
+  }, 2000);
 
   const filtered = search.trim()
     ? meetings.filter(m => m.title.includes(search.trim()) || m.keywords.some(k => k.includes(search.trim())))
@@ -471,12 +488,17 @@ export default function MeetingPage() {
       {/* 검색 */}
       <div className="flex items-center gap-2 rounded-[14px] px-[14px] py-[11px] mb-4 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
         <span className="text-[15px] shrink-0">🔍</span>
-        <input className="flex-1 bg-transparent text-[14px] min-w-0" style={{ color: 'var(--text)' }} placeholder="키워드로 검색 (ex. 카페, 운동)" value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="flex-1 bg-transparent text-[14px] min-w-0" style={{ color: 'var(--text)' }} placeholder="키워드로 검색 (ex. 카페, 운동)" value={searchInput} onChange={e => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }} />
         {search && <button className="text-[12px] px-1" style={{ color: 'var(--text-muted)' }} onClick={() => setSearch('')}>✕</button>}
       </div>
 
       {/* 목록 */}
-      {filtered.length === 0 ? (
+      {meetingsLoading ? (
+        <div className="flex flex-col items-center py-16 gap-2.5">
+          <span className="text-[48px]">🎉</span>
+          <p className="text-[15px] font-bold" style={{ color: 'var(--text-sub)' }}>불러오는 중이에요...</p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center py-16 gap-2.5">
           <span className="text-[48px]" style={{ animation: 'float 2.8s ease-in-out infinite' }}>🎉</span>
           <p className="text-[15px] font-bold" style={{ color: 'var(--text-sub)' }}>{search ? '검색 결과가 없어요' : '아직 미팅이 없어요'}</p>

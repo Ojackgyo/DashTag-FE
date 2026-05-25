@@ -1,7 +1,17 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './context/ThemeContext';
 import { AcceptedDashProvider } from './context/AcceptedDashContext';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 import { isLoggedIn } from './api/client';
 import Header from './components/Header';
 import GNB from './components/GNB';
@@ -41,6 +51,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
+    <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <AcceptedDashProvider>
       <BrowserRouter>
@@ -70,5 +81,6 @@ export default function App() {
       </BrowserRouter>
       </AcceptedDashProvider>
     </ThemeProvider>
+    </QueryClientProvider>
   );
 }
