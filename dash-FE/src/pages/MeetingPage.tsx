@@ -142,22 +142,50 @@ function MeetingCard({ m, onOpen }: { m: MeetingResponse; onOpen: () => void }) 
   );
 }
 
-/* ── 참여자 카드 ── */
-function ParticipantCard({ p, gender, delay }: { p: MeetingParticipant | null; gender: 'female' | 'male'; delay: number }) {
+/* ── 참여자 프로필 팝업 ── */
+function ParticipantProfileModal({ p, gender, onClose }: { p: MeetingParticipant; gender: 'female' | 'male'; onClose: () => void }) {
   const isFemale = gender === 'female';
   const accent = isFemale ? '#FF80AB' : '#4AADFF';
-  const accentBg = isFemale ? 'rgba(255,128,171,0.12)' : 'rgba(74,173,255,0.12)';
-  const accentBorder = isFemale ? 'rgba(255,128,171,0.35)' : 'rgba(74,173,255,0.35)';
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 520, borderRadius: '24px 24px 0 0', background: 'white', padding: '28px 24px 48px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: '#eee', marginBottom: 4 }} />
+        <div style={{ width: 80, height: 80, borderRadius: 22, background: isFemale ? 'rgba(255,128,171,0.1)' : 'rgba(74,173,255,0.1)', border: `2px solid ${accent}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44 }}>
+          {faceTypeToEmoji(p.face_type)}
+        </div>
+        <p style={{ fontSize: 22, fontWeight: 900, color: '#222' }}>{p.nickname}</p>
+        {p.mbti && (
+          <span style={{ fontSize: 13, fontWeight: 700, padding: '4px 12px', borderRadius: 20, background: `${accent}18`, color: accent, border: `1px solid ${accent}44` }}>{p.mbti}</span>
+        )}
+        {p.charm_points && p.charm_points.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: 4 }}>
+            {p.charm_points.map(cp => (
+              <span key={cp} style={{ fontSize: 12, color: '#666', background: '#f5f5f5', padding: '4px 10px', borderRadius: 20, border: '1px solid #eee' }}>#{cp}</span>
+            ))}
+          </div>
+        )}
+        <button onClick={onClose} style={{ marginTop: 8, width: '100%', padding: '14px', borderRadius: 14, fontSize: 14, fontWeight: 700, color: '#888', background: '#f5f5f5' }}>닫기</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── 참여자 카드 (작은 버전) ── */
+function ParticipantCard({ p, gender, delay, onTap }: { p: MeetingParticipant | null; gender: 'female' | 'male'; delay: number; onTap?: () => void }) {
+  const isFemale = gender === 'female';
+  const accent = isFemale ? '#FF80AB' : '#4AADFF';
+  const accentBg = isFemale ? 'rgba(255,128,171,0.1)' : 'rgba(74,173,255,0.1)';
+  const accentBorder = isFemale ? 'rgba(255,128,171,0.3)' : 'rgba(74,173,255,0.3)';
 
   if (!p) {
     return (
       <div style={{
-        borderRadius: 16, padding: '14px 10px', minHeight: 100,
-        background: 'rgba(255,255,255,0.55)', border: `2px dashed ${accentBorder}`,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5,
+        borderRadius: 12, padding: '10px 8px',
+        background: 'rgba(255,255,255,0.5)', border: `1.5px dashed ${accentBorder}`,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, minHeight: 72,
       }}>
-        <span style={{ fontSize: 22, opacity: 0.25 }}>{isFemale ? '🩷' : '🩵'}</span>
-        <span style={{ fontSize: 11, color: '#aaa', fontWeight: 600 }}>대기중</span>
+        <span style={{ fontSize: 16, opacity: 0.2 }}>{isFemale ? '🩷' : '🩵'}</span>
+        <span style={{ fontSize: 10, color: '#bbb', fontWeight: 600 }}>대기중</span>
       </div>
     );
   }
@@ -165,27 +193,28 @@ function ParticipantCard({ p, gender, delay }: { p: MeetingParticipant | null; g
   const isAnon = p.user_id < 0;
 
   return (
-    <div className={isAnon ? '' : 'slot-reel'} style={{
-      animationDelay: `${delay}s`,
-      borderRadius: 16, padding: '13px 10px',
-      background: accentBg, border: `2px solid ${accentBorder}`,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-    }}>
-      <span style={{ fontSize: 32, lineHeight: 1 }}>{isAnon ? (isFemale ? '🙍‍♀️' : '🙍‍♂️') : faceTypeToEmoji(p.face_type)}</span>
-      <span style={{ fontSize: 12, fontWeight: 800, color: '#333', textAlign: 'center' }}>
+    <button
+      className={isAnon ? '' : 'slot-reel'}
+      onClick={!isAnon ? onTap : undefined}
+      style={{
+        animationDelay: `${delay}s`,
+        borderRadius: 12, padding: '9px 7px', width: '100%',
+        background: accentBg, border: `1.5px solid ${accentBorder}`,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+        cursor: isAnon ? 'default' : 'pointer',
+      }}
+    >
+      <span style={{ fontSize: 26, lineHeight: 1 }}>{isAnon ? (isFemale ? '🙍‍♀️' : '🙍‍♂️') : faceTypeToEmoji(p.face_type)}</span>
+      <span style={{ fontSize: 11, fontWeight: 800, color: '#333', textAlign: 'center', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {isAnon ? '참여중' : p.nickname}
       </span>
       {!isAnon && p.mbti && (
-        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: `${accent}22`, color: accent }}>{p.mbti}</span>
+        <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 20, background: `${accent}18`, color: accent }}>{p.mbti}</span>
       )}
       {!isAnon && p.charm_points && p.charm_points.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'center' }}>
-          {p.charm_points.slice(0, 2).map(cp => (
-            <span key={cp} style={{ fontSize: 9, color: '#888', background: 'rgba(255,255,255,0.7)', padding: '1px 5px', borderRadius: 6, border: '1px solid #eee' }}>#{cp}</span>
-          ))}
-        </div>
+        <span style={{ fontSize: 9, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>#{p.charm_points[0]}</span>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -198,6 +227,7 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
   chanceLoading: boolean;
 }) {
   const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
+  const [selectedP, setSelectedP] = useState<{ p: MeetingParticipant; gender: 'female' | 'male' } | null>(null);
 
   useEffect(() => {
     getMeetingParticipants(m.id).then(setParticipants).catch(() => {});
@@ -252,6 +282,7 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 20, color: '#555',
         }}>‹</button>
+        {selectedP && <ParticipantProfileModal p={selectedP.p} gender={selectedP.gender} onClose={() => setSelectedP(null)} />}
         <p style={{ flex: 1, fontSize: 15, fontWeight: 800, color: '#222', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</p>
         <span style={{ fontSize: 12, fontWeight: 700, padding: '5px 10px', borderRadius: 10, background: 'var(--gradient)', color: 'white', flexShrink: 0 }}>
           {formatScheduledAt(m.scheduled_at)}
@@ -296,9 +327,9 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
                 <span style={{ fontSize: 11, fontWeight: 800, color: fFull ? '#FF80AB' : '#888' }}>TEAM</span>
                 <span style={{ fontSize: 11, fontWeight: 700, color: fFull ? '#FF80AB' : '#aaa' }}>{filledF}/{m.required_female}</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {femaleSlots.map((p, i) => (
-                  <ParticipantCard key={i} p={p} gender="female" delay={i * 0.12} />
+                  <ParticipantCard key={i} p={p} gender="female" delay={i * 0.12} onTap={p && p.user_id > 0 ? () => setSelectedP({ p, gender: 'female' }) : undefined} />
                 ))}
               </div>
             </div>
@@ -321,9 +352,9 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
                 <span style={{ fontSize: 11, fontWeight: 800, color: mFull ? '#4AADFF' : '#888' }}>TEAM</span>
                 <span style={{ fontSize: 11, fontWeight: 700, color: mFull ? '#4AADFF' : '#aaa' }}>{filledM}/{m.required_male}</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {maleSlots.map((p, i) => (
-                  <ParticipantCard key={i} p={p} gender="male" delay={i * 0.12 + 0.08} />
+                  <ParticipantCard key={i} p={p} gender="male" delay={i * 0.12 + 0.08} onTap={p && p.user_id > 0 ? () => setSelectedP({ p, gender: 'male' }) : undefined} />
                 ))}
               </div>
             </div>
