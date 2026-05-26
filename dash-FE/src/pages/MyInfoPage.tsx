@@ -407,7 +407,7 @@ export default function MyInfoPage() {
 
   const { mutateAsync: doUpdate } = useMutation({
     mutationFn: (body: UserUpdate) => updateMe(body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.me }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: queryKeys.me }),
   });
 
   const handleSaveField = async (key: keyof UserUpdate, value: unknown) => {
