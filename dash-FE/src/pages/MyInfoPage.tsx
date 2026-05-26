@@ -66,7 +66,7 @@ function FieldEditorSheet({ field, user, onSave, onClose }: {
   onSave: (key: keyof UserUpdate, value: unknown) => Promise<void>;
   onClose: () => void;
 }) {
-  const rawVal = user ? (user as Record<string, unknown>)[field.key] : null;
+  const rawVal = user ? (user as unknown as Record<string, unknown>)[field.key] : null;
 
   const [textVal, setTextVal] = useState<string>(typeof rawVal === 'string' ? rawVal : '');
   const [numVal, setNumVal] = useState<number>(typeof rawVal === 'number' ? rawVal : (field.min ?? 20));
