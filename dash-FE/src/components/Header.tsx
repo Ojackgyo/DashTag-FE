@@ -45,12 +45,13 @@ export default function Header() {
       <div className="flex items-center justify-between gap-2.5 px-[18px] h-[54px]">
         {/* 브랜드 */}
         <div
-          className="text-[21px] font-extrabold tracking-tight cursor-pointer select-none shrink-0"
+          className="flex items-center gap-2 cursor-pointer select-none shrink-0"
           onClick={() => navigate('/')}
         >
-          <span style={{ color: 'var(--text)' }}>Dash</span>
-          <span style={{ background: 'var(--gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-            Tag
+          <img src="/logo.svg" alt="DashTag" style={{ height: 28, width: 'auto' }} />
+          <span className="text-[21px] font-extrabold tracking-tight">
+            <span style={{ color: 'var(--text)' }}>Dash</span>
+            <span style={{ background: 'var(--gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Tag</span>
           </span>
         </div>
 
