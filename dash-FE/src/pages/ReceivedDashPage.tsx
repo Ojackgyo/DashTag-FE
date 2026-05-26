@@ -78,7 +78,7 @@ export default function ReceivedDashPage() {
       setAcceptedIds(prev => new Set([...prev, selected.id]));
       setShowChanceModal(false);
       closeCard();
-      navigate('/chat');
+      navigate('/chat', { state: { openRoom: { type: 'dating' } } });
     } catch {
       setShowChanceModal(false);
     }

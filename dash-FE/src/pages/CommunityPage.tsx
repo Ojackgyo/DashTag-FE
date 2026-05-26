@@ -223,7 +223,7 @@ function GroupDetailView({ group, onClose, onJoin, isCreator, userId, userGender
           <>
             <button
               style={{ width: '100%', padding: '14px', borderRadius: 18, fontSize: 15, fontWeight: 800, color: 'white', background: 'var(--gradient)', boxShadow: '0 5px 20px rgba(255,128,171,0.4)' }}
-              onClick={() => navigate('/chat')}
+              onClick={() => navigate('/chat', { state: { openRoom: { type: 'community', relatedId: group.id } } })}
             >💬 채팅방으로 이동</button>
             <button style={{ width: '100%', padding: '14px', borderRadius: 18, fontSize: 15, fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-bg)', border: '2px solid var(--primary-border)' }} disabled>✓ 가입 완료</button>
           </>

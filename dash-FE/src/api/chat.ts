@@ -1,9 +1,23 @@
-import { api } from './client';
+import { api, getToken } from './client';
+
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'https://dashtag-be-production.up.railway.app';
+
+// WebSocket 시도 (백엔드가 지원할 경우에만 연결됨 — 실패 시 onerror로 감지)
+export function createChatSocket(roomId: number): WebSocket {
+  const wsBase = BASE_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
+  const token = getToken();
+  const url = token
+    ? `${wsBase}/ws/chat/${roomId}?token=${encodeURIComponent(token)}`
+    : `${wsBase}/ws/chat/${roomId}`;
+  return new WebSocket(url);
+}
 
 export interface ChatRoomResponse {
   id: number;
   room_type: string;
   related_id?: number | null;
+  name?: string | null;
+  emoji?: string | null;
   created_at: string;
   last_message?: string | null;
   last_message_at?: string | null;

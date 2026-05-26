@@ -1,8 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getChatRooms, getChatMessages, sendMessage as apiSendMessage, setSchedule, reportRoom } from '../api/chat';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { getChatRooms, getChatMessages, sendMessage as apiSendMessage, createChatSocket, setSchedule, reportRoom } from '../api/chat';
 import { getMe } from '../api/user';
 import type { ChatRoomResponse, MessageResponse } from '../api/chat';
+
+interface OpenRoomState {
+  type: string;
+  relatedId?: number;
+}
 
 type Category = '소개팅' | '미팅' | '소모임';
 
@@ -231,6 +236,8 @@ function ReportModal({ roomId, roomName, reportedUserId, onClose }: { roomId: nu
   );
 }
 
+const POLL_INTERVAL = 5000;
+
 /* ── 채팅방 뷰 ── */
 function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId: number; onBack: () => void }) {
   const [messages, setMessages] = useState<MessageResponse[]>([]);
@@ -239,9 +246,52 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
   const [scheduledDate, setScheduledDate] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const wsLiveRef = useRef(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+
+  const mergeMessages = (incoming: MessageResponse[]) => {
+    setMessages(prev => {
+      const ids = new Set(prev.map(m => m.id));
+      const fresh = incoming.filter(m => !ids.has(m.id));
+      return fresh.length ? [...prev, ...fresh] : prev;
+    });
+  };
 
   useEffect(() => {
+    // 초기 메시지 로드
     getChatMessages(room.id).then(setMessages).catch(() => {});
+
+    // WebSocket 시도
+    const ws = createChatSocket(room.id);
+    wsRef.current = ws;
+
+    ws.onopen = () => { wsLiveRef.current = true; };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg: MessageResponse = JSON.parse(event.data);
+        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
+      } catch { /* ignore */ }
+    };
+
+    // WS 연결 실패 또는 닫힘 → 폴링으로 fallback
+    const startPolling = () => {
+      if (pollRef.current) return;
+      pollRef.current = setInterval(() => {
+        getChatMessages(room.id).then(mergeMessages).catch(() => {});
+      }, POLL_INTERVAL);
+    };
+
+    ws.onerror = () => { wsLiveRef.current = false; startPolling(); };
+    ws.onclose = () => { wsLiveRef.current = false; startPolling(); };
+
+    return () => {
+      ws.close();
+      wsRef.current = null;
+      clearInterval(pollRef.current);
+      pollRef.current = undefined;
+    };
   }, [room.id]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -249,20 +299,36 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
   const handleSend = async () => {
     const text = input.trim();
     if (!text) return;
-    const optimistic: MessageResponse = {
-      id: Date.now(),
-      room_id: room.id,
-      sender_id: userId,
-      content: text,
-      is_read: false,
-      created_at: new Date().toISOString(),
-    };
-    setMessages(prev => [...prev, optimistic]);
     setInput('');
-    try {
-      const sent = await apiSendMessage(room.id, text);
-      setMessages(prev => prev.map(m => m.id === optimistic.id ? sent : m));
-    } catch { /* keep optimistic */ }
+
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ content: text }));
+      const optimistic: MessageResponse = {
+        id: Date.now(),
+        room_id: room.id,
+        sender_id: userId,
+        content: text,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, optimistic]);
+    } else {
+      // REST fallback
+      const optimistic: MessageResponse = {
+        id: Date.now(),
+        room_id: room.id,
+        sender_id: userId,
+        content: text,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, optimistic]);
+      try {
+        const sent = await apiSendMessage(room.id, text);
+        setMessages(prev => prev.map(m => m.id === optimistic.id ? sent : m));
+      } catch { /* keep optimistic */ }
+    }
   };
 
   const handleConfirmDate = (label: string) => {
@@ -285,7 +351,9 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
       <div className="flex items-center gap-2.5 px-[18px] py-3 shrink-0 border-b" style={{ background: 'var(--header-bg)', backdropFilter: 'blur(16px)', borderColor: 'var(--border)' }}>
         <button className="w-8 h-8 rounded-[9px] flex items-center justify-center text-[16px] font-semibold shrink-0 border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-sub)' }} onClick={onBack}>←</button>
         <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-bold truncate" style={{ color: 'var(--text)' }}>{roomCategory(room.room_type)} #{room.id}</p>
+          <p className="text-[15px] font-bold truncate" style={{ color: 'var(--text)' }}>
+            {room.emoji ? `${room.emoji} ` : ''}{room.name ?? `${roomCategory(room.room_type)} #${room.id}`}
+          </p>
         </div>
         <button
           className="text-[11px] font-bold px-2.5 py-1.5 rounded-[10px] border shrink-0 whitespace-nowrap active:opacity-75"
@@ -391,6 +459,9 @@ function formatRoomTime(iso: string): string {
 
 export default function ChatPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const openRoomState = (location.state as { openRoom?: OpenRoomState } | null)?.openRoom;
+
   const [rooms, setRooms] = useState<ChatRoomResponse[]>([]);
   const [userId, setUserId] = useState<number>(0);
   const [category, setCategory] = useState<Category>('소개팅');
@@ -398,7 +469,26 @@ export default function ChatPage() {
 
   useEffect(() => {
     getMe().then(u => setUserId(u.id)).catch(() => {});
-    getChatRooms().then(setRooms).catch(() => {});
+    getChatRooms().then(loaded => {
+      setRooms(loaded);
+      if (openRoomState) {
+        const match = loaded.find(r => {
+          if (r.room_type !== openRoomState.type) return false;
+          if (openRoomState.relatedId != null) return r.related_id === openRoomState.relatedId;
+          return true;
+        }) ?? loaded.filter(r => r.room_type === openRoomState.type).sort((a, b) =>
+          new Date(b.last_message_at ?? b.created_at).getTime() - new Date(a.last_message_at ?? a.created_at).getTime()
+        )[0];
+        if (match) {
+          setActiveRoom(match);
+          setCategory(roomCategory(match.room_type));
+        } else {
+          const typeMap: Record<string, Category> = { dating: '소개팅', meeting: '미팅', community: '소모임' };
+          const cat = typeMap[openRoomState.type];
+          if (cat) setCategory(cat);
+        }
+      }
+    }).catch(() => {});
   }, []);
 
   if (activeRoom) return <ChatRoomView room={activeRoom} userId={userId} onBack={() => setActiveRoom(null)} />;
@@ -445,10 +535,10 @@ export default function ChatPage() {
               <div
                 className="w-[50px] h-[50px] rounded-[16px] flex items-center justify-center text-[24px] shrink-0"
                 style={{ background: 'var(--bg-card2)' }}
-              >{CATEGORY_EMOJI[roomCategory(room.room_type)]}</div>
+              >{room.emoji ?? CATEGORY_EMOJI[roomCategory(room.room_type)]}</div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start mb-1 gap-2">
-                  <span className="text-[15px] font-bold" style={{ color: 'var(--text)' }}>{roomCategory(room.room_type)} #{room.id}</span>
+                  <span className="text-[15px] font-bold" style={{ color: 'var(--text)' }}>{room.name ?? `${roomCategory(room.room_type)} #${room.id}`}</span>
                   <span className="text-[11px] shrink-0 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{formatRoomTime(room.last_message_at ?? room.created_at)}</span>
                 </div>
                 <div className="flex justify-between items-center gap-2">
