@@ -364,7 +364,9 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
   };
 
   return (
-    <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 54px - 50px)' }}>
+    <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 54px - 50px)', position: 'relative' }}>
+      {/* 로고 워터마크 — 스크롤과 무관하게 중앙 고정 */}
+      <img src="/logo.svg" alt="" aria-hidden style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 180, opacity: 0.08, pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
       {/* 헤더 */}
       <div className="flex items-center gap-2.5 px-[18px] py-3 shrink-0 border-b" style={{ background: 'var(--header-bg)', backdropFilter: 'blur(16px)', borderColor: 'var(--border)' }}>
         <button className="w-8 h-8 rounded-[9px] flex items-center justify-center text-[16px] font-semibold shrink-0 border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-sub)' }} onClick={onBack}>←</button>
@@ -405,8 +407,7 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
       )}
 
       {/* 메시지 */}
-      <div className="flex-1 overflow-y-auto px-[18px] py-4 flex flex-col gap-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ position: 'relative' }}>
-        <img src="/logo.svg" alt="" aria-hidden style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 160, opacity: 0.045, pointerEvents: 'none', userSelect: 'none' }} />
+      <div className="flex-1 overflow-y-auto px-[18px] py-4 flex flex-col gap-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ position: 'relative', zIndex: 1 }}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <span className="text-[40px]">💬</span>
