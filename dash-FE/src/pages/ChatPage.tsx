@@ -405,7 +405,8 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
       )}
 
       {/* 메시지 */}
-      <div className="flex-1 overflow-y-auto px-[18px] py-4 flex flex-col gap-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex-1 overflow-y-auto px-[18px] py-4 flex flex-col gap-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ position: 'relative' }}>
+        <img src="/logo.svg" alt="" aria-hidden style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 160, opacity: 0.045, pointerEvents: 'none', userSelect: 'none' }} />
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <span className="text-[40px]">💬</span>
