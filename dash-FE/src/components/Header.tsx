@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { clearTokens } from '../api/client';
 import { useTheme } from '../context/ThemeContext';
 
 function ChatIcon() {
@@ -37,24 +35,7 @@ function MoonIcon() {
 
 export default function Header() {
   const navigate = useNavigate();
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('dashtag_access_token'));
   const { isDark, setMode } = useTheme();
-
-  useEffect(() => {
-    const sync = () => setIsLoggedIn(!!localStorage.getItem('dashtag_access_token'));
-    window.addEventListener('storage', sync);
-    window.addEventListener('dashtag-auth', sync);
-    return () => {
-      window.removeEventListener('storage', sync);
-      window.removeEventListener('dashtag-auth', sync);
-    };
-  }, []);
-
-  const handleLogout = () => {
-    clearTokens();
-    setIsLoggedIn(false);
-    navigate('/login');
-  };
 
   return (
     <header
@@ -93,23 +74,6 @@ export default function Header() {
             <span>채팅</span>
           </button>
 
-          {isLoggedIn ? (
-            <button
-              onClick={handleLogout}
-              className="text-[13px] font-bold px-4 py-[7px] rounded-full min-h-[34px] shrink-0 active:opacity-85 active:scale-95"
-              style={{ background: 'var(--bg-card2)', border: '1px solid var(--border)', color: 'var(--text-sub)' }}
-            >
-              로그아웃
-            </button>
-          ) : (
-            <button
-              onClick={() => navigate('/login')}
-              className="text-[13px] font-bold px-4 py-[7px] rounded-full min-h-[34px] text-white shrink-0 active:opacity-85 active:scale-95"
-              style={{ background: 'var(--gradient)' }}
-            >
-              로그인
-            </button>
-          )}
         </div>
       </div>
     </header>

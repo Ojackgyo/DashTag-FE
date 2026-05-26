@@ -54,3 +54,17 @@ export function joinMeetingByCode(invite_code: string): Promise<MeetingResponse>
 export function leaveMeeting(id: number): Promise<void> {
   return api.delete<void>(`/api/meetings/${id}/leave`);
 }
+
+export interface MeetingParticipant {
+  user_id: number;
+  nickname: string;
+  gender?: string | null;
+  face_type?: string | null;
+  mbti?: string | null;
+  charm_points?: string[] | null;
+}
+
+// GET /api/meetings/{id}/participants
+export function getMeetingParticipants(id: number): Promise<MeetingParticipant[]> {
+  return api.get<MeetingParticipant[]>(`/api/meetings/${id}/participants`);
+}

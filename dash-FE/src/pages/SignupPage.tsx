@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import './SignupPage.css';
 import rawNicknames from '../data/nicknames.csv?raw';
 import inhaMajorsRaw from '../data/inha_majors.json';
 import { signup as apiSignup, verifyEmail as apiVerifyEmail, resendVerification } from '../api/auth';
-import { updateMe } from '../api/user';
+import { updateMe, getMe } from '../api/user';
+import { isLoggedIn } from '../api/client';
+import { queryKeys } from '../lib/queryKeys';
 import StudentIdVerify from '../components/StudentIdVerify';
 
 /* ─── 닉네임 목록 (CSV) ─── */
@@ -223,6 +226,12 @@ function getSteps(gender: string): Step[] {
   }
 
   return steps;
+}
+
+// 이미 로그인된 상태(내정보 수정)일 때는 이메일·비번·인증 단계 제외
+const EDIT_SKIP_KEYS = new Set(['email', 'password', 'emailCode']);
+function getEditSteps(gender: string): Step[] {
+  return getSteps(gender).filter(s => !EDIT_SKIP_KEYS.has(s.key));
 }
 
 /* ─── MBTI 선택기 ─── */
@@ -639,6 +648,9 @@ function IntroScreen() {
 /* ─── 메인 컴포넌트 ─── */
 export default function SignupPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const editMode = isLoggedIn();
+
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [visible, setVisible] = useState(false);
@@ -649,8 +661,39 @@ export default function SignupPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const advancingRef = useRef(false);
 
+  // 편집 모드: 기존 유저 데이터를 answers에 pre-fill
+  useEffect(() => {
+    if (!editMode) return;
+    getMe().then(u => {
+      const genderVal = u.gender === 'male' ? '남성' : u.gender === 'female' ? '여성' : '';
+      setAnswers(prev => ({
+        gender:       genderVal,
+        nickname:     u.nickname ?? '',
+        name:         u.name ?? '',
+        age:          u.age != null ? String(u.age) : '',
+        major:        u.major ?? '',
+        faceType:     u.face_type ?? '',
+        height:       u.height != null ? String(u.height) : '',
+        weight:       u.weight != null ? String(u.weight) : '',
+        skinTone:     u.skin_tone ?? '',
+        mbti:         u.mbti ? u.mbti.split('').join(',') : '',
+        tattoo:       u.tattoo === true ? '작은 타투' : u.tattoo === false ? '없어요' : '',
+        smoking:      u.smoking === true ? '흡연자예요' : u.smoking === false ? '비흡연' : '',
+        charmPoints:  u.charm_points?.join(',') ?? '',
+        idealFaceType:   (u.ideal_type?.face_type as string) ?? '',
+        idealSkinTone:   (u.ideal_type?.skin_tone as string) ?? '',
+        idealAge:        (u.ideal_type?.age_diff as string) ?? '',
+        idealTattoo:     (u.ideal_type?.tattoo as string) ?? '',
+        idealSmoking:    (u.ideal_type?.smoking as string) ?? '',
+        idealMilitary:   (u.ideal_type?.military as string) ?? '',
+        ...prev,
+      }));
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const gender = answers['gender'] || '';
-  const steps  = useMemo(() => getSteps(gender), [gender]);
+  const steps  = useMemo(() => editMode ? getEditSteps(gender) : getSteps(gender), [editMode, gender]);
   const step   = steps[currentStep] ?? steps[0];
   const isLast = currentStep === steps.length - 1;
   const progress = (currentStep / steps.length) * 100;
@@ -662,8 +705,9 @@ export default function SignupPage() {
     return () => clearTimeout(t);
   }, [currentStep]);
 
-  // 이메일 인증 단계 진입 시 회원가입 API 호출
+  // 이메일 인증 단계 진입 시 회원가입 API 호출 (신규 가입 전용)
   useEffect(() => {
+    if (editMode) return;
     if (step.key === 'emailCode') {
       const email = answers['email'] ?? '';
       const password = answers['password'] ?? '';
@@ -754,9 +798,11 @@ export default function SignupPage() {
         const mbtiStr = (answers['mbti'] ?? '').replace(/,/g, '');
         const idealMbtiStr = (answers['idealMbti'] ?? '').replace(/,/g, '');
         await updateMe({
+          nickname: answers['nickname'] || null,
           name: answers['name'] || null,
           age: parseInt(answers['age'] ?? '0') || null,
           major: answers['major'] || null,
+          gender: answers['gender'] === '남성' ? 'male' : answers['gender'] === '여성' ? 'female' : null,
           face_type: answers['faceType'] || null,
           height: parseInt(answers['height'] ?? '0') || null,
           weight: parseInt(answers['weight'] ?? '0') || null,
@@ -775,6 +821,7 @@ export default function SignupPage() {
             military: answers['idealMilitary'],
           },
         });
+        queryClient.invalidateQueries({ queryKey: queryKeys.me });
         navigate('/');
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : '프로필 저장에 실패했어요');
@@ -789,7 +836,7 @@ export default function SignupPage() {
 
   const handleBack = () => {
     if (advancingRef.current) return;
-    if (currentStep === 0) { navigate('/login'); return; }
+    if (currentStep === 0) { navigate(editMode ? '/' : '/login'); return; }
     setExiting(true);
     setTimeout(() => { setExiting(false); setCurrentStep(s => s - 1); }, 220);
   };

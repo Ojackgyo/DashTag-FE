@@ -8,6 +8,6 @@ export function useMe() {
     queryKey: queryKeys.me,
     queryFn: getMe,
     enabled: isLoggedIn(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 }

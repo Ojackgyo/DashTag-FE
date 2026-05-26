@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCommunities, createCommunity, joinCommunity, getCommunityDashboard, removeCommunityMember } from '../api/community';
 import { isLoggedIn } from '../api/client';
 import { useMe } from '../hooks/useMe';
-import { useDebounce, useThrottle } from '../lib/hooks';
+import { useDebounce } from '../lib/hooks';
 import { queryKeys } from '../lib/queryKeys';
 import type { CommunityResponse, CommunityDashboard, CommunityMemberInfo } from '../api/community';
 
@@ -105,12 +105,16 @@ function DashboardSheet({ communityId, myUserId, onClose }: { communityId: numbe
 }
 
 /* ── 그룹 상세 뷰 ── */
-function GroupDetailView({ group, onClose, onJoin, isCreator, userId, userGender }: { group: CommunityResponse; onClose: () => void; onJoin: (id: number) => void | Promise<void>; isCreator: boolean; userId: number; userGender: string | null }) {
+function GroupDetailView({ group, onClose, onJoin, isCreator, userId, userGender }: { group: CommunityResponse; onClose: () => void; onJoin: (id: number) => Promise<void>; isCreator: boolean; userId: number; userGender: string | null }) {
   const navigate = useNavigate();
   const [joined, setJoined] = useState(group.is_joined);
   const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState('');
   const [showDashboard, setShowDashboard] = useState(false);
   const gc = genderColor(group.gender);
+
+  // 외부에서 group.is_joined 가 바뀌면 동기화
+  useEffect(() => { setJoined(group.is_joined); }, [group.is_joined]);
 
   const genderAllowed = (() => {
     const g = group.gender;
@@ -124,10 +128,13 @@ function GroupDetailView({ group, onClose, onJoin, isCreator, userId, userGender
   const handleJoin = async () => {
     if (joining || joined) return;
     setJoining(true);
+    setJoinError('');
     try {
       await onJoin(group.id);
       setJoined(true);
-    } catch { /* ignore */ }
+    } catch (e) {
+      setJoinError(e instanceof Error ? e.message : '가입에 실패했어요. 다시 시도해주세요.');
+    }
     setJoining(false);
   };
 
@@ -219,6 +226,9 @@ function GroupDetailView({ group, onClose, onJoin, isCreator, userId, userGender
         background: 'linear-gradient(to top, var(--bg) 70%, transparent)',
         display: 'flex', flexDirection: 'column', gap: 8,
       }}>
+        {joinError && (
+          <p style={{ fontSize: 12, color: '#FF6B6B', textAlign: 'center', marginBottom: 4 }}>{joinError}</p>
+        )}
         {joined ? (
           <>
             <button
@@ -429,7 +439,10 @@ export default function CommunityPage() {
 
   const { mutateAsync: doJoin } = useMutation({
     mutationFn: joinCommunity,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.communities }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.communities });
+      setSelectedGroup(prev => prev?.id === result.id ? result : prev);
+    },
   });
 
   const { mutateAsync: doCreate } = useMutation({
@@ -449,9 +462,9 @@ export default function CommunityPage() {
     });
   };
 
-  const handleJoin = useThrottle(async (id: number) => {
+  const handleJoin = async (id: number) => {
     await doJoin(id);
-  }, 2000);
+  };
 
   const filtered = groups.filter(g => {
     const gk = genderKey(g.gender);

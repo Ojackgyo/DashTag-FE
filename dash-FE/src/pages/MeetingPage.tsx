@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useChance } from '../hooks/useChance';
 import { useDebounce, useThrottle } from '../lib/hooks';
 import { isLoggedIn } from '../api/client';
 import { queryKeys } from '../lib/queryKeys';
 import ChanceModal from '../components/ChanceModal';
-import { getMeetings, createMeeting, joinMeeting, joinMeetingByCode } from '../api/meeting';
-import type { MeetingResponse } from '../api/meeting';
+import { getMeetings, createMeeting, joinMeeting, joinMeetingByCode, getMeetingParticipants } from '../api/meeting';
+import { faceTypeToEmoji } from '../api/user';
+import type { MeetingResponse, MeetingParticipant } from '../api/meeting';
 
 const DAYS_KR = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -141,71 +142,47 @@ function MeetingCard({ m, onOpen }: { m: MeetingResponse; onOpen: () => void }) 
   );
 }
 
-/* ── 참여자 슬롯 ── */
-function ParticipantSlots({ count, required, gender }: { count: number; required: number; gender: 'female' | 'male' }) {
-  const [revealed, setRevealed] = useState(0);
-
-  useEffect(() => {
-    setRevealed(0);
-    let i = 0;
-    const tick = () => {
-      if (i < count) { i++; setRevealed(i); setTimeout(tick, 200); }
-    };
-    const t = setTimeout(tick, 350);
-    return () => clearTimeout(t);
-  }, [count]);
-
+/* ── 참여자 카드 (목업 스타일) ── */
+function ParticipantCard({ p, gender, delay }: { p: MeetingParticipant | null; gender: 'female' | 'male'; delay: number }) {
   const isFemale = gender === 'female';
   const c = isFemale
-    ? { bg: 'rgba(255,128,171,0.13)', border: 'var(--primary-border)', shadow: 'rgba(255,128,171,0.22)', label: 'var(--primary)' }
-    : { bg: 'rgba(100,180,255,0.13)', border: 'rgba(100,180,255,0.38)', shadow: 'rgba(100,180,255,0.22)', label: '#4AADFF' };
+    ? { bg: 'rgba(255,128,171,0.10)', border: 'var(--primary-border)', mbti: '#FF80AB' }
+    : { bg: 'rgba(100,180,255,0.10)', border: 'rgba(100,180,255,0.35)', mbti: '#4AADFF' };
+
+  if (!p) {
+    return (
+      <div className="wait-slot" style={{
+        borderRadius: 16, padding: '14px 10px',
+        background: 'var(--bg-card2)', border: '2px dashed var(--border)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 5, minHeight: 96,
+      }}>
+        <span style={{ fontSize: 26, opacity: 0.18 }}>👤</span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>대기중</span>
+        <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.5 }}>♡ ...</span>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
-      {Array.from({ length: required }, (_, i) => {
-        const isRevealed = i < revealed;
-        const isFilled = i < count;
-        const isSpinning = isFilled && !isRevealed;
-
-        return (
-          <div
-            key={i}
-            className={isRevealed ? 'slot-reel' : isSpinning ? '' : 'wait-slot'}
-            style={{
-              animationDelay: isRevealed ? `${i * 0.12}s` : '0s',
-              width: 56, height: 70, borderRadius: 16,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
-              transition: 'all 0.2s',
-              ...(isRevealed ? {
-                background: c.bg,
-                border: `2px solid ${c.border}`,
-                boxShadow: `0 4px 16px ${c.shadow}`,
-              } : isSpinning ? {
-                background: 'var(--bg-card2)',
-                border: '2px solid var(--border)',
-                animation: 'waitSlot 0.35s ease-in-out infinite',
-              } : {
-                background: 'var(--bg-card2)',
-                border: '2px dashed var(--border)',
-              }),
-            }}
-          >
-            {isRevealed ? (
-              <>
-                <span style={{ fontSize: 28, lineHeight: 1 }}>{isFemale ? '🩷' : '🩵'}</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: c.label }}>참여✓</span>
-              </>
-            ) : isSpinning ? (
-              <span style={{ fontSize: 24 }}>🎰</span>
-            ) : (
-              <>
-                <span style={{ fontSize: 22, opacity: 0.22 }}>👤</span>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>대기중</span>
-              </>
-            )}
-          </div>
-        );
-      })}
+    <div className="slot-reel" style={{
+      animationDelay: `${delay}s`,
+      borderRadius: 16, padding: '13px 10px',
+      background: c.bg, border: `2px solid ${c.border}`,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+    }}>
+      <span style={{ fontSize: 34, lineHeight: 1 }}>{faceTypeToEmoji(p.face_type)}</span>
+      <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', textAlign: 'center' }}>{p.nickname}</span>
+      {p.mbti && (
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: `${c.mbti}20`, color: c.mbti }}>{p.mbti}</span>
+      )}
+      {p.charm_points && p.charm_points.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'center' }}>
+          {p.charm_points.slice(0, 2).map(cp => (
+            <span key={cp} style={{ fontSize: 9, color: 'var(--text-muted)', background: 'var(--bg-card)', padding: '1px 5px', borderRadius: 6, border: '1px solid var(--border)' }}>#{cp}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -218,93 +195,108 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
   hasChance: boolean;
   chanceLoading: boolean;
 }) {
-  const total = m.required_male + m.required_female;
-  const filledF = Math.min(m.female_count, m.required_female);
-  const filledM = Math.min(m.male_count, m.required_male);
-  const fFull = filledF >= m.required_female;
-  const mFull = filledM >= m.required_male;
-  const full = !m.is_active || m.participant_count >= total;
+  const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
+
+  useEffect(() => {
+    getMeetingParticipants(m.id).then(setParticipants).catch(() => {});
+  }, [m.id]);
+
+  const total    = m.required_male + m.required_female;
+  const filledF  = Math.min(m.female_count, m.required_female);
+  const filledM  = Math.min(m.male_count, m.required_male);
+  const fFull    = filledF >= m.required_female;
+  const mFull    = filledM >= m.required_male;
+  const full     = !m.is_active || m.participant_count >= total;
+
+  const femaleParticipants = participants.filter(p => p.gender === 'female' || p.gender === '여성');
+  const maleParticipants   = participants.filter(p => p.gender === 'male'   || p.gender === '남성');
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--bg)', display: 'flex', flexDirection: 'column', animation: 'slideInFromRight 0.3s cubic-bezier(0.22,1,0.36,1)' }}>
       {/* 헤더 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', background: 'var(--header-bg)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
         <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--text)' }}>‹</button>
-        <p style={{ flex: 1, fontSize: 16, fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</p>
-        <span style={{ fontSize: 13, fontWeight: 700, padding: '5px 12px', borderRadius: 10, background: 'var(--gradient)', color: 'white', flexShrink: 0 }}>
-          📅 {formatScheduledAt(m.scheduled_at)}
+        <p style={{ flex: 1, fontSize: 15, fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</p>
+        <span style={{ fontSize: 12, fontWeight: 700, padding: '5px 10px', borderRadius: 10, background: 'var(--gradient)', color: 'white', flexShrink: 0 }}>
+          {formatScheduledAt(m.scheduled_at)}
         </span>
       </div>
 
       {/* 스크롤 콘텐츠 */}
-      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 110, scrollbarWidth: 'none' }}>
-        {/* 키워드 배너 */}
-        <div style={{ background: 'linear-gradient(160deg, var(--primary-bg) 0%, var(--bg-card2) 100%)', padding: '18px 20px 16px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {m.keywords.map(k => (
-              <span key={k} style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-bg)', border: '1px solid var(--primary-border)', padding: '4px 10px', borderRadius: 20 }}>#{k}</span>
-            ))}
+      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 120, scrollbarWidth: 'none' }}>
+
+        {/* MATCHING ROOM 카드 */}
+        <div style={{ margin: '16px 16px 0', borderRadius: 24, border: '1px solid var(--border)', background: 'var(--bg-card)', overflow: 'hidden' }}>
+          {/* 카드 헤더 */}
+          <div style={{ background: 'linear-gradient(135deg, var(--primary-bg) 0%, var(--bg-card2) 100%)', padding: '14px 16px 10px', borderBottom: '1px solid var(--border)' }}>
+            <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.8px', color: 'var(--primary)', textTransform: 'uppercase', marginBottom: 4 }}>MATCHING ROOM</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</p>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6 }}>
+              {m.keywords.map(k => (
+                <span key={k} style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-bg)', border: '1px solid var(--primary-border)', padding: '2px 8px', borderRadius: 20 }}>#{k}</span>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* 참여자 슬롯 */}
-        <div style={{ padding: '24px 20px 28px', borderBottom: '1px solid var(--border)' }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)', marginBottom: 20, textAlign: 'center' }}>참여자 현황</p>
-
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 12 }}>
-            {/* 여성 */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 20 }}>🩷</span>
-                <span style={{ fontSize: 15, fontWeight: 800, color: fFull ? 'var(--primary)' : 'var(--text)' }}>
-                  {filledF}<span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>/{m.required_female}</span>
-                </span>
-                {fFull && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: 'var(--primary-bg)', color: 'var(--primary)' }}>FULL</span>}
+          {/* 팀 vs 팀 */}
+          <div style={{ display: 'flex', gap: 0 }}>
+            {/* 여성 팀 */}
+            <div style={{ flex: 1, padding: '14px 12px 16px', borderRight: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+                <span style={{ fontSize: 14 }}>🩷</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: fFull ? 'var(--primary)' : 'var(--text-sub)' }}>TEAM</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: fFull ? 'var(--primary)' : 'var(--text-muted)' }}>{filledF}/{m.required_female}</span>
               </div>
-              <ParticipantSlots count={filledF} required={m.required_female} gender="female" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {Array.from({ length: m.required_female }, (_, i) => (
+                  <ParticipantCard key={i} p={femaleParticipants[i] ?? null} gender="female" delay={i * 0.15} />
+                ))}
+              </div>
             </div>
 
             {/* VS */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 50, flexShrink: 0 }}>
-              <div style={{ padding: '6px 10px', borderRadius: 10, background: 'var(--bg-card2)', border: '1px solid var(--border)' }}>
-                <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--text-muted)' }}>VS</span>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', background: 'var(--bg-card2)' }}>
+              <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-muted)', writingMode: 'vertical-rl' }}>VS</span>
             </div>
 
-            {/* 남성 */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 20 }}>🩵</span>
-                <span style={{ fontSize: 15, fontWeight: 800, color: mFull ? '#4AADFF' : 'var(--text)' }}>
-                  {filledM}<span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>/{m.required_male}</span>
-                </span>
-                {mFull && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: 'rgba(100,180,255,0.12)', color: '#4AADFF' }}>FULL</span>}
+            {/* 남성 팀 */}
+            <div style={{ flex: 1, padding: '14px 12px 16px', borderLeft: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+                <span style={{ fontSize: 14 }}>🩵</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: mFull ? '#4AADFF' : 'var(--text-sub)' }}>TEAM</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: mFull ? '#4AADFF' : 'var(--text-muted)' }}>{filledM}/{m.required_male}</span>
               </div>
-              <ParticipantSlots count={filledM} required={m.required_male} gender="male" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {Array.from({ length: m.required_male }, (_, i) => (
+                  <ParticipantCard key={i} p={maleParticipants[i] ?? null} gender="male" delay={i * 0.15 + 0.1} />
+                ))}
+              </div>
             </div>
           </div>
 
           {/* 총 인원 바 */}
-          <div style={{ marginTop: 24, borderRadius: 12, overflow: 'hidden', height: 8, background: 'var(--bg-card2)' }}>
-            <div style={{
-              height: '100%',
-              width: `${Math.min(100, (m.participant_count / total) * 100)}%`,
-              background: full ? 'var(--primary)' : 'var(--gradient)',
-              transition: 'width 0.8s cubic-bezier(0.22,1,0.36,1)',
-              borderRadius: 12,
-            }} />
+          <div style={{ padding: '10px 16px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg-card2)' }}>
+            <div style={{ borderRadius: 8, overflow: 'hidden', height: 6, background: 'var(--border)', marginBottom: 6 }}>
+              <div style={{
+                height: '100%',
+                width: `${Math.min(100, (m.participant_count / total) * 100)}%`,
+                background: full ? 'var(--primary)' : 'var(--gradient)',
+                transition: 'width 0.8s cubic-bezier(0.22,1,0.36,1)',
+                borderRadius: 8,
+              }} />
+            </div>
+            <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
+              전체 {m.participant_count}/{total}명 · {full ? '마감' : '모집 중'}
+            </p>
           </div>
-          <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
-            전체 {m.participant_count}/{total}명 {full ? '· 마감' : '모집 중'}
-          </p>
         </div>
 
         {/* 초대코드 */}
         {m.is_joined && m.invite_code && (
-          <div style={{ padding: '18px 20px' }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)', marginBottom: 10 }}>🔑 초대코드</p>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: 14, padding: '14px 18px', background: 'var(--bg-card2)', border: '1px solid var(--primary-border)' }}>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>친구에게 공유하세요</span>
+          <div style={{ margin: '12px 16px 0', borderRadius: 18, padding: '14px 18px', background: 'var(--bg-card)', border: '1px solid var(--primary-border)' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-sub)', marginBottom: 8 }}>🔑 초대코드</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>친구에게 공유하세요</span>
               <span style={{ fontSize: 20, fontWeight: 900, letterSpacing: 7, color: 'var(--primary)' }}>{m.invite_code}</span>
             </div>
           </div>
@@ -312,7 +304,20 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
       </div>
 
       {/* 하단 고정 버튼 */}
-      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 520, padding: '12px 20px 36px', background: 'linear-gradient(to top, var(--bg) 70%, transparent)' }}>
+      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 520, padding: '10px 20px 36px', background: 'linear-gradient(to top, var(--bg) 75%, transparent)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* 친구 초대 버튼 (참여 중일 때만) */}
+        {m.is_joined && m.invite_code && (
+          <button
+            style={{ width: '100%', padding: '13px', borderRadius: 16, fontSize: 14, fontWeight: 700, color: 'var(--text-sub)', background: 'var(--bg-card)', border: '1.5px solid var(--border)' }}
+            onClick={() => {
+              if (navigator.share) {
+                navigator.share({ text: `미팅 초대코드: ${m.invite_code}` }).catch(() => {});
+              } else {
+                navigator.clipboard?.writeText(m.invite_code!).catch(() => {});
+              }
+            }}
+          >👫 친구 초대하기</button>
+        )}
         {full ? (
           <button style={{ width: '100%', padding: '16px', borderRadius: 18, fontSize: 15, fontWeight: 800, color: 'var(--text-muted)', background: 'var(--bg-card2)', cursor: 'not-allowed' }} disabled>🔒 마감된 미팅이에요</button>
         ) : m.is_joined ? (
@@ -325,7 +330,7 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
             disabled={chanceLoading}
             onClick={() => onJoin(m)}
           >
-            {chanceLoading ? '확인 중...' : '⚡ 기회 사용하여 참여하기'}
+            {chanceLoading ? '확인 중...' : '⚡ 기회 사용하고 참여하기'}
           </button>
         )}
       </div>

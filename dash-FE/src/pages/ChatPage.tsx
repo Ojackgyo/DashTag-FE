@@ -243,7 +243,17 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [input, setInput] = useState('');
   const [showDateModal, setShowDateModal] = useState(false);
-  const [scheduledDate, setScheduledDate] = useState<string | null>(null);
+  const [scheduledDate, setScheduledDate] = useState<string | null>(() => {
+    if (!room.scheduled_at) return null;
+    const d = new Date(room.scheduled_at);
+    const mm = d.getMonth() + 1;
+    const dd = d.getDate();
+    const dayStr = DAYS_KR[d.getDay()];
+    const h = d.getHours();
+    const isPM = h >= 12;
+    const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+    return `${mm}월 ${dd}일 (${dayStr}) ${isPM ? '오후' : '오전'} ${displayH}시`;
+  });
   const [showReport, setShowReport] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -262,11 +272,20 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
     // 초기 메시지 로드
     getChatMessages(room.id).then(setMessages).catch(() => {});
 
-    // WebSocket 시도
+    // 폴링 즉시 시작 (WS 연결 여부와 무관하게 백그라운드 갱신 보장)
+    pollRef.current = setInterval(() => {
+      getChatMessages(room.id).then(mergeMessages).catch(() => {});
+    }, POLL_INTERVAL);
+
+    // WebSocket 추가 시도 — 연결되면 폴링 중단, 끊기면 폴링 재시작
     const ws = createChatSocket(room.id);
     wsRef.current = ws;
 
-    ws.onopen = () => { wsLiveRef.current = true; };
+    ws.onopen = () => {
+      wsLiveRef.current = true;
+      clearInterval(pollRef.current);
+      pollRef.current = undefined;
+    };
 
     ws.onmessage = (event) => {
       try {
@@ -275,16 +294,15 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
       } catch { /* ignore */ }
     };
 
-    // WS 연결 실패 또는 닫힘 → 폴링으로 fallback
-    const startPolling = () => {
-      if (pollRef.current) return;
-      pollRef.current = setInterval(() => {
-        getChatMessages(room.id).then(mergeMessages).catch(() => {});
-      }, POLL_INTERVAL);
+    ws.onerror = () => { wsLiveRef.current = false; };
+    ws.onclose = () => {
+      wsLiveRef.current = false;
+      if (!pollRef.current) {
+        pollRef.current = setInterval(() => {
+          getChatMessages(room.id).then(mergeMessages).catch(() => {});
+        }, POLL_INTERVAL);
+      }
     };
-
-    ws.onerror = () => { wsLiveRef.current = false; startPolling(); };
-    ws.onclose = () => { wsLiveRef.current = false; startPolling(); };
 
     return () => {
       ws.close();
