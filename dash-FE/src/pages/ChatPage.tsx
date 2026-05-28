@@ -238,6 +238,15 @@ function ReportModal({ roomId, roomName, reportedUserId, onClose }: { roomId: nu
 
 const POLL_INTERVAL = 5000;
 
+/* 날짜 설정 권한:
+ * - 소개팅: 둘 다 가능
+ * - 미팅/소모임: creator만 가능 (creator_id가 없으면 허용) */
+function canSetDate(room: ChatRoomResponse, userId: number): boolean {
+  if (room.room_type === 'dating') return true;
+  if (room.creator_id == null) return true; // 백엔드 미지원 시 허용
+  return room.creator_id === userId;
+}
+
 /* ── 채팅방 뷰 ── */
 function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId: number; onBack: () => void }) {
   const [messages, setMessages] = useState<MessageResponse[]>([]);
@@ -355,6 +364,14 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
   };
 
   const reportedUserId = messages.find(m => m.sender_id !== userId)?.sender_id ?? 0;
+  const allowSetDate = canSetDate(room, userId);
+  const isGroup = room.room_type === 'meeting' || room.room_type === 'community';
+
+  // sender_id → 닉네임 캐시 (sender_nickname 필드 있으면 그걸로, 없으면 ID 축약)
+  const nicknameOf = (msg: MessageResponse): string => {
+    if (msg.sender_nickname) return msg.sender_nickname;
+    return `#${msg.sender_id}`;
+  };
 
   const formatMsgTime = (iso: string) => {
     const d = new Date(iso);
@@ -365,8 +382,9 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
 
   return (
     <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 54px - 50px)', position: 'relative' }}>
-      {/* 로고 워터마크 — 스크롤과 무관하게 중앙 고정 */}
+      {/* 로고 워터마크 */}
       <img src="/logo.svg" alt="" aria-hidden style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 180, opacity: 0.08, pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
+
       {/* 헤더 */}
       <div className="flex items-center gap-2.5 px-[18px] py-3 shrink-0 border-b" style={{ background: 'var(--header-bg)', backdropFilter: 'blur(16px)', borderColor: 'var(--border)' }}>
         <button className="w-8 h-8 rounded-[9px] flex items-center justify-center text-[16px] font-semibold shrink-0 border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-sub)' }} onClick={onBack}>←</button>
@@ -375,13 +393,15 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
             {room.emoji ? `${room.emoji} ` : ''}{room.name ?? `${roomCategory(room.room_type)} #${room.id}`}
           </p>
         </div>
-        <button
-          className="text-[11px] font-bold px-2.5 py-1.5 rounded-[10px] border shrink-0 whitespace-nowrap active:opacity-75"
-          style={{ background: 'var(--primary-bg)', borderColor: 'var(--primary-border)', color: 'var(--primary)' }}
-          onClick={() => setShowDateModal(true)}
-        >
-          📅 날짜 정하기
-        </button>
+        {allowSetDate && (
+          <button
+            className="text-[11px] font-bold px-2.5 py-1.5 rounded-[10px] border shrink-0 whitespace-nowrap active:opacity-75"
+            style={{ background: 'var(--primary-bg)', borderColor: 'var(--primary-border)', color: 'var(--primary)' }}
+            onClick={() => setShowDateModal(true)}
+          >
+            📅 날짜 정하기
+          </button>
+        )}
         <button
           className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[15px] border shrink-0 active:opacity-75"
           style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-muted)' }}
@@ -395,29 +415,36 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
         <button
           className="flex items-center gap-2.5 px-[18px] py-2.5 border-b w-full text-left shrink-0 active:opacity-75"
           style={{ background: 'var(--primary-bg)', borderColor: 'var(--primary-border)' }}
-          onClick={() => setShowDateModal(true)}
+          onClick={allowSetDate ? () => setShowDateModal(true) : undefined}
         >
           <span className="text-[18px]">📍</span>
           <div className="flex-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.3px]" style={{ color: 'var(--primary)' }}>약속 날짜</p>
             <p className="text-[13px] font-bold" style={{ color: 'var(--text)' }}>{scheduledDate}</p>
           </div>
-          <span className="text-[11px] font-semibold" style={{ color: 'var(--primary)' }}>수정</span>
+          {allowSetDate && <span className="text-[11px] font-semibold" style={{ color: 'var(--primary)' }}>수정</span>}
         </button>
       )}
 
       {/* 메시지 */}
-      <div className="flex-1 overflow-y-auto px-[18px] py-4 flex flex-col gap-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ position: 'relative', zIndex: 1 }}>
+      <div className="flex-1 overflow-y-auto px-[18px] py-4 flex flex-col gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ position: 'relative', zIndex: 1 }}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <span className="text-[40px]">💬</span>
             <p className="text-[14px]" style={{ color: 'var(--text-muted)' }}>첫 메시지를 보내보세요!</p>
           </div>
         )}
-        {messages.map(msg => {
+        {messages.map((msg, idx) => {
           const mine = msg.sender_id === userId;
+          const prevMsg = idx > 0 ? messages[idx - 1] : null;
+          const showSender = !mine && (isGroup || room.room_type === 'dating') && (!prevMsg || prevMsg.sender_id !== msg.sender_id);
           return (
             <div key={msg.id} className={`flex flex-col max-w-[78%] gap-[3px] ${mine ? 'self-end items-end' : 'self-start items-start'}`}>
+              {showSender && (
+                <span className="text-[11px] font-semibold px-1" style={{ color: 'var(--text-sub)' }}>
+                  {nicknameOf(msg)}
+                </span>
+              )}
               <div
                 className="px-[14px] py-2.5 text-[14px] leading-relaxed break-words"
                 style={{
@@ -439,7 +466,9 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
 
       {/* 입력창 */}
       <div className="flex items-center gap-2 px-[18px] py-2.5 pb-3.5 border-t shrink-0" style={{ background: 'var(--gnb-bg)', borderColor: 'var(--border)' }}>
-        <button className="w-10 h-10 rounded-[12px] flex items-center justify-center text-[18px] border shrink-0 active:opacity-70" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)' }} onClick={() => setShowDateModal(true)} title="날짜 정하기">📅</button>
+        {allowSetDate && (
+          <button className="w-10 h-10 rounded-[12px] flex items-center justify-center text-[18px] border shrink-0 active:opacity-70" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)' }} onClick={() => setShowDateModal(true)} title="날짜 정하기">📅</button>
+        )}
         <input
           className="flex-1 rounded-[20px] px-4 py-2.5 text-[14px] border min-w-0"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text)' }}
@@ -456,7 +485,7 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
         >↑</button>
       </div>
 
-      {showDateModal && <DateModal roomId={room.id} onConfirm={handleConfirmDate} onClose={() => setShowDateModal(false)} />}
+      {showDateModal && allowSetDate && <DateModal roomId={room.id} onConfirm={handleConfirmDate} onClose={() => setShowDateModal(false)} />}
       {showReport && <ReportModal roomId={room.id} roomName={`${roomCategory(room.room_type)} #${room.id}`} reportedUserId={reportedUserId} onClose={() => setShowReport(false)} />}
     </div>
   );

@@ -23,12 +23,14 @@ export interface ChatRoomResponse {
   last_message_at?: string | null;
   unread_count: number;
   scheduled_at?: string | null;
+  creator_id?: number | null;
 }
 
 export interface MessageResponse {
   id: number;
   room_id: number;
   sender_id: number;
+  sender_nickname?: string | null;
   content: string;
   is_read: boolean;
   created_at: string;
