@@ -317,14 +317,13 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
           </div>
 
           {/* 참여자 그리드 */}
-          <div style={{ display: 'flex' }}>
-            <div style={{ flex: 1, padding: '12px 10px 14px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <div style={{ display: 'flex', gap: 8, padding: '12px 12px 14px' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
               {femaleSlots.map((p, i) => (
                 <ParticipantCard key={i} p={p} gender="female" delay={i * 0.12} onTap={p && p.user_id > 0 ? () => setSelectedP({ p, gender: 'female' }) : undefined} />
               ))}
             </div>
-            <div style={{ width: 1, background: 'var(--border)', margin: '12px 0' }} />
-            <div style={{ flex: 1, padding: '12px 12px 14px 10px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
               {maleSlots.map((p, i) => (
                 <ParticipantCard key={i} p={p} gender="male" delay={i * 0.12 + 0.08} onTap={p && p.user_id > 0 ? () => setSelectedP({ p, gender: 'male' }) : undefined} />
               ))}

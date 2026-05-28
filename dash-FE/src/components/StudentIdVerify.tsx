@@ -34,29 +34,57 @@ export default function StudentIdVerify({ onChange, onPreFill }: Props) {
       if (/^\d{8,10}$/.test(code)) studentId = code;
     } catch { /* 바코드 없음 */ }
 
-    // Step 2: OCR 텍스트 인식
+    // Step 2: OCR — 원본 + 전처리본 두 번 시도, 결과 합산
     setStatus('ocr');
     try {
       const { default: Tesseract } = await import('tesseract.js');
-      const { data: { text } } = await Tesseract.recognize(dataUrl, 'kor+eng', {
-        logger: () => {},
-      });
 
-      // 학번 (바코드 실패 시 텍스트에서 추출)
+      // 이미지 전처리: 그레이스케일 + 대비 강화 + 스케일업
+      const enhanced = await preprocessImage(dataUrl);
+
+      const ocrConfig = {
+        logger: () => {},
+        tessedit_pageseg_mode: '6',       // uniform block of text
+        preserve_interword_spaces: '1',
+        tessedit_char_blacklist: '`~@#$%^&*()_+=[]{}\\|<>/',
+      };
+
+      // 전처리본으로 먼저 인식
+      const { data: { text: textEnhanced } } = await Tesseract.recognize(enhanced, 'kor+eng', ocrConfig);
+      // 원본으로도 인식해서 보완
+      const { data: { text: textRaw } } = await Tesseract.recognize(dataUrl, 'kor+eng', ocrConfig);
+      const text = textEnhanced + '\n' + textRaw;
+
+      // 학번 (바코드 실패 시)
       if (!studentId) {
-        const m = text.match(/\b(\d{8,10})\b/);
-        if (m) studentId = m[1];
+        // 학번/학생번호 레이블 근처 숫자 우선
+        const byLabel = text.match(/(?:학번|학생번호|student\s*id|no\.?)\s*[:\s]?\s*(\d{7,12})/i);
+        const anyNum = text.match(/\b(\d{8,10})\b/);
+        studentId = byLabel?.[1] ?? anyNum?.[1] ?? '';
       }
 
-      // 이름 (이름/성명 레이블 근처 한글 우선, 없으면 첫 번째 한글 2~4자)
-      const nameByLabel = text.match(/(?:이름|성명)\s*[:\s]\s*([가-힣]{2,4})/);
-      const nameAny = text.match(/([가-힣]{2,4})/);
-      name = (nameByLabel ?? nameAny)?.[1] ?? '';
+      // 이름
+      const nameByLabel = text.match(/(?:이름|성명|name)\s*[:\s]\s*([가-힣]{2,5})/i);
+      // 2~4자 한글, 숫자·영문 혼합 없는 것만
+      const nameMatches = [...text.matchAll(/([가-힣]{2,5})/g)].map(m => m[1]);
+      // 흔한 레이블 단어 제외
+      const skipWords = new Set(['인하대', '대학교', '학생증', '인하대학교', '재학생', '발급일', '이름', '성명', '학번', '생년월일']);
+      const nameAny = nameMatches.find(n => !skipWords.has(n));
+      name = nameByLabel?.[1] ?? nameAny ?? '';
 
-      // 생년월일
-      const birthMatch = text.match(/(\d{4})[.년\-]\s*(\d{1,2})[.월\-]\s*(\d{1,2})/);
-      if (birthMatch) {
-        birthDate = `${birthMatch[1]}.${birthMatch[2].padStart(2, '0')}.${birthMatch[3].padStart(2, '0')}`;
+      // 생년월일 — 여러 패턴 시도
+      const birthPatterns = [
+        /(\d{4})[.\-년]\s*(\d{1,2})[.\-월]\s*(\d{1,2})/,
+        /생년월일[:\s]*(\d{2,4})[.\-](\d{1,2})[.\-](\d{1,2})/,
+        /(\d{2})(\d{2})(\d{2})/,  // YYMMDD 형태
+      ];
+      for (const pat of birthPatterns) {
+        const m = text.match(pat);
+        if (m) {
+          const y = m[1].length === 2 ? `19${m[1]}` : m[1];
+          birthDate = `${y}.${m[2].padStart(2, '0')}.${m[3].padStart(2, '0')}`;
+          break;
+        }
       }
 
       setExtracted({ studentId, name, birthDate });
@@ -235,5 +263,45 @@ async function readFileAsDataUrl(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = e => resolve(e.target!.result as string);
     reader.readAsDataURL(file);
+  });
+}
+
+// OCR 정확도 향상을 위한 이미지 전처리
+// 그레이스케일 변환 + 대비 강화 + 최소 해상도 보장
+async function preprocessImage(dataUrl: string): Promise<string> {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const MIN_WIDTH = 1200;
+      const scale = img.width < MIN_WIDTH ? MIN_WIDTH / img.width : 1;
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+
+      // 흰 배경 먼저
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const d = imageData.data;
+
+      for (let i = 0; i < d.length; i += 4) {
+        // 그레이스케일
+        const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        // 대비 강화 (contrast factor 1.8)
+        const contrasted = Math.min(255, Math.max(0, 1.8 * (gray - 128) + 128));
+        d[i] = d[i + 1] = d[i + 2] = contrasted;
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => resolve(dataUrl); // 실패 시 원본 그대로
+    img.src = dataUrl;
   });
 }
