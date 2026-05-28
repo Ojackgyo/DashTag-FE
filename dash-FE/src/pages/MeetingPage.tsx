@@ -38,41 +38,6 @@ function dayToISO(dayOffset: number): string {
   return d.toISOString();
 }
 
-/* ── 세로 배터리 컴포넌트 ── */
-function Battery({ filled, total }: { filled: number; total: number }) {
-  const isFull = filled >= total;
-  const cellH = Math.min(20, Math.floor(80 / total));
-
-  return (
-    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
-      <div style={{
-        width: 10, height: 4, borderRadius: '3px 3px 0 0', marginBottom: -1,
-        background: isFull ? 'var(--primary)' : 'var(--border)', transition: 'background 0.3s',
-      }} />
-      <div style={{
-        display: 'flex', flexDirection: 'column', gap: '2px', padding: '3px',
-        border: `2px solid ${isFull ? 'var(--primary)' : 'var(--border)'}`,
-        borderRadius: '7px', background: 'var(--bg-card2)',
-        boxShadow: isFull ? '0 0 10px rgba(255,128,171,0.45)' : 'none',
-        transition: 'box-shadow 0.3s, border-color 0.3s',
-      }}>
-        {Array.from({ length: total }, (_, i) => {
-          const cellIndex = total - 1 - i;
-          const active = cellIndex < filled;
-          return (
-            <div key={i} style={{
-              width: 22, height: cellH, borderRadius: 4,
-              transition: 'background 0.35s, box-shadow 0.35s',
-              background: active ? (isFull ? '#FF80AB' : '#FFB3CC') : 'var(--bg-card)',
-              boxShadow: active && isFull ? '0 0 5px rgba(255,128,171,0.7)' : 'none',
-            }} />
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 /* ── 미팅 카드 (클릭 시 상세 시트 열림) ── */
 function MeetingCard({ m, onOpen }: { m: MeetingResponse; onOpen: () => void }) {
   const total = m.required_male + m.required_female;
@@ -96,35 +61,14 @@ function MeetingCard({ m, onOpen }: { m: MeetingResponse; onOpen: () => void }) 
         ))}
       </div>
 
-      <div className="flex items-center justify-around mb-3">
-        <div className="flex flex-col items-center gap-2">
-          <span style={{ fontSize: 28 }}>🩷</span>
-          <Battery filled={filledF} total={m.required_female} />
-          <div className="flex flex-col items-center gap-[2px]">
-            <span className="text-[22px] font-extrabold" style={{ color: fFull ? 'var(--primary)' : 'var(--text)', lineHeight: 1 }}>
-              {filledF}<span className="text-[14px] font-semibold" style={{ color: 'var(--text-muted)' }}>/{m.required_female}</span>
-            </span>
-            {fFull && <span className="text-[10px] font-bold px-1.5 py-[1px] rounded-[5px]" style={{ background: 'var(--primary-bg)', color: 'var(--primary)' }}>FULL</span>}
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center gap-1.5">
-          <span className="text-[15px] font-extrabold px-3 py-1 rounded-[10px]" style={{ background: 'var(--gradient)', color: 'white' }}>
-            {formatScheduledAt(m.scheduled_at)}
-          </span>
-          <span className="text-[12px] font-bold" style={{ color: 'var(--text-muted)' }}>VS</span>
-        </div>
-
-        <div className="flex flex-col items-center gap-2">
-          <span style={{ fontSize: 28 }}>🩵</span>
-          <Battery filled={filledM} total={m.required_male} />
-          <div className="flex flex-col items-center gap-[2px]">
-            <span className="text-[22px] font-extrabold" style={{ color: mFull ? 'var(--primary)' : 'var(--text)', lineHeight: 1 }}>
-              {filledM}<span className="text-[14px] font-semibold" style={{ color: 'var(--text-muted)' }}>/{m.required_male}</span>
-            </span>
-            {mFull && <span className="text-[10px] font-bold px-1.5 py-[1px] rounded-[5px]" style={{ background: 'var(--primary-bg)', color: 'var(--primary)' }}>FULL</span>}
-          </div>
-        </div>
+      <div className="flex items-center gap-2 mb-3 rounded-[12px] px-3 py-2.5" style={{ background: 'var(--bg-card2)' }}>
+        <span className="text-[15px]">🩷</span>
+        <span className="text-[13px] font-bold" style={{ color: fFull ? 'var(--primary)' : 'var(--text)' }}>{filledF}/{m.required_female}</span>
+        {fFull && <span className="text-[10px] font-bold px-1.5 py-[1px] rounded-[5px]" style={{ background: 'var(--primary-bg)', color: 'var(--primary)' }}>FULL</span>}
+        <span className="flex-1 text-center text-[12px] font-bold" style={{ color: 'var(--primary)' }}>{formatScheduledAt(m.scheduled_at)}</span>
+        {mFull && <span className="text-[10px] font-bold px-1.5 py-[1px] rounded-[5px]" style={{ background: 'rgba(96,175,255,0.15)', color: '#60AFFF' }}>FULL</span>}
+        <span className="text-[13px] font-bold" style={{ color: mFull ? '#60AFFF' : 'var(--text)' }}>{filledM}/{m.required_male}</span>
+        <span className="text-[15px]">🩵</span>
       </div>
 
       <div
