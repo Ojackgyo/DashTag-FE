@@ -380,7 +380,6 @@ function CreateSheet({ onClose, onSubmit }: {
           </div>
           <div className="flex flex-col items-center gap-1">
             <span className="text-[22px]">💕</span>
-            <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>VS</span>
           </div>
           <div className="flex flex-col items-center gap-2.5">
             <span className="text-[28px]">👨</span>
