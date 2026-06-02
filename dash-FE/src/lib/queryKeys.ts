@@ -6,4 +6,5 @@ export const queryKeys = {
   meetings:        ['meetings']        as const,
   communities:     ['communities']     as const,
   reviews:         ['reviews']         as const,
+  chatRooms:       ['chatRooms']       as const,
 };

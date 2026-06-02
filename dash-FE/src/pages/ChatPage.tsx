@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getChatRooms, getChatMessages, sendMessage as apiSendMessage, createChatSocket, setSchedule, reportRoom } from '../api/chat';
-import { getMe } from '../api/user';
+import { getChatMessages, sendMessage as apiSendMessage, createChatSocket, setSchedule, reportRoom } from '../api/chat';
 import type { ChatRoomResponse, MessageResponse } from '../api/chat';
+import { useMe } from '../hooks/useMe';
+import { useChatRooms } from '../hooks/useChatRooms';
+import { useChatStore } from '../store/chatStore';
 
 interface OpenRoomState {
   type: string;
@@ -248,7 +250,9 @@ function canSetDate(room: ChatRoomResponse, userId: number): boolean {
 }
 
 /* ── 채팅방 뷰 ── */
-function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId: number; onBack: () => void }) {
+function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => void }) {
+  const { data: user } = useMe();
+  const userId = user?.id ?? 0;
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [input, setInput] = useState('');
   const [showDateModal, setShowDateModal] = useState(false);
@@ -390,7 +394,7 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
         <button className="w-8 h-8 rounded-[9px] flex items-center justify-center text-[16px] font-semibold shrink-0 border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-sub)' }} onClick={onBack}>←</button>
         <div className="flex-1 min-w-0">
           <p className="text-[15px] font-bold truncate" style={{ color: 'var(--text)' }}>
-            {room.emoji ? `${room.emoji} ` : ''}{room.name ?? `${roomCategory(room.room_type)} #${room.id}`}
+            {room.emoji ? `${room.emoji} ` : ''}{room.name || `${roomCategory(room.room_type)} #${room.id}`}
           </p>
         </div>
         {allowSetDate && (
@@ -486,7 +490,7 @@ function ChatRoomView({ room, userId, onBack }: { room: ChatRoomResponse; userId
       </div>
 
       {showDateModal && allowSetDate && <DateModal roomId={room.id} onConfirm={handleConfirmDate} onClose={() => setShowDateModal(false)} />}
-      {showReport && <ReportModal roomId={room.id} roomName={`${roomCategory(room.room_type)} #${room.id}`} reportedUserId={reportedUserId} onClose={() => setShowReport(false)} />}
+      {showReport && <ReportModal roomId={room.id} roomName={room.name || `${roomCategory(room.room_type)} #${room.id}`} reportedUserId={reportedUserId} onClose={() => setShowReport(false)} />}
     </div>
   );
 }
@@ -511,36 +515,34 @@ export default function ChatPage() {
   const location = useLocation();
   const openRoomState = (location.state as { openRoom?: OpenRoomState } | null)?.openRoom;
 
-  const [rooms, setRooms] = useState<ChatRoomResponse[]>([]);
-  const [userId, setUserId] = useState<number>(0);
-  const [category, setCategory] = useState<Category>('소개팅');
-  const [activeRoom, setActiveRoom] = useState<ChatRoomResponse | null>(null);
+  const { data: rooms = [] } = useChatRooms();
+  const { activeRoom, category, setActiveRoom, setCategory } = useChatStore();
 
+  // openRoomState는 최초 1회만 처리 (rooms가 로드된 후)
+  const openRoomHandled = useRef(false);
   useEffect(() => {
-    getMe().then(u => setUserId(u.id)).catch(() => {});
-    getChatRooms().then(loaded => {
-      setRooms(loaded);
-      if (openRoomState) {
-        const match = loaded.find(r => {
-          if (r.room_type !== openRoomState.type) return false;
-          if (openRoomState.relatedId != null) return r.related_id === openRoomState.relatedId;
-          return true;
-        }) ?? loaded.filter(r => r.room_type === openRoomState.type).sort((a, b) =>
-          new Date(b.last_message_at ?? b.created_at).getTime() - new Date(a.last_message_at ?? a.created_at).getTime()
-        )[0];
-        if (match) {
-          setActiveRoom(match);
-          setCategory(roomCategory(match.room_type));
-        } else {
-          const typeMap: Record<string, Category> = { dating: '소개팅', meeting: '미팅', community: '소모임' };
-          const cat = typeMap[openRoomState.type];
-          if (cat) setCategory(cat);
-        }
-      }
-    }).catch(() => {});
-  }, []);
+    if (!openRoomState || rooms.length === 0 || openRoomHandled.current) return;
+    openRoomHandled.current = true;
 
-  if (activeRoom) return <ChatRoomView room={activeRoom} userId={userId} onBack={() => setActiveRoom(null)} />;
+    const match = rooms.find(r => {
+      if (r.room_type !== openRoomState.type) return false;
+      if (openRoomState.relatedId != null) return r.related_id === openRoomState.relatedId;
+      return true;
+    }) ?? rooms.filter(r => r.room_type === openRoomState.type).sort((a, b) =>
+      new Date(b.last_message_at ?? b.created_at).getTime() - new Date(a.last_message_at ?? a.created_at).getTime()
+    )[0];
+
+    if (match) {
+      setActiveRoom(match);
+      setCategory(roomCategory(match.room_type));
+    } else {
+      const typeMap: Record<string, Category> = { dating: '소개팅', meeting: '미팅', community: '소모임' };
+      const cat = typeMap[openRoomState.type];
+      if (cat) setCategory(cat);
+    }
+  }, [rooms, openRoomState, setActiveRoom, setCategory]);
+
+  if (activeRoom) return <ChatRoomView room={activeRoom} onBack={() => setActiveRoom(null)} />;
 
   const filtered = rooms.filter(r => roomCategory(r.room_type) === category);
 
@@ -587,7 +589,7 @@ export default function ChatPage() {
               >{room.emoji ?? CATEGORY_EMOJI[roomCategory(room.room_type)]}</div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start mb-1 gap-2">
-                  <span className="text-[15px] font-bold" style={{ color: 'var(--text)' }}>{room.name ?? `${roomCategory(room.room_type)} #${room.id}`}</span>
+                  <span className="text-[15px] font-bold" style={{ color: 'var(--text)' }}>{room.name || `${roomCategory(room.room_type)} #${room.id}`}</span>
                   <span className="text-[11px] shrink-0 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{formatRoomTime(room.last_message_at ?? room.created_at)}</span>
                 </div>
                 <div className="flex justify-between items-center gap-2">
