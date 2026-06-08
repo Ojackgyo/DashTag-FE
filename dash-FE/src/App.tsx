@@ -29,7 +29,7 @@ import SentDashPage from './pages/SentDashPage';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   useEffect(() => {
-    const check = () => { if (!isLoggedIn()) navigate('/login', { replace: true }); };
+    const check = () => { if (!isLoggedIn()) navigate('/login', { replace: true, state: { expired: true } }); };
     window.addEventListener('dashtag-auth', check);
     return () => window.removeEventListener('dashtag-auth', check);
   }, [navigate]);

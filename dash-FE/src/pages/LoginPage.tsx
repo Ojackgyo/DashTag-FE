@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { login } from '../api/auth';
 import { isLoggedIn } from '../api/client';
 import './LoginPage.css';
@@ -27,6 +27,8 @@ const PROMO = [
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const sessionExpired = (location.state as { expired?: boolean } | null)?.expired === true;
   const [tab, setTab] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
@@ -95,6 +97,20 @@ export default function LoginPage() {
 
         {tab === 'login' && (
           <div className="login-form">
+            {sessionExpired && (
+              <div style={{
+                background: 'rgba(255,128,171,0.12)',
+                border: '1.5px solid var(--primary-border)',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                marginBottom: '12px',
+                fontSize: '13px',
+                color: 'var(--primary)',
+                textAlign: 'center',
+              }}>
+                세션이 만료됐어요. 다시 로그인해주세요 🔐
+              </div>
+            )}
             {savedEmail && (
               <button className="quick-login-card" onClick={handleQuickLogin}>
                 <div className="quick-login-avatar">🏷️</div>

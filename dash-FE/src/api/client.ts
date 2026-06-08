@@ -31,7 +31,7 @@ async function request<T>(path: string, init: RequestInit = {}, retry = false): 
     },
   });
 
-  if (res.status === 401 && !retry && path !== '/auth/refresh') {
+  if (res.status === 401 && !retry && path !== '/auth/refresh' && path !== '/auth/login') {
     const refreshToken = localStorage.getItem('dashtag_refresh_token');
     if (refreshToken) {
       try {
@@ -48,7 +48,7 @@ async function request<T>(path: string, init: RequestInit = {}, retry = false): 
       } catch { /* ignore */ }
     }
     clearTokens();
-    throw new Error('로그인이 만료됐어요. 다시 로그인해주세요.');
+    throw Object.assign(new Error('auth_expired'), { isAuthExpired: true });
   }
 
   if (!res.ok) {
