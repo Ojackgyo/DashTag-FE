@@ -115,7 +115,7 @@ function ParticipantProfileModal({ p, gender, onClose }: { p: MeetingParticipant
 }
 
 /* ── 참여자 슬롯 ── */
-function ParticipantCard({ p, gender, delay, onTap }: { p: MeetingParticipant | null; gender: 'female' | 'male'; delay: number; onTap?: () => void }) {
+function ParticipantCard({ p, gender, onTap }: { p: MeetingParticipant | null; gender: 'female' | 'male'; delay?: number; onTap?: () => void }) {
   const isFemale = gender === 'female';
   const accent = isFemale ? '#FF80AB' : '#60AFFF';
 
