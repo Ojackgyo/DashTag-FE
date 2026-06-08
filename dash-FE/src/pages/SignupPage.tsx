@@ -8,7 +8,6 @@ import { signup as apiSignup, verifyEmail as apiVerifyEmail, resendVerification 
 import { updateMe, getMe } from '../api/user';
 import { isLoggedIn } from '../api/client';
 import { queryKeys } from '../lib/queryKeys';
-import StudentIdVerify from '../components/StudentIdVerify';
 
 /* ─── 닉네임 목록 (CSV) ─── */
 const _nicknameLines = rawNicknames.split('\n');
@@ -167,7 +166,6 @@ function getSteps(gender: string): Step[] {
     },
   );
 
-  steps.push({ type: 'student-id-verify', key: 'studentId', question: '학생증으로 인증해봐요 🪪', sub: '학번·이름·생년월일을 자동으로 인식해요. 건너뛰기도 가능해요' });
   steps.push({ type: 'intro', key: 'idealIntro', question: '이상형' });
 
   steps.push(
@@ -974,22 +972,6 @@ export default function SignupPage() {
             value={currentValue}
             onChange={v => setAnswers(prev => ({ ...prev, [step.key]: v }))}
             gender={gender}
-          />
-        )}
-
-        {/* 학생증 인증 */}
-        {step.type === 'student-id-verify' && (
-          <StudentIdVerify
-            onChange={v => setAnswers(prev => ({ ...prev, [step.key]: v }))}
-            onPreFill={(ocrName, birthDate) => {
-              const birthYear = parseInt(birthDate?.split('.')?.[0] ?? '0');
-              const age = birthYear > 1900 ? new Date().getFullYear() - birthYear : 0;
-              setAnswers(prev => ({
-                ...prev,
-                ...(ocrName ? { name: ocrName } : {}),
-                ...(age >= 18 && age <= 35 ? { age: String(age) } : {}),
-              }));
-            }}
           />
         )}
 
