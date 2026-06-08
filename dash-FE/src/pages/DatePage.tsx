@@ -31,14 +31,16 @@ export default function DatePage() {
   const [introMsg, setIntroMsg] = useState('');
   const { hasChance, spend } = useChance();
 
-  const { data: profiles = [], isLoading: profilesLoading } = useQuery({
+  const { data: profiles = [], isLoading: profilesLoading, isError: profilesError } = useQuery({
     queryKey: queryKeys.dateProfiles,
     queryFn: getDateProfiles,
     enabled: isLoggedIn(),
     staleTime: 2 * 60 * 1000,
   });
 
-  const { mutateAsync: doSendRequest } = useMutation({ mutationFn: (id: number) => sendDateRequest(id) });
+  const { mutateAsync: doSendRequest } = useMutation({
+    mutationFn: ({ id, message }: { id: number; message: string }) => sendDateRequest(id, message),
+  });
 
   const selectedProfile = profiles.find(p => p.id === selectedId) ?? null;
 
@@ -60,7 +62,7 @@ export default function DatePage() {
 
   const confirmChat = useThrottle(async () => {
     if (!selectedId) return;
-    try { await doSendRequest(selectedId); } catch { /* ignore */ }
+    try { await doSendRequest({ id: selectedId, message: introMsg }); } catch { /* ignore */ }
     spend();
     setChatSentId(selectedId);
     setShowChanceModal(false);
@@ -84,6 +86,12 @@ export default function DatePage() {
         <div className="flex flex-col items-center py-16 gap-2.5">
           <span className="text-[52px]">💘</span>
           <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>불러오는 중이에요...</p>
+        </div>
+      ) : profilesError ? (
+        <div className="flex flex-col items-center py-16 gap-2.5">
+          <span className="text-[52px]">😢</span>
+          <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>프로필을 불러오지 못했어요</p>
+          <p className="text-[13px] text-center" style={{ color: 'var(--text-muted)' }}>잠시 후 다시 시도해주세요</p>
         </div>
       ) : profiles.length === 0 ? (
         <div className="flex flex-col items-center py-16 gap-2.5">
