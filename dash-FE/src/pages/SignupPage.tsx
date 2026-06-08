@@ -93,7 +93,7 @@ function getSteps(gender: string): Step[] {
     },
     {
       type: 'text', key: 'email', question: '인하대 이메일을 입력해주세요 📧',
-      placeholder: '22000000@inha.edu',
+      placeholder: '아이디@inha.edu',
       sub: '포털 이메일(@inha.edu)만 사용할 수 있어요',
     },
     {
@@ -909,7 +909,7 @@ export default function SignupPage() {
             <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
               1. 인하대 포털 <b style={{ color: 'var(--text)' }}>portal.inha.edu</b> 로그인<br />
               2. 마이페이지 → 기본정보 → 이메일 확인<br />
-              3. 형식: <b style={{ color: 'var(--primary)' }}>학번@inha.edu</b>
+              3. 형식: <b style={{ color: 'var(--primary)' }}>아이디@inha.edu</b>
             </p>
           </div>
         )}

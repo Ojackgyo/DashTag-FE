@@ -127,7 +127,7 @@ export default function LoginPage() {
               <input
                 className="login-input"
                 type="email"
-                placeholder="22000000@inha.edu"
+                placeholder="아이디@inha.edu"
                 value={email}
                 onChange={e => { setEmail(e.target.value); setError(''); }}
                 autoComplete="email"
