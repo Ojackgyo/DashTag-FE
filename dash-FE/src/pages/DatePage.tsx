@@ -31,7 +31,7 @@ export default function DatePage() {
   const [introMsg, setIntroMsg] = useState('');
   const { hasChance, spend } = useChance();
 
-  const { data: profiles = [], isLoading: profilesLoading, isError: profilesError } = useQuery({
+  const { data: profiles = [], isLoading: profilesLoading, isError: profilesError, error: profilesErrorObj } = useQuery({
     queryKey: queryKeys.dateProfiles,
     queryFn: getDateProfiles,
     enabled: isLoggedIn(),
@@ -87,11 +87,15 @@ export default function DatePage() {
           <span className="text-[52px]">💘</span>
           <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>불러오는 중이에요...</p>
         </div>
-      ) : profilesError && !(profilesError as { isAuthExpired?: boolean }).isAuthExpired ? (
+      ) : profilesError && !(profilesErrorObj as { isAuthExpired?: boolean } | null)?.isAuthExpired ? (
         <div className="flex flex-col items-center py-16 gap-2.5">
           <span className="text-[52px]">😢</span>
-          <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>프로필을 불러오지 못했어요</p>
-          <p className="text-[13px] text-center" style={{ color: 'var(--text-muted)' }}>잠시 후 다시 시도해주세요</p>
+          <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>소개팅 상대를 불러오지 못했어요</p>
+          {profilesErrorObj instanceof Error && (
+            <p className="text-[13px] text-center px-4" style={{ color: 'var(--text-muted)' }}>
+              {profilesErrorObj.message}
+            </p>
+          )}
         </div>
       ) : profiles.length === 0 ? (
         <div className="flex flex-col items-center py-16 gap-2.5">
