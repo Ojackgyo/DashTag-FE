@@ -7,7 +7,20 @@ import { getDateProfiles, sendDateRequest } from '../api/date';
 import { faceTypeToEmoji } from '../api/user';
 import { isLoggedIn } from '../api/client';
 import { queryKeys } from '../lib/queryKeys';
+import { useMe } from '../hooks/useMe';
 import type { UserProfileResponse } from '../api/user';
+
+const MOCK_MALE: UserProfileResponse[] = [
+  { id: -1, nickname: 'StarryWolf', age: 23, major: '컴퓨터공학과', gender: 'male', face_type: '늑대상', height: 180, weight: 72, skin_tone: '중간', hair_style: '투블럭', smoking: false, tattoo: false, mbti: 'INTJ', charm_points: ['지적인', '배려심있는'] },
+  { id: -2, nickname: 'CoolFox',    age: 24, major: '경영학과',     gender: 'male', face_type: '여우상', height: 176, weight: 68, skin_tone: '밝은편', hair_style: '짧은머리', smoking: false, tattoo: false, mbti: 'ENFP', charm_points: ['유머있는', '활발한'] },
+  { id: -3, nickname: 'SoftBear',   age: 22, major: '기계공학과',   gender: 'male', face_type: '곰상',   height: 182, weight: 78, skin_tone: '중간',   hair_style: '단발',    smoking: false, tattoo: false, mbti: 'ISFJ', charm_points: ['섬세한', '조용한'] },
+];
+
+const MOCK_FEMALE: UserProfileResponse[] = [
+  { id: -4, nickname: 'MoonCat',    age: 22, major: '영어영문학과', gender: 'female', face_type: '고양이상', height: 163, weight: 50, skin_tone: '밝은편', hair_style: '긴머리', smoking: false, tattoo: false, mbti: 'ENFJ', charm_points: ['감성적인', '애교있는'] },
+  { id: -5, nickname: 'SunnyDeer',  age: 23, major: '심리학과',     gender: 'female', face_type: '사슴상',   height: 166, weight: 53, skin_tone: '중간',   hair_style: '웨이브', smoking: false, tattoo: false, mbti: 'INFP', charm_points: ['섬세한', '지적인'] },
+  { id: -6, nickname: 'FluffyRabb', age: 21, major: '디자인학과',   gender: 'female', face_type: '토끼상',   height: 160, weight: 48, skin_tone: '밝은편', hair_style: '단발',   smoking: false, tattoo: false, mbti: 'ESFP', charm_points: ['활발한', '유머있는'] },
+];
 
 function detailRows(p: UserProfileResponse) {
   return [
@@ -30,13 +43,17 @@ export default function DatePage() {
   const [showChanceModal, setShowChanceModal] = useState(false);
   const [introMsg, setIntroMsg] = useState('');
   const { hasChance, spend } = useChance();
+  const { data: me } = useMe();
 
-  const { data: profiles = [], isLoading: profilesLoading, isError: profilesError, error: profilesErrorObj } = useQuery({
+  const { data: fetchedProfiles = [], isLoading: profilesLoading, isError: profilesError, error: profilesErrorObj } = useQuery({
     queryKey: queryKeys.dateProfiles,
     queryFn: getDateProfiles,
     enabled: isLoggedIn(),
     staleTime: 2 * 60 * 1000,
   });
+
+  const mockProfiles = me?.gender === 'female' ? MOCK_MALE : MOCK_FEMALE;
+  const profiles = profilesError ? mockProfiles : fetchedProfiles;
 
   const { mutateAsync: doSendRequest } = useMutation({
     mutationFn: ({ id, message }: { id: number; message: string }) => sendDateRequest(id, message),
@@ -55,8 +72,10 @@ export default function DatePage() {
     setTimeout(() => setSelectedId(null), 650);
   };
 
+  const isMock = selectedId !== null && selectedId < 0;
+
   const handleChatRequest = () => {
-    if (chatSentId !== null || !hasChance) return;
+    if (isMock || chatSentId !== null || !hasChance) return;
     setShowMsgSheet(true);
   };
 
@@ -86,16 +105,6 @@ export default function DatePage() {
         <div className="flex flex-col items-center py-16 gap-2.5">
           <span className="text-[52px]">💘</span>
           <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>불러오는 중이에요...</p>
-        </div>
-      ) : profilesError && !(profilesErrorObj as { isAuthExpired?: boolean } | null)?.isAuthExpired ? (
-        <div className="flex flex-col items-center py-16 gap-2.5">
-          <span className="text-[52px]">😢</span>
-          <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>소개팅 상대를 불러오지 못했어요</p>
-          {profilesErrorObj instanceof Error && (
-            <p className="text-[13px] text-center px-4" style={{ color: 'var(--text-muted)' }}>
-              {profilesErrorObj.message}
-            </p>
-          )}
         </div>
       ) : profiles.length === 0 ? (
         <div className="flex flex-col items-center py-16 gap-2.5">
@@ -320,26 +329,28 @@ export default function DatePage() {
                     style={{
                       width: '100%', padding: '14px', borderRadius: '16px',
                       fontSize: '15px', fontWeight: 700,
-                      color: isChatSent ? 'var(--primary)' : chatDisabled ? 'var(--text-muted)' : 'white',
-                      background: isChatSent
+                      color: isMock ? 'var(--text-muted)' : isChatSent ? 'var(--primary)' : chatDisabled ? 'var(--text-muted)' : 'white',
+                      background: isMock ? 'var(--bg-card2)' : isChatSent
                         ? 'var(--primary-bg)'
                         : chatDisabled ? 'var(--bg-card2)' : 'var(--gradient)',
                       border: isChatSent ? '1.5px solid var(--primary-border)' : '1.5px solid transparent',
-                      cursor: chatDisabled ? 'not-allowed' : 'pointer',
-                      boxShadow: (!isChatSent && !chatDisabled) ? '0 4px 16px rgba(255,128,171,0.35)' : 'none',
+                      cursor: (isMock || chatDisabled) ? 'not-allowed' : 'pointer',
+                      boxShadow: (!isMock && !isChatSent && !chatDisabled) ? '0 4px 16px rgba(255,128,171,0.35)' : 'none',
                     }}
                     onClick={handleChatRequest}
-                    disabled={chatDisabled || isChatSent}
+                    disabled={isMock || chatDisabled || isChatSent}
                   >
-                    {isChatSent
-                      ? '💌 채팅 요청 완료'
-                      : !hasChance && !isChatSent
-                        ? '⚡ 오늘 기회를 사용했어요'
-                        : chatDisabled
-                          ? '오늘 채팅 요청을 이미 보냈어요'
-                          : '💬 대화 신청하기'}
+                    {isMock
+                      ? '🔒 서비스 준비 중이에요'
+                      : isChatSent
+                        ? '💌 채팅 요청 완료'
+                        : !hasChance && !isChatSent
+                          ? '⚡ 오늘 기회를 사용했어요'
+                          : chatDisabled
+                            ? '오늘 채팅 요청을 이미 보냈어요'
+                            : '💬 대화 신청하기'}
                   </button>
-                  {!isChatSent && !chatDisabled && (
+                  {!isMock && !isChatSent && !chatDisabled && (
                     <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
                       하루에 한 명에게만 채팅을 보낼 수 있어요
                     </p>
