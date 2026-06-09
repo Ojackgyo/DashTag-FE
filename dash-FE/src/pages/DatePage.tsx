@@ -11,14 +11,13 @@ import { useMe } from '../hooks/useMe';
 import type { UserProfileResponse } from '../api/user';
 
 const MOCK_MALE: UserProfileResponse[] = [
-  { id: -2, nickname: 'CoolFox',    age: 24, major: '경영학과',     gender: 'male', face_type: '여우상', height: 176, weight: 68, skin_tone: '밝은편', hair_style: '짧은머리', smoking: false, tattoo: false, mbti: 'ENFP', charm_points: ['유머있는', '활발한'] },
   { id: -1, nickname: 'Ryan',   age: 24, major: '인공지능공학과', gender: 'male', face_type: '늑대상', height: 170, weight: 72, skin_tone: '중간',   hair_style: '투블럭',   smoking: false, tattoo: false, mbti: 'INTJ', charm_points: ['지적인', '배려심있는'] },
   { id: -2, nickname: 'Oscar',  age: 25, major: '데이터사이언스학과',     gender: 'male', face_type: '강아지상', height: 181, weight: 68, skin_tone: '밝은편', hair_style: '짧은머리', smoking: false, tattoo: false, mbti: 'ENFP', charm_points: ['유머있는', '활발한'] },
   { id: -3, nickname: 'Ethan',  age: 21, major: '인공지능공학과',   gender: 'male', face_type: '곰상',   height: 167, weight: 78, skin_tone: '중간',   hair_style: '단발',     smoking: false, tattoo: false, mbti: 'ISFJ', charm_points: ['섬세한', '조용한'] },
 ];
 
 const MOCK_FEMALE: UserProfileResponse[] = [
-  { id: -4, nickname: 'Sophie', age: 21, major: '인공지능공학과', gender: 'female', face_type: '고양이상', height: 168, weight: 50, skin_tone: '밝은편', hair_style: '긴머리', smoking: false, tattoo: false, mbti: 'ENFJ', charm_points: ['감성적인', '애교있는'] },
+  { id: -4, nickname: 'Olive', age: 21, major: '인공지능공학과', gender: 'female', face_type: '고양이상', height: 168, weight: 50, skin_tone: '밝은편', hair_style: '긴머리', smoking: false, tattoo: false, mbti: 'ENFJ', charm_points: ['감성적인', '애교있는'] },
   { id: -5, nickname: 'Mia',    age: 23, major: '심리학과',     gender: 'female', face_type: '사슴상',   height: 166, weight: 53, skin_tone: '중간',   hair_style: '웨이브', smoking: false, tattoo: false, mbti: 'INFP', charm_points: ['섬세한', '지적인'] },
   { id: -6, nickname: 'Lily',   age: 21, major: '디자인학과',   gender: 'female', face_type: '토끼상',   height: 160, weight: 48, skin_tone: '밝은편', hair_style: '단발',   smoking: false, tattoo: false, mbti: 'ESFP', charm_points: ['활발한', '유머있는'] },
 ];
