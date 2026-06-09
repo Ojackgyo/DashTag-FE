@@ -45,7 +45,7 @@ export default function DatePage() {
   const { hasChance, spend } = useChance();
   const { data: me } = useMe();
 
-  const { data: fetchedProfiles = [], isLoading: profilesLoading, isError: profilesError, error: profilesErrorObj } = useQuery({
+  const { data: fetchedProfiles = [], isLoading: profilesLoading, isError: profilesError } = useQuery({
     queryKey: queryKeys.dateProfiles,
     queryFn: getDateProfiles,
     enabled: isLoggedIn(),
