@@ -1,5 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './context/ThemeContext';
 import { AcceptedDashProvider } from './context/AcceptedDashContext';
@@ -12,7 +11,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-import { isLoggedIn } from './api/client';
 import Header from './components/Header';
 import GNB from './components/GNB';
 import HomePage from './pages/HomePage';
@@ -22,18 +20,12 @@ import CommunityPage from './pages/CommunityPage';
 import MyInfoPage from './pages/MyInfoPage';
 import ChatPage from './pages/ChatPage';
 import SignupPage from './pages/SignupPage';
-import LoginPage from './pages/LoginPage';
 import ReceivedDashPage from './pages/ReceivedDashPage';
 import SentDashPage from './pages/SentDashPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-  useEffect(() => {
-    const check = () => { if (!isLoggedIn()) navigate('/login', { replace: true, state: { expired: true } }); };
-    window.addEventListener('dashtag-auth', check);
-    return () => window.removeEventListener('dashtag-auth', check);
-  }, [navigate]);
-  if (!isLoggedIn()) return <Navigate to="/login" replace />;
+  // 개발 중에는 로그인 여부와 관계없이 모든 페이지 접근을 허용합니다.
+  // 로그인 기능을 다시 사용할 때 기존 인증 가드 로직을 복구하세요.
   return <>{children}</>;
 }
 
@@ -56,7 +48,8 @@ export default function App() {
       <AcceptedDashProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          {/* 로그인 기능 비활성화 중: 로그인 주소도 홈으로 바로 이동 */}
+          <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/received-dashes" element={<ProtectedRoute><ReceivedDashPage /></ProtectedRoute>} />
           <Route path="/sent-dashes" element={<ProtectedRoute><SentDashPage /></ProtectedRoute>} />

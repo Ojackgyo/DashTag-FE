@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import './SignupPage.css';
 import rawNicknames from '../data/nicknames.csv?raw';
 import inhaMajorsRaw from '../data/inha_majors.json';
-import { signup as apiSignup, verifyEmail as apiVerifyEmail, resendVerification } from '../api/auth';
-import { updateMe, getMe } from '../api/user';
+import { resendVerification } from '../api/auth';
+import { getMe } from '../api/user';
 import { isLoggedIn } from '../api/client';
-import { queryKeys } from '../lib/queryKeys';
 
 /* ─── 닉네임 목록 (CSV) ─── */
 const _nicknameLines = rawNicknames.split('\n');
@@ -55,16 +53,6 @@ function getPwStrength(pw: string): PwStrength {
   if (passed === 3) return { level: 2, label: '보통', color: '#F5A623' };
   if (passed === 4) return { level: 2, label: '양호', color: '#7ED321' };
   return { level: 3, label: '강함', color: '#2ECC71' };
-}
-
-function isPasswordStrong(pw: string): boolean {
-  return (
-    pw.length >= 8 &&
-    /[A-Z]/.test(pw) &&
-    /[a-z]/.test(pw) &&
-    /[0-9]/.test(pw) &&
-    /[!@#$%^&*()\-_=+\[\]{};':"\\|,.<>/?]/.test(pw)
-  );
 }
 
 /* ─── Step types ─── */
@@ -646,7 +634,6 @@ function IntroScreen() {
 /* ─── 메인 컴포넌트 ─── */
 export default function SignupPage() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const editMode = isLoggedIn();
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -655,7 +642,7 @@ export default function SignupPage() {
   const [exiting, setExiting] = useState(false);
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const submitting = false;
   const inputRef = useRef<HTMLInputElement>(null);
   const advancingRef = useRef(false);
 
@@ -703,21 +690,6 @@ export default function SignupPage() {
     return () => clearTimeout(t);
   }, [currentStep]);
 
-  // 이메일 인증 단계 진입 시 회원가입 API 호출 (신규 가입 전용)
-  useEffect(() => {
-    if (editMode) return;
-    if (step.key === 'emailCode') {
-      const email = answers['email'] ?? '';
-      const password = answers['password'] ?? '';
-      const nickname = answers['nickname'] ?? '';
-      const g = answers['gender'] === '남성' ? 'male' : 'female';
-      if (email && password && nickname) {
-        apiSignup(email, password, nickname, g).catch(() => {});
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step.key]);
-
   useEffect(() => {
     if (step.type === 'text' || step.type === 'password') {
       setTimeout(() => inputRef.current?.focus(), 300);
@@ -737,95 +709,12 @@ export default function SignupPage() {
     }, 220);
   };
 
-  const validate = (): string | null => {
-    if (step.key === 'email') {
-      if (!currentValue.endsWith('@inha.edu')) return '인하대 이메일(@inha.edu)만 사용할 수 있어요';
-    }
-    if (step.key === 'emailCode') {
-      if (currentValue.length !== 6) return '6자리 인증번호를 입력해주세요';
-    }
-    if (step.type === 'password') {
-      if (!isPasswordStrong(currentValue)) return '비밀번호 요건을 모두 충족해주세요';
-    }
-    if (step.key === 'name') {
-      if (currentValue.trim().length < 2) return '이름을 올바르게 입력해주세요 (2자 이상)';
-    }
-    if (step.key === 'age') {
-      const age = parseInt(currentValue);
-      if (isNaN(age) || age < 18 || age > 35) return '18~35세 사이의 나이를 입력해주세요';
-    }
-    return null;
-  };
-
-  const mbtiAllSelected = (val: string, ideal?: boolean) => {
-    const parts = val ? val.split(',') : [];
-    if (parts.length < 4) return false;
-    return parts.every(p => p === 'E' || p === 'I' || p === 'S' || p === 'N' ||
-      p === 'T' || p === 'F' || p === 'J' || p === 'P' || (ideal && p === '?'));
-  };
-
-  const handleNext = async () => {
+  const handleNext = () => {
     if (advancingRef.current || submitting) return;
-    if (step.type === 'mbti-selector') {
-      const ideal = 'ideal' in step ? step.ideal : false;
-      if (!mbtiAllSelected(currentValue, ideal)) return;
-    } else if (step.type !== 'intro' && step.type !== 'tags' && step.type !== 'nickname-picker' && step.type !== 'major-select' && step.type !== 'email-verify' && !currentValue) {
-      return;
-    }
-    const err = validate();
-    if (err) { setError(err); return; }
 
-    // 이메일 인증 코드 확인
-    if (step.key === 'emailCode') {
-      setSubmitting(true);
-      try {
-        await apiVerifyEmail(answers['email'] ?? '', currentValue);
-        advance();
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : '인증코드가 올바르지 않아요');
-      } finally {
-        setSubmitting(false);
-      }
-      return;
-    }
-
-    // 마지막 스텝: 프로필 저장
+    // 개발 중에는 입력/선택 검증과 회원가입 API 호출 없이 다음 단계로 이동합니다.
     if (isLast) {
-      setSubmitting(true);
-      try {
-        const mbtiStr = (answers['mbti'] ?? '').replace(/,/g, '');
-        const idealMbtiStr = (answers['idealMbti'] ?? '').replace(/,/g, '');
-        await updateMe({
-          nickname: answers['nickname'] || null,
-          name: answers['name'] || null,
-          age: parseInt(answers['age'] ?? '0') || null,
-          major: answers['major'] || null,
-          gender: answers['gender'] === '남성' ? 'male' : answers['gender'] === '여성' ? 'female' : null,
-          face_type: answers['faceType'] || null,
-          height: parseInt(answers['height'] ?? '0') || null,
-          weight: parseInt(answers['weight'] ?? '0') || null,
-          skin_tone: answers['skinTone'] || null,
-          mbti: mbtiStr || null,
-          tattoo: answers['tattoo'] ? answers['tattoo'] !== '없어요' : null,
-          smoking: answers['smoking'] ? answers['smoking'] !== '비흡연' : null,
-          charm_points: answers['charmPoints']?.split(',').filter(Boolean) ?? [],
-          ideal_type: {
-            face_type: answers['idealFaceType'],
-            skin_tone: answers['idealSkinTone'],
-            mbti: idealMbtiStr,
-            age_diff: answers['idealAge'],
-            tattoo: answers['idealTattoo'],
-            smoking: answers['idealSmoking'],
-            military: answers['idealMilitary'],
-          },
-        });
-        queryClient.invalidateQueries({ queryKey: queryKeys.me });
-        navigate('/');
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : '프로필 저장에 실패했어요');
-      } finally {
-        setSubmitting(false);
-      }
+      navigate('/');
       return;
     }
 
@@ -868,17 +757,7 @@ export default function SignupPage() {
     step.type === 'mbti-selector' ||
     step.type === 'student-id-verify';
 
-  const isNextEnabled = (() => {
-    if (step.type === 'intro') return true;
-    if (step.type === 'tags') return true;
-    if (step.type === 'student-id-verify') return true; // 건너뛰기 허용
-    if (step.type === 'email-verify') return currentValue.length === 6;
-    if (step.type === 'nickname-picker') return !!currentValue;
-    if (step.type === 'major-select') return !!currentValue;
-    if (step.type === 'mbti-selector') return mbtiAllSelected(currentValue, 'ideal' in step ? step.ideal : false);
-    if (step.type === 'password') return isPasswordStrong(currentValue);
-    return !!currentValue;
-  })();
+  const isNextEnabled = true;
 
   return (
     <div className="signup-page">
