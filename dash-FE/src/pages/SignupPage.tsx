@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './SignupPage.css';
 import rawNicknames from '../data/nicknames.csv?raw';
-import inhaMajorsRaw from '../data/inha_majors.json';
 import { confirmEmailVerification, requestEmailVerification, resendVerification, signup } from '../api/auth';
-import { getMe } from '../api/user';
+import { getMe, saveMemberProfile } from '../api/user';
+import { getIdealPreference, saveIdealPreference } from '../api/idealPreference';
+import { getColleges, type MajorResponse } from '../api/college';
 import { isLoggedIn } from '../api/client';
 import StudentIdVerify from '../components/StudentIdVerify';
 
@@ -20,10 +21,6 @@ const FEMALE_NICKNAMES: string[] = _nicknameLines
   .flatMap(line => line.split(','))
   .map(n => n.trim())
   .filter(Boolean);
-
-/* ─── 인하대 학과 목록 (inha_majors.json) ─── */
-const INHA_DEPARTMENTS: string[] = (inhaMajorsRaw as { college: string; majors?: string[]; major?: string[] }[])
-  .flatMap(c => c.majors ?? c.major ?? []);
 
 /* ─── 금지어 목록 ─── */
 const BLOCKED_WORDS = [
@@ -101,6 +98,7 @@ function getSteps(gender: string): Step[] {
     },
     { type: 'nickname-picker', key: 'nickname', question: '영어 닉네임을 골라봐요 ✨', sub: '앱에서 사용할 닉네임이에요' },
     { type: 'text', key: 'name', question: '이름이 뭐예요? 👋', placeholder: '학생증에서 확인된 실명이에요' },
+    { type: 'text', key: 'birthdate', question: '생년월일을 확인해주세요 🎂', placeholder: 'YYYY-MM-DD', sub: '학생증에서 인식한 생년월일을 확인해주세요' },
     {
       type: 'choice', key: 'faceType', question: '내 얼굴상은? 🐾',
       options: [
@@ -124,8 +122,14 @@ function getSteps(gender: string): Step[] {
         { label: '매우 어두움', emoji: '🌑' },
       ],
     },
+    {
+      type: 'choice', key: 'hairStyle', question: '헤어스타일은 어떤 편인가요? 💇',
+      options: [
+        { label: '짧은 머리', emoji: '✂️' }, { label: '중간 머리', emoji: '💇' },
+        { label: '긴 머리', emoji: '💁' }, { label: '펌', emoji: '🌀' },
+      ],
+    },
     { type: 'mbti-selector', key: 'mbti', question: 'MBTI가 뭐예요? 🧠', sub: '각 항목에서 해당하는 쪽을 선택해주세요' },
-    { type: 'text', key: 'age', question: '몇 살이에요? 🎂', placeholder: '만 나이를 숫자로 입력 (ex. 24)', sub: '만 나이 기준으로 입력해주세요' },
     { type: 'major-select', key: 'major', question: '학과가 어떻게 돼요? 🎓', sub: '인하대학교 학과를 선택해주세요' },
   ];
 
@@ -522,13 +526,13 @@ function EmailVerifyInput({ email, value, onChange }: {
 }
 
 /* ─── 학과 선택 (자동완성) ─── */
-function MajorSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function MajorSelect({ value, majors, onChange }: { value: string; majors: MajorResponse[]; onChange: (v: MajorResponse | null) => void }) {
   const [search, setSearch] = useState(value || '');
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const filtered = search.trim()
-    ? INHA_DEPARTMENTS.filter(d => d.includes(search.trim())).slice(0, 10)
+    ? majors.filter(d => d.name.includes(search.trim())).slice(0, 10)
     : [];
 
   useEffect(() => {
@@ -539,9 +543,9 @@ function MajorSelect({ value, onChange }: { value: string; onChange: (v: string)
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleSelect = (dept: string) => {
+  const handleSelect = (dept: MajorResponse) => {
     onChange(dept);
-    setSearch(dept);
+    setSearch(dept.name);
     setOpen(false);
   };
 
@@ -555,7 +559,7 @@ function MajorSelect({ value, onChange }: { value: string; onChange: (v: string)
         onChange={e => {
           setSearch(e.target.value);
           setOpen(true);
-          if (value && value !== e.target.value) onChange('');
+          if (value && value !== e.target.value) onChange(null);
         }}
         onFocus={() => { if (search.trim()) setOpen(true); }}
       />
@@ -568,17 +572,17 @@ function MajorSelect({ value, onChange }: { value: string; onChange: (v: string)
         }}>
           {filtered.map((dept, i) => (
             <button
-              key={dept}
+              key={dept.id}
               onMouseDown={e => { e.preventDefault(); handleSelect(dept); }}
               style={{
                 width: '100%', padding: '13px 16px', textAlign: 'left',
-                background: value === dept ? 'var(--primary-bg)' : 'transparent',
+                background: value === dept.name ? 'var(--primary-bg)' : 'transparent',
                 borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none',
-                color: value === dept ? 'var(--primary)' : 'var(--text)',
-                fontSize: 15, fontWeight: value === dept ? 700 : 500,
+                color: value === dept.name ? 'var(--primary)' : 'var(--text)',
+                fontSize: 15, fontWeight: value === dept.name ? 700 : 500,
               }}
             >
-              {dept}
+              {dept.name}
             </button>
           ))}
         </div>
@@ -659,6 +663,27 @@ function IntroScreen() {
   );
 }
 
+const FACE_TYPES: Record<string, string> = {
+  늑대상: 'WOLF', 강아지상: 'DOG', 여우상: 'FOX', 고양이상: 'CAT', 곰상: 'BEAR',
+  토끼상: 'RABBIT', 사슴상: 'DEER', 공룡상: 'DINOSAUR', 새상: 'BIRD', 물개상: 'SEAL',
+};
+const SKIN_TONES: Record<string, string> = {
+  '매우 밝음': 'VERY_LIGHT', 밝음: 'LIGHT', 중간: 'MEDIUM', '어두운 편': 'DARK', '매우 어두움': 'VERY_DARK',
+};
+const HAIR_STYLES: Record<string, string> = {
+  '짧은 머리': 'SHORT', '중간 머리': 'MEDIUM', '긴 머리': 'LONG', 펌: 'PERM',
+};
+const TATTOO_STATUSES: Record<string, string> = {
+  없어요: 'NONE', '작은 타투': 'SMALL', '큰 타투': 'LARGE', 많아요: 'MANY',
+};
+const SMOKING_STATUSES: Record<string, string> = {
+  비흡연: 'NON_SMOKER', '가끔 피워요': 'OCCASIONAL', '흡연자예요': 'SMOKER', '금연 중이에요': 'QUITTING',
+};
+
+function mbtiValue(value = ''): string {
+  return value.split(',').join('');
+}
+
 /* ─── 메인 컴포넌트 ─── */
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -673,8 +698,15 @@ export default function SignupPage() {
   const [submitting, setSubmitting] = useState(false);
   const [verificationToken, setVerificationToken] = useState('');
   const [accountCreated, setAccountCreated] = useState(editMode);
+  const [majors, setMajors] = useState<MajorResponse[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const advancingRef = useRef(false);
+
+  useEffect(() => {
+    getColleges()
+      .then(colleges => setMajors(colleges.flatMap(college => college.majors)))
+      .catch(e => setError(e instanceof Error ? e.message : '학과 목록을 불러오지 못했어요'));
+  }, []);
 
   // 편집 모드: 기존 유저 데이터를 answers에 pre-fill
   useEffect(() => {
@@ -685,12 +717,14 @@ export default function SignupPage() {
         gender:       genderVal,
         nickname:     u.nickname ?? '',
         name:         u.name ?? '',
-        age:          u.age != null ? String(u.age) : '',
+        birthdate:    u.birthdate ?? '',
         major:        u.major ?? '',
+        majorId:      u.major_id != null ? String(u.major_id) : '',
         faceType:     u.face_type ?? '',
         height:       u.height != null ? String(u.height) : '',
         topSize:      u.top_size ?? '',
         skinTone:     u.skin_tone ?? '',
+        hairStyle:    u.hair_style ?? '',
         mbti:         u.mbti ? u.mbti.split('').join(',') : '',
         tattoo:       u.tattoo === true ? '작은 타투' : u.tattoo === false ? '없어요' : '',
         smoking:      u.smoking === true ? '흡연자예요' : u.smoking === false ? '비흡연' : '',
@@ -704,6 +738,16 @@ export default function SignupPage() {
         ...prev,
       }));
     }).catch(() => {});
+    getIdealPreference().then(ideal => setAnswers(prev => ({
+      ...prev,
+      idealFaceType: ideal.faceType ?? '',
+      idealSkinTone: ideal.skinTone ?? '',
+      idealMbti: ideal.mbtiPattern ? ideal.mbtiPattern.split('').join(',') : '',
+      idealAge: ideal.maxAgeDiff == null ? '2,2' : `${ideal.maxAgeDiff},${ideal.maxAgeDiff}`,
+      idealTattoo: ideal.tattooPreference ?? '',
+      idealSmoking: ideal.smokingPreference ?? '',
+      idealMilitary: ideal.militaryPreference ?? '',
+    }))).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -727,6 +771,40 @@ export default function SignupPage() {
   }, [currentStep, step.type]);
 
   const currentValue = answers[step.key] || (step.type === 'age-range' ? '2,2' : '');
+
+  const finishOnboarding = async (values: Record<string, string>) => {
+    const majorId = Number(values.majorId);
+    const birthdate = values.birthdate?.trim();
+    if (!Number.isInteger(majorId) || majorId <= 0) throw new Error('학과를 목록에서 다시 선택해주세요');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate) || Number.isNaN(new Date(birthdate).getTime())) {
+      throw new Error('생년월일을 YYYY-MM-DD 형식으로 입력해주세요');
+    }
+    const [younger = '2', older = '2'] = (values.idealAge || '2,2').split(',');
+    await saveMemberProfile({
+      nickname: values.nickname,
+      gender: values.gender === '남성' ? 'MALE' : 'FEMALE',
+      birthdate,
+      majorId,
+      faceType: FACE_TYPES[values.faceType] ?? values.faceType,
+      height: Number(values.height),
+      skinTone: SKIN_TONES[values.skinTone] ?? values.skinTone,
+      hairStyle: HAIR_STYLES[values.hairStyle] ?? values.hairStyle,
+      mbti: mbtiValue(values.mbti),
+      smokingStatus: SMOKING_STATUSES[values.smoking] ?? values.smoking,
+      tattooStatus: TATTOO_STATUSES[values.tattoo] ?? values.tattoo,
+      militaryStatus: values.gender === '남성' ? (values.military === '군필' ? 'COMPLETED' : 'NOT_COMPLETED') : 'NOT_APPLICABLE',
+      charmPoints: (values.charmPoints || '').split(',').map(v => v.trim()).filter(Boolean).slice(0, 3),
+    });
+    await saveIdealPreference({
+      faceType: values.idealFaceType === '상관없어요' ? null : FACE_TYPES[values.idealFaceType] ?? values.idealFaceType,
+      skinTone: values.idealSkinTone === '상관없어요' ? null : SKIN_TONES[values.idealSkinTone] ?? values.idealSkinTone,
+      mbtiPattern: mbtiValue(values.idealMbti).replace(/🤷/g, '?'),
+      maxAgeDiff: Math.max(Number(younger), Number(older)),
+      tattooPreference: values.idealTattoo === '없었으면 해요' ? 'NONE' : values.idealTattoo === '작은 건 괜찮아요' ? 'SMALL_OK' : 'ANY',
+      smokingPreference: values.idealSmoking === '비흡연만' ? 'NON_SMOKER_ONLY' : values.idealSmoking === '가끔은 괜찮아요' ? 'OCCASIONAL_OK' : 'ANY',
+      militaryPreference: values.idealMilitary === '군필 선호해요' ? 'COMPLETED_ONLY' : 'ANY',
+    });
+  };
 
   const advance = () => {
     advancingRef.current = true;
@@ -790,7 +868,15 @@ export default function SignupPage() {
     }
 
     if (isLast) {
-      navigate('/');
+      try {
+        setSubmitting(true);
+        await finishOnboarding(answers);
+        navigate('/');
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : '프로필 저장에 실패했어요');
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
     advance();
@@ -817,7 +903,13 @@ export default function SignupPage() {
           setExiting(false);
           advancingRef.current = false;
           if (currentStep < steps.length - 1) setCurrentStep(s => s + 1);
-          else navigate('/');
+          else {
+            setSubmitting(true);
+            finishOnboarding({ ...answers, [step.key]: val })
+              .then(() => navigate('/'))
+              .catch((e: unknown) => setError(e instanceof Error ? e.message : '프로필 저장에 실패했어요'))
+              .finally(() => setSubmitting(false));
+          }
         }, 220);
       }, 180);
     }
@@ -941,7 +1033,12 @@ export default function SignupPage() {
         {step.type === 'major-select' && (
           <MajorSelect
             value={currentValue}
-            onChange={v => setAnswers(prev => ({ ...prev, [step.key]: v }))}
+            majors={majors}
+            onChange={major => setAnswers(prev => ({
+              ...prev,
+              [step.key]: major?.name ?? '',
+              majorId: major ? String(major.id) : '',
+            }))}
           />
         )}
 
@@ -1003,8 +1100,8 @@ export default function SignupPage() {
         {step.type === 'student-id-verify' && (
           <StudentIdVerify
             onChange={v => setAnswers(prev => ({ ...prev, studentNumber: v }))}
-            onPreFill={(name) => {
-              if (name) setAnswers(prev => ({ ...prev, name }));
+            onPreFill={(name, birthdate) => {
+              setAnswers(prev => ({ ...prev, ...(name ? { name } : {}), ...(birthdate ? { birthdate } : {}) }));
             }}
           />
         )}

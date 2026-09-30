@@ -42,19 +42,62 @@ export interface DateScheduleResponse {
   created_at: string;
 }
 
+type ChatRoomApiResponse = {
+  id: number;
+  roomType: string;
+  name?: string | null;
+  createdAt: string;
+};
+
+type ChatMessageApiResponse = {
+  id: number;
+  roomId?: number;
+  senderId?: number;
+  senderMemberId?: number;
+  senderNickname?: string | null;
+  content: string;
+  createdAt?: string;
+  sentAt?: string;
+};
+
+type ChatMessagePageApiResponse = {
+  messages: ChatMessageApiResponse[];
+  nextCursor?: number | null;
+  hasNext: boolean;
+};
+
+function toRoom(room: ChatRoomApiResponse): ChatRoomResponse {
+  return { id: room.id, room_type: room.roomType.toLowerCase(), name: room.name, created_at: room.createdAt, unread_count: 0 };
+}
+
+function toMessage(message: ChatMessageApiResponse, roomId: number): MessageResponse {
+  return {
+    id: message.id,
+    room_id: message.roomId ?? roomId,
+    sender_id: message.senderMemberId ?? message.senderId ?? 0,
+    sender_nickname: message.senderNickname,
+    content: message.content,
+    is_read: false,
+    created_at: message.sentAt ?? message.createdAt ?? new Date().toISOString(),
+  };
+}
+
 // GET /api/chats
-export function getChatRooms(): Promise<ChatRoomResponse[]> {
-  return api.get<ChatRoomResponse[]>('/api/chats');
+export async function getChatRooms(): Promise<ChatRoomResponse[]> {
+  const rooms = await api.get<ChatRoomApiResponse[]>('/api/chat-rooms');
+  return rooms.map(toRoom);
 }
 
 // GET /api/chats/{room_id}/messages
-export function getChatMessages(roomId: number): Promise<MessageResponse[]> {
-  return api.get<MessageResponse[]>(`/api/chats/${roomId}/messages`);
+export async function getChatMessages(roomId: number): Promise<MessageResponse[]> {
+  const page = await api.get<ChatMessagePageApiResponse>(`/api/chat-rooms/${roomId}/messages`);
+  return page.messages.map(message => toMessage(message, roomId));
 }
 
 // POST /api/chats/{room_id}/messages
-export function sendMessage(roomId: number, content: string): Promise<MessageResponse> {
-  return api.post<MessageResponse>(`/api/chats/${roomId}/messages`, { content: sanitizePlainText(content, 2000) });
+export async function sendMessage(roomId: number, content: string): Promise<MessageResponse> {
+  const message = await api.post<ChatMessageApiResponse>(`/api/chat-rooms/${roomId}/messages`, { content: sanitizePlainText(content, 2000) });
+  return toMessage(message, roomId);
 }
 
 // PUT /api/chats/{room_id}/schedule

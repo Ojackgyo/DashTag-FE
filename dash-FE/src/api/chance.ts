@@ -7,12 +7,25 @@ export interface ChanceResponse {
   spent_at?: string | null;
 }
 
+interface ChanceApiResponse {
+  hasChance: boolean;
+  date: string;
+  isSpent: boolean;
+  spentAt?: string | null;
+}
+
 // GET /api/chances
-export function getChance(): Promise<ChanceResponse> {
-  return api.get<ChanceResponse>('/api/chances');
+export async function getChance(): Promise<ChanceResponse> {
+  const result = await api.get<ChanceApiResponse>('/api/chances');
+  return {
+    has_chance: result.hasChance,
+    date: result.date,
+    is_spent: result.isSpent,
+    spent_at: result.spentAt,
+  };
 }
 
 // POST /api/chances/spend
 export function spendChance(): Promise<ChanceResponse> {
-  return api.post<ChanceResponse>('/api/chances/spend');
+  return getChance();
 }
