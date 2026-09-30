@@ -11,7 +11,10 @@ export default function HomePage() {
   const { data: requests, isLoading } = useDatingRequests();
 
   const myId = user?.id;
-  const received = requests?.filter(r => r.status === 'pending' && r.to_user_id === myId) ?? [];
+  const received = requests?.filter(r => {
+    const expiresAt = r.expires_at ? new Date(r.expires_at).getTime() : new Date(r.created_at).getTime() + 24 * 60 * 60 * 1000;
+    return r.status === 'pending' && r.to_user_id === myId && Date.now() < expiresAt;
+  }) ?? [];
   const sent     = requests?.filter(r => r.from_user_id === myId) ?? [];
 
   const [viewMonth, setViewMonth] = useState(() => {
@@ -197,6 +200,15 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+
+        <footer style={{ padding: '24px 0 8px', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, fontSize: 12, fontWeight: 600 }}>
+            <button type="button" onClick={() => navigate('/legal/terms')} style={{ background: 'none', color: 'inherit', padding: 4 }}>이용약관</button>
+            <span aria-hidden>·</span>
+            <button type="button" onClick={() => navigate('/legal/privacy')} style={{ background: 'none', color: 'inherit', padding: 4 }}>개인정보 처리방침</button>
+          </div>
+          <p style={{ fontSize: 11, marginTop: 8 }}>© DashTag</p>
+        </footer>
 
       </div>
     </div>

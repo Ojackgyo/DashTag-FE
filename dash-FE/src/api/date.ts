@@ -1,5 +1,6 @@
 import { api } from './client';
 import type { UserProfileResponse } from './user';
+import { sanitizePlainText } from '../lib/security';
 
 // GET /api/profiles → 소개팅 상대 프로필 목록
 export function getDateProfiles(): Promise<UserProfileResponse[]> {
@@ -8,5 +9,6 @@ export function getDateProfiles(): Promise<UserProfileResponse[]> {
 
 // POST /api/dating/requests
 export function sendDateRequest(to_user_id: number, message?: string): Promise<{ id: number; status: string }> {
-  return api.post<{ id: number; status: string }>('/api/dating/requests', { to_user_id, message: message || null });
+  const safeMessage = message ? sanitizePlainText(message, 300) : '';
+  return api.post<{ id: number; status: string }>('/api/dating/requests', { to_user_id, message: safeMessage || null });
 }

@@ -11,7 +11,7 @@ export interface UserResponse {
   gender?: string | null;
   face_type?: string | null;
   height?: number | null;
-  weight?: number | null;
+  top_size?: 'XS' | 'S' | 'M' | 'L' | 'XL' | '2XL' | null;
   skin_tone?: string | null;
   hair_style?: string | null;
   smoking?: boolean | null;
@@ -32,7 +32,7 @@ export interface UserUpdate {
   gender?: string | null;
   face_type?: string | null;
   height?: number | null;
-  weight?: number | null;
+  top_size?: 'XS' | 'S' | 'M' | 'L' | 'XL' | '2XL' | null;
   skin_tone?: string | null;
   hair_style?: string | null;
   smoking?: boolean | null;
@@ -50,7 +50,7 @@ export interface UserProfileResponse {
   gender?: string | null;
   face_type?: string | null;
   height?: number | null;
-  weight?: number | null;
+  top_size?: 'XS' | 'S' | 'M' | 'L' | 'XL' | '2XL' | null;
   skin_tone?: string | null;
   hair_style?: string | null;
   smoking?: boolean | null;

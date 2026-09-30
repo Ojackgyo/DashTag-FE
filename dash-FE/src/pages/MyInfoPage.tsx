@@ -44,7 +44,7 @@ const FIELD_GROUPS: { title: string; rows: FieldRow[] }[] = [
     rows: [
       { key: 'face_type', label: '얼굴상', displayValue: u => u?.face_type ? `${faceTypeToEmoji(u.face_type)} ${u.face_type}` : '미설정', editorType: 'choice', options: FACE_TYPES },
       { key: 'height', label: '키', displayValue: u => u?.height != null ? `${u.height}cm` : '미설정', editorType: 'number', min: 150, max: 200, unit: 'cm' },
-      { key: 'weight', label: '몸무게', displayValue: u => u?.weight != null ? `${u.weight}kg` : '미설정', editorType: 'number', min: 40, max: 120, unit: 'kg' },
+      { key: 'top_size', label: '상의 사이즈', displayValue: u => u?.top_size ?? '미설정', editorType: 'choice', options: ['XS', 'S', 'M', 'L', 'XL', '2XL'] },
       { key: 'skin_tone', label: '피부톤', displayValue: u => u?.skin_tone ?? '미설정', editorType: 'choice', options: SKIN_TONES },
       { key: 'hair_style', label: '헤어스타일', displayValue: u => u?.hair_style ?? '미설정', editorType: 'choice', options: HAIR_STYLES },
     ],

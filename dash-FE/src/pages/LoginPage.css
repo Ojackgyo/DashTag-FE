@@ -88,6 +88,9 @@
 
 .login-tab {
   flex: 1;
+  appearance: none;
+  background: transparent;
+  border: 0;
   padding: 11px;
   font-size: 15px;
   font-weight: 600;
@@ -165,14 +168,19 @@
 
 .pw-toggle {
   position: absolute;
-  right: 14px;
+  right: 6px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 18px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   background: none;
   border: none;
   cursor: pointer;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ── 에러 ── */
@@ -262,25 +270,37 @@
 /* ── 제출 버튼 ── */
 .login-submit {
   width: 100%;
-  padding: 16px;
+  min-height: 52px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  border: 0;
   border-radius: 16px;
   font-size: 16px;
   font-weight: 700;
-  color: rgba(255,255,255,0.45);
+  color: var(--text-muted);
   background: var(--bg-card2);
   margin-top: 4px;
   transition: background 0.22s, color 0.22s, box-shadow 0.22s, transform 0.12s;
 }
 
-.login-submit.enabled {
+.login-submit.enabled:not(:disabled) {
   color: white;
   background: linear-gradient(135deg, #FF6B9D 0%, #FF80AB 60%, #C084FC 100%);
   box-shadow: 0 5px 20px rgba(255, 128, 171, 0.48);
 }
 
-.login-submit.enabled:active {
+.login-submit.enabled:not(:disabled):active {
   transform: scale(0.97);
   opacity: 0.9;
+}
+
+.login-submit:disabled {
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.72;
 }
 
 /* ── 인하대 안내 ── */
@@ -348,7 +368,13 @@
 
 .signup-start-btn {
   width: 100%;
-  padding: 16px;
+  min-height: 52px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  border: 0;
   border-radius: 16px;
   font-size: 16px;
   font-weight: 800;

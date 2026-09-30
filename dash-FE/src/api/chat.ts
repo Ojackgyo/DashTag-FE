@@ -1,6 +1,5 @@
-import { api, getToken } from './client';
-
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'https://dashtag-be-production.up.railway.app';
+import { api, BASE_URL, getToken } from './client';
+import { sanitizePlainText } from '../lib/security';
 
 // WebSocket 시도 (백엔드가 지원할 경우에만 연결됨 — 실패 시 onerror로 감지)
 export function createChatSocket(roomId: number): WebSocket {
@@ -55,7 +54,7 @@ export function getChatMessages(roomId: number): Promise<MessageResponse[]> {
 
 // POST /api/chats/{room_id}/messages
 export function sendMessage(roomId: number, content: string): Promise<MessageResponse> {
-  return api.post<MessageResponse>(`/api/chats/${roomId}/messages`, { content });
+  return api.post<MessageResponse>(`/api/chats/${roomId}/messages`, { content: sanitizePlainText(content, 2000) });
 }
 
 // PUT /api/chats/{room_id}/schedule
@@ -65,5 +64,9 @@ export function setSchedule(roomId: number, scheduled_at: string): Promise<DateS
 
 // POST /api/chats/{room_id}/report
 export function reportRoom(roomId: number, reported_user_id: number, reason: string, detail?: string): Promise<void> {
-  return api.post<void>(`/api/chats/${roomId}/report`, { reported_user_id, reason, detail });
+  return api.post<void>(`/api/chats/${roomId}/report`, {
+    reported_user_id,
+    reason: sanitizePlainText(reason, 100),
+    detail: detail ? sanitizePlainText(detail, 1000) : undefined,
+  });
 }

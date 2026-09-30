@@ -86,10 +86,10 @@ export default function LoginPage() {
 
       <div className="login-card">
         <div className="login-tabs">
-          <button className={`login-tab ${tab === 'login' ? 'active' : ''}`} onClick={() => { setTab('login'); setError(''); }}>
+          <button type="button" className={`login-tab ${tab === 'login' ? 'active' : ''}`} onClick={() => { setTab('login'); setError(''); }}>
             로그인
           </button>
-          <button className={`login-tab ${tab === 'signup' ? 'active' : ''}`} onClick={() => { setTab('signup'); setError(''); }}>
+          <button type="button" className={`login-tab ${tab === 'signup' ? 'active' : ''}`} onClick={() => { setTab('signup'); setError(''); }}>
             회원가입
           </button>
           <div className="login-tab-bar" style={{ transform: tab === 'login' ? 'translateX(0)' : 'translateX(100%)' }} />
@@ -112,7 +112,7 @@ export default function LoginPage() {
               </div>
             )}
             {savedEmail && (
-              <button className="quick-login-card" onClick={handleQuickLogin}>
+              <button type="button" className="quick-login-card" onClick={handleQuickLogin}>
                 <div className="quick-login-avatar">🏷️</div>
                 <div className="quick-login-info">
                   <p className="quick-login-label">이전에 로그인한 계정</p>
@@ -146,7 +146,7 @@ export default function LoginPage() {
                   onChange={e => { setPw(e.target.value); setError(''); }}
                   onKeyDown={e => { if (e.key === 'Enter' && canLogin) handleLogin(); }}
                 />
-                <button className="pw-toggle" onClick={() => setShowPw(v => !v)}
+                <button type="button" className="pw-toggle" aria-label={showPw ? '비밀번호 숨기기' : '비밀번호 보기'} onClick={() => setShowPw(v => !v)}
                   style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
                   {showPw ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
@@ -156,6 +156,7 @@ export default function LoginPage() {
             {error && <p className="login-error">{error}</p>}
 
             <button
+              type="button"
               className={`login-submit ${canLogin ? 'enabled' : ''}`}
               onClick={handleLogin}
               disabled={!canLogin || submitting}
@@ -184,7 +185,7 @@ export default function LoginPage() {
               <p>인하대 포털 이메일(@inha.edu)로만 가입할 수 있어요</p>
             </div>
 
-            <button className="signup-start-btn" onClick={() => navigate('/signup')}>
+            <button type="button" className="signup-start-btn" onClick={() => navigate('/signup')}>
               회원가입 시작하기 →
             </button>
           </div>
@@ -193,11 +194,11 @@ export default function LoginPage() {
         <p className="login-switch">
           {tab === 'login' ? (
             <>계정이 없으신가요?{' '}
-              <button className="login-switch-btn" onClick={() => setTab('signup')}>회원가입</button>
+              <button type="button" className="login-switch-btn" onClick={() => setTab('signup')}>회원가입</button>
             </>
           ) : (
             <>이미 계정이 있으신가요?{' '}
-              <button className="login-switch-btn" onClick={() => setTab('login')}>로그인</button>
+              <button type="button" className="login-switch-btn" onClick={() => setTab('login')}>로그인</button>
             </>
           )}
         </p>

@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useChance } from '../hooks/useChance';
 import { useMe } from '../hooks/useMe';
 import { useDatingRequests } from '../hooks/useDatingRequests';
 import { useThrottle } from '../lib/hooks';
-import ChanceModal from '../components/ChanceModal';
 import { updateDatingRequest } from '../api/home';
 import { faceTypeToEmoji } from '../api/user';
 import { queryKeys } from '../lib/queryKeys';
@@ -16,8 +14,8 @@ function DetailRows({ p }: { p: UserProfileResponse }) {
   const rows = [
     p.age != null         ? { label: '🎂 나이',        value: `${p.age}세` }                          : null,
     p.major               ? { label: '🎓 학과',        value: p.major }                               : null,
-    p.height != null && p.weight != null
-                          ? { label: '📏 키 / 몸무게', value: `${p.height}cm / ${p.weight}kg` }       : null,
+    p.height != null      ? { label: '📏 키',          value: `${p.height}cm` }                       : null,
+    p.top_size            ? { label: '👕 상의 사이즈', value: p.top_size }                            : null,
     p.skin_tone           ? { label: '🎨 피부톤',      value: p.skin_tone }                           : null,
     p.hair_style          ? { label: '💇 헤어스타일',  value: p.hair_style }                          : null,
     p.tattoo != null      ? { label: '🖊️ 타투',       value: p.tattoo ? '있어요' : '없어요' }         : null,
@@ -50,17 +48,33 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hours / 24)}일 전`;
 }
 
+const DASH_TTL_MS = 24 * 60 * 60 * 1000;
+
+function remainingTime(r: DatingRequestResponse): string {
+  const remaining = expiresAt(r) - Date.now();
+  if (remaining <= 0) return '만료됨';
+  const hours = Math.floor(remaining / 3_600_000);
+  const minutes = Math.ceil((remaining % 3_600_000) / 60_000);
+  return hours > 0 ? `${hours}시간 ${minutes}분 남음` : `${minutes}분 남음`;
+}
+
+function expiresAt(r: DatingRequestResponse): number {
+  return r.expires_at ? new Date(r.expires_at).getTime() : new Date(r.created_at).getTime() + DASH_TTL_MS;
+}
+
 export default function ReceivedDashPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { hasChance, spend } = useChance();
   const { data: me } = useMe();
   const { data: allRequests = [] } = useDatingRequests();
   const [selected, setSelected] = useState<DatingRequestResponse | null>(null);
-  const [showChanceModal, setShowChanceModal] = useState(false);
   const [acceptedIds, setAcceptedIds] = useState<Set<number>>(new Set());
 
-  const received = allRequests.filter(r => r.status === 'pending' && r.to_user_id === me?.id);
+  const received = allRequests.filter(r =>
+    r.status === 'pending' &&
+    r.to_user_id === me?.id &&
+    Date.now() < expiresAt(r)
+  );
 
   const { mutateAsync: doUpdate } = useMutation({
     mutationFn: ({ id, status }: { id: number; status: 'accepted' | 'rejected' }) => updateDatingRequest(id, status),
@@ -74,14 +88,10 @@ export default function ReceivedDashPage() {
     if (!selected) return;
     try {
       await doUpdate({ id: selected.id, status: 'accepted' as const });
-      spend();
       setAcceptedIds(prev => new Set([...prev, selected.id]));
-      setShowChanceModal(false);
       closeCard();
       navigate('/chat', { state: { openRoom: { type: 'dating' } } });
-    } catch {
-      setShowChanceModal(false);
-    }
+    } catch { /* 서버 오류는 기존 화면을 유지 */ }
   }, 2000);
 
   const handleReject = useThrottle(async (r: DatingRequestResponse) => {
@@ -167,7 +177,8 @@ export default function ReceivedDashPage() {
                     </p>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{timeAgo(r.created_at)}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{timeAgo(r.created_at)}</p>
+                    <p style={{ fontSize: 10, color: 'var(--primary)', fontWeight: 700, marginBottom: 4 }}>{remainingTime(r)}</p>
                     {!accepted && (
                       <span style={{
                         fontSize: 10, fontWeight: 700, color: 'white',
@@ -182,15 +193,6 @@ export default function ReceivedDashPage() {
           </div>
         )}
       </div>
-
-      {/* 기회 사용 확인 */}
-      {showChanceModal && (
-        <ChanceModal
-          label="정말 오늘의 기회를 사용하시겠습니까?"
-          onConfirm={confirmAccept}
-          onCancel={() => setShowChanceModal(false)}
-        />
-      )}
 
       {/* 바텀시트 모달 */}
       {selected && (() => {
@@ -291,20 +293,17 @@ export default function ReceivedDashPage() {
                       <button style={{
                         flex: 1, padding: 14, borderRadius: 16,
                         fontSize: 15, fontWeight: 700,
-                        color: !hasChance ? 'var(--text-muted)' : 'white',
-                        background: !hasChance ? 'var(--bg-card2)' : 'var(--gradient)',
+                        color: 'white',
+                        background: 'var(--gradient)',
                         border: '1.5px solid transparent',
-                        cursor: !hasChance ? 'not-allowed' : 'pointer',
-                        boxShadow: hasChance ? '0 4px 16px rgba(255,128,171,0.35)' : 'none',
-                      }} disabled={!hasChance} onClick={() => hasChance && setShowChanceModal(true)}>
-                        {!hasChance ? '기회 없음' : '수락하기'}
+                        boxShadow: '0 4px 16px rgba(255,128,171,0.35)',
+                      }} onClick={confirmAccept}>
+                        수락하기
                       </button>
                     </div>
-                    {hasChance && (
-                      <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-                        하루에 한 명에게만 수락할 수 있어요
-                      </p>
-                    )}
+                    <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+                      수락에는 오늘의 기회가 차감되지 않아요
+                    </p>
                   </>
                 )}
               </div>

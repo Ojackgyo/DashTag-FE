@@ -1,44 +1,43 @@
 import { api, setTokens, clearTokens } from './client';
 
-export interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type?: string;
+export interface AccessTokenResponse {
+  accessToken: string;
 }
 
-interface AuthMsg { message: string; }
-
-// POST /auth/signup
-// 계정 생성 + 인증 메일 발송
-export function signup(email: string, password: string, nickname: string, gender: string): Promise<AuthMsg> {
-  return api.post<AuthMsg>('/auth/signup', { email, password, nickname, gender });
+export interface SignupVerificationTokenResponse {
+  verificationToken: string;
 }
 
-// POST /auth/verify-email
-// 인증코드 확인 → 토큰 발급
-export async function verifyEmail(email: string, code: string): Promise<TokenResponse> {
-  const res = await api.post<TokenResponse>('/auth/verify-email', { email, code });
-  setTokens(res.access_token, res.refresh_token);
+// POST /api/auth/email-verifications
+export function requestEmailVerification(email: string): Promise<void> {
+  return api.post<void>('/api/auth/email-verifications', { email: email.trim() });
+}
+
+// POST /api/auth/email-verifications/confirm
+export function confirmEmailVerification(email: string, code: string): Promise<SignupVerificationTokenResponse> {
+  return api.post<SignupVerificationTokenResponse>('/api/auth/email-verifications/confirm', {
+    email: email.trim(),
+    code: code.trim(),
+  });
+}
+
+export function resendVerification(email: string): Promise<void> {
+  return requestEmailVerification(email);
+}
+
+// POST /api/auth/signup
+export async function signup(verificationToken: string, password: string): Promise<AccessTokenResponse> {
+  const res = await api.post<AccessTokenResponse>('/api/auth/signup', { verificationToken, password });
+  if (!res?.accessToken) throw new Error('회원가입 응답에 access token이 없습니다');
+  setTokens(res.accessToken);
   return res;
 }
 
-// POST /auth/resend-verification
-// 인증코드 재발송
-export function resendVerification(email: string): Promise<AuthMsg> {
-  return api.post<AuthMsg>('/auth/resend-verification', { email });
-}
-
-// POST /auth/login
-export async function login(email: string, password: string): Promise<TokenResponse> {
-  const res = await api.post<TokenResponse>('/auth/login', { email, password });
-  setTokens(res.access_token, res.refresh_token);
-  return res;
-}
-
-// POST /auth/refresh
-export async function refreshToken(refresh_token: string): Promise<TokenResponse> {
-  const res = await api.post<TokenResponse>('/auth/refresh', { refresh_token });
-  setTokens(res.access_token, res.refresh_token);
+// POST /api/auth/login
+export async function login(email: string, password: string): Promise<AccessTokenResponse> {
+  const res = await api.post<AccessTokenResponse>('/api/auth/login', { email: email.trim(), password });
+  if (!res?.accessToken) throw new Error('로그인 응답에 access token이 없습니다');
+  setTokens(res.accessToken);
   return res;
 }
 

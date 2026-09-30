@@ -10,8 +10,8 @@ function DetailRows({ p }: { p: UserProfileResponse }) {
   const rows = [
     p.age != null         ? { label: '🎂 나이',        value: `${p.age}세` }                          : null,
     p.major               ? { label: '🎓 학과',        value: p.major }                               : null,
-    p.height != null && p.weight != null
-                          ? { label: '📏 키 / 몸무게', value: `${p.height}cm / ${p.weight}kg` }       : null,
+    p.height != null      ? { label: '📏 키',          value: `${p.height}cm` }                       : null,
+    p.top_size            ? { label: '👕 상의 사이즈', value: p.top_size }                            : null,
     p.skin_tone           ? { label: '🎨 피부톤',      value: p.skin_tone }                           : null,
     p.hair_style          ? { label: '💇 헤어스타일',  value: p.hair_style }                          : null,
     p.tattoo != null      ? { label: '🖊️ 타투',       value: p.tattoo ? '있어요' : '없어요' }         : null,

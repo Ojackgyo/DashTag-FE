@@ -13,7 +13,7 @@
 .signup-topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 14px 0 10px;
 }
 
@@ -35,12 +35,6 @@
 
 .back-btn:active {
   border-color: var(--primary);
-}
-
-.step-counter {
-  font-size: 13px;
-  color: var(--text-muted);
-  font-weight: 600;
 }
 
 /* Progress */

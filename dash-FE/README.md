@@ -1,5 +1,12 @@
 # React + TypeScript + Vite
 
+## Local API origin
+
+The backend CORS allowlist currently permits `http://localhost:5173`. The Vite
+development server is therefore pinned to that host and port and will fail
+instead of silently selecting another port. Before production go-live, add the
+deployed frontend origin to the backend CORS allowlist.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

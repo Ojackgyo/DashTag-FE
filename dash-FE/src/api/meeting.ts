@@ -1,4 +1,5 @@
 import { api } from './client';
+import { sanitizePlainText } from '../lib/security';
 
 export interface MeetingResponse {
   id: number;
@@ -37,7 +38,11 @@ export function getMeeting(id: number): Promise<MeetingResponse> {
 
 // POST /api/meetings
 export function createMeeting(body: MeetingCreate): Promise<MeetingResponse> {
-  return api.post<MeetingResponse>('/api/meetings', body);
+  return api.post<MeetingResponse>('/api/meetings', {
+    ...body,
+    title: sanitizePlainText(body.title, 80),
+    keywords: body.keywords?.map(keyword => sanitizePlainText(keyword, 20)).filter(Boolean).slice(0, 3),
+  });
 }
 
 // POST /api/meetings/{id}/join
@@ -47,7 +52,7 @@ export function joinMeeting(id: number): Promise<MeetingResponse> {
 
 // POST /api/meetings/join-by-code
 export function joinMeetingByCode(invite_code: string): Promise<MeetingResponse> {
-  return api.post<MeetingResponse>('/api/meetings/join-by-code', { invite_code });
+  return api.post<MeetingResponse>('/api/meetings/join-by-code', { invite_code: sanitizePlainText(invite_code, 32) });
 }
 
 // DELETE /api/meetings/{id}/leave

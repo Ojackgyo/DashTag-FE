@@ -7,6 +7,7 @@ export interface DatingRequestResponse {
   to_user_id: number;
   status: 'pending' | 'accepted' | 'rejected';
   created_at: string;
+  expires_at?: string | null;
   message?: string | null;
   from_user?: UserProfileResponse | null;
   to_user?: UserProfileResponse | null;

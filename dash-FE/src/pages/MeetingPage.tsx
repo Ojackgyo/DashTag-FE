@@ -355,13 +355,10 @@ function CreateSheet({ onClose, onSubmit }: {
   };
   const removeKeyword = (k: string) => setKeywords(prev => prev.filter(x => x !== k));
 
-  const Counter = ({ count, set }: { count: number; set: React.Dispatch<React.SetStateAction<number>> }) => (
-    <div className="flex items-center gap-3">
-      <button className="w-8 h-8 rounded-[9px] flex items-center justify-center text-[18px] font-bold border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)' }} onClick={() => set(c => Math.max(2, c - 1))}>−</button>
-      <span className="text-[20px] font-extrabold min-w-[24px] text-center" style={{ color: 'var(--text)' }}>{count}</span>
-      <button className="w-8 h-8 rounded-[9px] flex items-center justify-center text-[18px] font-bold border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)' }} onClick={() => set(c => Math.min(5, c + 1))}>+</button>
-    </div>
-  );
+  const selectSize = (size: number) => {
+    setFemaleCount(size);
+    setMaleCount(size);
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
@@ -372,20 +369,13 @@ function CreateSheet({ onClose, onSubmit }: {
         </div>
 
         <p className="text-[13px] font-bold mb-3" style={{ color: 'var(--text-sub)' }}>인원 구성</p>
-        <div className="flex items-center justify-around rounded-[18px] py-4 px-3 mb-5 border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)' }}>
-          <div className="flex flex-col items-center gap-2.5">
-            <span className="text-[28px]">👩</span>
-            <span className="text-[12px] font-semibold" style={{ color: 'var(--text-sub)' }}>여성</span>
-            <Counter count={femaleCount} set={setFemaleCount} />
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-[22px]">💕</span>
-          </div>
-          <div className="flex flex-col items-center gap-2.5">
-            <span className="text-[28px]">👨</span>
-            <span className="text-[12px] font-semibold" style={{ color: 'var(--text-sub)' }}>남성</span>
-            <Counter count={maleCount} set={setMaleCount} />
-          </div>
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          {[2, 3, 4].map(size => (
+            <button key={size} type="button" onClick={() => selectSize(size)} className="rounded-[14px] py-3 text-[14px] font-extrabold border"
+              style={femaleCount === size ? { background: 'var(--gradient)', color: 'white', borderColor: 'transparent' } : { background: 'var(--bg-card2)', color: 'var(--text-sub)', borderColor: 'var(--border)' }}>
+              {size} 대 {size}
+            </button>
+          ))}
         </div>
 
         <p className="text-[13px] font-bold mb-3" style={{ color: 'var(--text-sub)' }}>날짜</p>
@@ -469,6 +459,7 @@ export default function MeetingPage() {
   const [pendingJoin, setPendingJoin] = useState<MeetingResponse | null>(null);
   const [pendingCreate, setPendingCreate] = useState<{ title: string; keywords: string[]; femaleCount: number; maleCount: number; dayOffset: number } | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingResponse | null>(null);
+  const [sizeFilter, setSizeFilter] = useState<0 | 2 | 3 | 4>(0);
   const { spend, hasChance, chanceLoading } = useChance();
 
   const { data: meetings = [], isLoading: meetingsLoading } = useQuery({
@@ -541,9 +532,12 @@ export default function MeetingPage() {
     setPendingCreate(null);
   }, 2000);
 
+  const sizeFiltered = sizeFilter === 0
+    ? meetings
+    : meetings.filter(m => m.required_female === sizeFilter && m.required_male === sizeFilter);
   const filtered = search.trim()
-    ? meetings.filter(m => m.title.includes(search.trim()) || m.keywords.some(k => k.includes(search.trim())))
-    : meetings;
+    ? sizeFiltered.filter(m => m.title.includes(search.trim()) || m.keywords.some(k => k.includes(search.trim())))
+    : sizeFiltered;
 
   return (
     <div className="px-[18px] pb-6">
@@ -576,6 +570,15 @@ export default function MeetingPage() {
       </div>
 
       {/* 검색 */}
+      <div className="grid grid-cols-4 gap-2 mb-3">
+        {([{ value: 0, label: '전체' }, { value: 2, label: '2:2' }, { value: 3, label: '3:3' }, { value: 4, label: '4:4' }] as const).map(item => (
+          <button key={item.value} type="button" onClick={() => setSizeFilter(item.value)} className="rounded-[12px] py-2.5 text-[13px] font-bold border"
+            style={sizeFilter === item.value ? { background: 'var(--gradient)', color: 'white', borderColor: 'transparent' } : { background: 'var(--bg-card)', color: 'var(--text-sub)', borderColor: 'var(--border)' }}>
+            {item.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-center gap-2 rounded-[14px] px-[14px] py-[11px] mb-4 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
         <span className="text-[15px] shrink-0">🔍</span>
         <input className="flex-1 bg-transparent text-[14px] min-w-0" style={{ color: 'var(--text)' }} placeholder="키워드로 검색 (ex. 카페, 운동)" value={searchInput} onChange={e => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }} />

@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import './SignupPage.css';
 import rawNicknames from '../data/nicknames.csv?raw';
 import inhaMajorsRaw from '../data/inha_majors.json';
-import { resendVerification } from '../api/auth';
+import { confirmEmailVerification, requestEmailVerification, resendVerification, signup } from '../api/auth';
 import { getMe } from '../api/user';
 import { isLoggedIn } from '../api/client';
+import StudentIdVerify from '../components/StudentIdVerify';
 
 /* ─── 닉네임 목록 (CSV) ─── */
 const _nicknameLines = rawNicknames.split('\n');
@@ -46,7 +47,7 @@ function getPwStrength(pw: string): PwStrength {
     /[A-Z]/.test(pw),
     /[a-z]/.test(pw),
     /[0-9]/.test(pw),
-    /[!@#$%^&*()\-_=+\[\]{};':"\\|,.<>/?]/.test(pw),
+    /[^A-Za-z0-9]/.test(pw),
   ];
   const passed = checks.filter(Boolean).length;
   if (passed <= 2) return { level: 1, label: '약함', color: '#FF6B6B' };
@@ -64,6 +65,7 @@ type Step =
   | { type: 'major-select';    key: string; question: string; sub?: string }
   | { type: 'choice';          key: string; question: string; options: { label: string; emoji: string }[]; sub?: string }
   | { type: 'range';           key: string; question: string; sub?: string }
+  | { type: 'age-range';       key: string; question: string; sub?: string }
   | { type: 'intro';             key: string; question: string }
   | { type: 'tags';              key: string; question: string; placeholder: string; sub?: string; max: number }
   | { type: 'mbti-selector';     key: string; question: string; ideal?: boolean; sub?: string }
@@ -76,25 +78,29 @@ function getSteps(gender: string): Step[] {
 
   const steps: Step[] = [
     {
-      type: 'choice', key: 'gender', question: '성별을 선택해주세요 👤',
-      options: [{ label: '남성', emoji: '👨' }, { label: '여성', emoji: '👩' }],
-    },
-    {
       type: 'text', key: 'email', question: '인하대 이메일을 입력해주세요 📧',
       placeholder: '아이디@inha.edu',
       sub: '포털 이메일(@inha.edu)만 사용할 수 있어요',
+    },
+    {
+      type: 'email-verify', key: 'emailCode', question: '이메일 인증을 완료해주세요 📬',
+      sub: '인증번호 6자리를 입력해주세요',
     },
     {
       type: 'password', key: 'password', question: '비밀번호를 설정해주세요 🔒',
       placeholder: '8자 이상, 대/소문자·숫자·특수문자 포함',
       sub: '보안을 위해 강력한 비밀번호를 설정해주세요',
     },
-    { type: 'nickname-picker', key: 'nickname', question: '영어 닉네임을 골라봐요 ✨', sub: '앱에서 사용할 닉네임이에요' },
     {
-      type: 'email-verify', key: 'emailCode', question: '이메일 인증을 완료해주세요 📬',
-      sub: '인증번호 6자리를 입력해주세요',
+      type: 'student-id-verify', key: 'studentNumber', question: '학생 인증을 완료해주세요 🪪',
+      sub: '학번·이름과 모바일 학생증이 모두 일치해야 해요',
     },
-    { type: 'text', key: 'name', question: '이름이 뭐예요? 👋', placeholder: '실명을 입력해주세요' },
+    {
+      type: 'choice', key: 'gender', question: '성별을 선택해주세요 👤',
+      options: [{ label: '남성', emoji: '👨' }, { label: '여성', emoji: '👩' }],
+    },
+    { type: 'nickname-picker', key: 'nickname', question: '영어 닉네임을 골라봐요 ✨', sub: '앱에서 사용할 닉네임이에요' },
+    { type: 'text', key: 'name', question: '이름이 뭐예요? 👋', placeholder: '학생증에서 확인된 실명이에요' },
     {
       type: 'choice', key: 'faceType', question: '내 얼굴상은? 🐾',
       options: [
@@ -106,7 +112,10 @@ function getSteps(gender: string): Step[] {
       ],
     },
     { type: 'range', key: 'height', question: '키가 어떻게 돼요? 📏' },
-    { type: 'range', key: 'weight', question: '몸무게는요? 🏋️', sub: '공개 여부는 나중에 설정할 수 있어요' },
+    {
+      type: 'choice', key: 'topSize', question: '상의 사이즈는 어떻게 돼요? 👕',
+      options: ['XS', 'S', 'M', 'L', 'XL', '2XL'].map(label => ({ label, emoji: '👕' })),
+    },
     {
       type: 'choice', key: 'skinTone', question: '피부톤은 어때요? 🎨',
       options: [
@@ -124,9 +133,7 @@ function getSteps(gender: string): Step[] {
     steps.push({
       type: 'choice', key: 'military', question: '군대는 다녀왔나요? 🪖',
       options: [
-        { label: '현역 복무', emoji: '✅' }, { label: '사회복무', emoji: '🏥' },
-        { label: '미필', emoji: '⏳' },      { label: '면제', emoji: '📋' },
-        { label: '해당 없음', emoji: '👩' },
+        { label: '군필', emoji: '✅' }, { label: '미필', emoji: '⏳' },
       ],
     });
   }
@@ -178,13 +185,8 @@ function getSteps(gender: string): Step[] {
     },
     { type: 'mbti-selector', key: 'idealMbti', question: '선호하는 MBTI는? 🧠', ideal: true, sub: '상관없으면 🤷를 선택해주세요' },
     {
-      type: 'choice', key: 'idealAge', question: '나이 차이는 얼마나 괜찮아요? 🎂',
-      sub: '내 나이 기준으로 선택해주세요',
-      options: [
-        { label: '±1살', emoji: '🎯' }, { label: '±2살', emoji: '💕' },
-        { label: '±3살', emoji: '🌸' }, { label: '±5살', emoji: '✨' },
-        { label: '±7살', emoji: '🌈' }, { label: '상관없어요', emoji: '🤷' },
-      ],
+      type: 'age-range', key: 'idealAge', question: '선호하는 나이 차이는? 🎂',
+      sub: '내 나이를 기준으로 연하·연상 범위를 각각 정해주세요',
     },
     {
       type: 'choice', key: 'idealTattoo', question: '타투는 괜찮나요? 🖊️',
@@ -301,6 +303,32 @@ function RangeInput({ stepKey, value, onChange }: { stepKey: string; value: stri
       </div>
       <input type="range" min={min} max={max} value={num} className="range-slider" onChange={e => onChange(e.target.value)} />
       <div className="range-minmax"><span>{min}{unit}</span><span>{max}{unit}</span></div>
+    </div>
+  );
+}
+
+function AgeRangeInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [youngerRaw = '2', olderRaw = '2'] = value.split(',');
+  const younger = Number(youngerRaw) || 0;
+  const older = Number(olderRaw) || 0;
+  const setRange = (nextYounger: number, nextOlder: number) => onChange(`${nextYounger},${nextOlder}`);
+
+  return (
+    <div className="range-wrap" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div>
+        <div className="range-display" style={{ marginBottom: 10 }}>
+          <span className="range-value">-{younger}</span><span className="range-unit">살까지 연하</span>
+        </div>
+        <input type="range" min="0" max="10" value={younger} className="range-slider" onChange={e => setRange(Number(e.target.value), older)} />
+        <div className="range-minmax"><span>동갑</span><span>10살 연하</span></div>
+      </div>
+      <div>
+        <div className="range-display" style={{ marginBottom: 10 }}>
+          <span className="range-value">+{older}</span><span className="range-unit">살까지 연상</span>
+        </div>
+        <input type="range" min="0" max="10" value={older} className="range-slider" onChange={e => setRange(younger, Number(e.target.value))} />
+        <div className="range-minmax"><span>동갑</span><span>10살 연상</span></div>
+      </div>
     </div>
   );
 }
@@ -582,7 +610,7 @@ function PasswordStrengthBar({ pw }: { pw: string }) {
     { label: '대문자 포함', ok: /[A-Z]/.test(pw) },
     { label: '소문자 포함', ok: /[a-z]/.test(pw) },
     { label: '숫자 포함', ok: /[0-9]/.test(pw) },
-    { label: '특수문자 포함', ok: /[!@#$%^&*()\-_=+\[\]{};':"\\|,.<>/?]/.test(pw) },
+    { label: '특수문자 포함', ok: /[^A-Za-z0-9]/.test(pw) },
   ];
   if (!pw) return null;
   return (
@@ -634,7 +662,7 @@ function IntroScreen() {
 /* ─── 메인 컴포넌트 ─── */
 export default function SignupPage() {
   const navigate = useNavigate();
-  const editMode = isLoggedIn();
+  const editMode = useRef(isLoggedIn()).current;
 
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -642,7 +670,9 @@ export default function SignupPage() {
   const [exiting, setExiting] = useState(false);
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const submitting = false;
+  const [submitting, setSubmitting] = useState(false);
+  const [verificationToken, setVerificationToken] = useState('');
+  const [accountCreated, setAccountCreated] = useState(editMode);
   const inputRef = useRef<HTMLInputElement>(null);
   const advancingRef = useRef(false);
 
@@ -659,7 +689,7 @@ export default function SignupPage() {
         major:        u.major ?? '',
         faceType:     u.face_type ?? '',
         height:       u.height != null ? String(u.height) : '',
-        weight:       u.weight != null ? String(u.weight) : '',
+        topSize:      u.top_size ?? '',
         skinTone:     u.skin_tone ?? '',
         mbti:         u.mbti ? u.mbti.split('').join(',') : '',
         tattoo:       u.tattoo === true ? '작은 타투' : u.tattoo === false ? '없어요' : '',
@@ -696,7 +726,7 @@ export default function SignupPage() {
     }
   }, [currentStep, step.type]);
 
-  const currentValue = answers[step.key] || '';
+  const currentValue = answers[step.key] || (step.type === 'age-range' ? '2,2' : '');
 
   const advance = () => {
     advancingRef.current = true;
@@ -709,20 +739,68 @@ export default function SignupPage() {
     }, 220);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (advancingRef.current || submitting) return;
 
-    // 개발 중에는 입력/선택 검증과 회원가입 API 호출 없이 다음 단계로 이동합니다.
+    setError('');
+
+    if (!editMode) {
+      try {
+        if (step.key === 'email') {
+          const email = currentValue.trim();
+          if (!email.endsWith('@inha.edu')) {
+            setError('인하대 이메일(@inha.edu)을 입력해주세요');
+            return;
+          }
+          setSubmitting(true);
+          await requestEmailVerification(email);
+        } else if (step.key === 'emailCode') {
+          if (!/^\d{6}$/.test(currentValue)) {
+            setError('인증번호 6자리를 입력해주세요');
+            return;
+          }
+          setSubmitting(true);
+          const result = await confirmEmailVerification(answers.email.trim(), currentValue);
+          if (!result?.verificationToken) {
+            throw new Error('이메일 인증 응답에 회원가입 인증 토큰이 없습니다');
+          }
+          setVerificationToken(result.verificationToken);
+        } else if (step.key === 'password') {
+          if (currentValue.length < 8 || currentValue.length > 64) {
+            setError('비밀번호는 8자 이상 64자 이하여야 해요');
+            return;
+          }
+          if (!verificationToken) {
+            setError('이메일 인증을 먼저 완료해주세요');
+            return;
+          }
+          setSubmitting(true);
+          await signup(verificationToken, currentValue);
+          setAccountCreated(true);
+        } else if (step.type !== 'intro' && !currentValue) {
+          setError('항목을 입력하거나 선택해주세요');
+          return;
+        }
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : '요청 처리에 실패했어요');
+        return;
+      } finally {
+        setSubmitting(false);
+      }
+    }
+
     if (isLast) {
       navigate('/');
       return;
     }
-
     advance();
   };
 
   const handleBack = () => {
     if (advancingRef.current) return;
+    // 계정 생성이 끝난 뒤에는 이미 사용된 verificationToken으로 돌아가
+    // 회원가입을 다시 요청하지 못하도록 인증 구간 진입을 막는다.
+    if (accountCreated && step.type === 'student-id-verify') return;
     if (currentStep === 0) { navigate(editMode ? '/' : '/login'); return; }
     setExiting(true);
     setTimeout(() => { setExiting(false); setCurrentStep(s => s - 1); }, 220);
@@ -752,18 +830,23 @@ export default function SignupPage() {
     step.type === 'nickname-picker' ||
     step.type === 'major-select' ||
     step.type === 'range' ||
+    step.type === 'age-range' ||
     step.type === 'tags' ||
     step.type === 'intro' ||
     step.type === 'mbti-selector' ||
     step.type === 'student-id-verify';
 
-  const isNextEnabled = true;
+  const isNextEnabled = step.type === 'intro' || currentValue.length > 0;
 
   return (
     <div className="signup-page">
       <div className="signup-topbar">
-        <button className="back-btn" onClick={handleBack}>‹</button>
-        <div className="step-counter">{currentStep + 1} / {steps.length}</div>
+        <button
+          className="back-btn"
+          onClick={handleBack}
+          aria-label="이전 단계"
+          style={{ visibility: accountCreated && step.type === 'student-id-verify' ? 'hidden' : 'visible' }}
+        >‹</button>
       </div>
 
       <div className="progress-track">
@@ -897,6 +980,13 @@ export default function SignupPage() {
           />
         )}
 
+        {step.type === 'age-range' && (
+          <AgeRangeInput
+            value={currentValue}
+            onChange={v => setAnswers(prev => ({ ...prev, [step.key]: v }))}
+          />
+        )}
+
         {/* MBTI */}
         {step.type === 'mbti-selector' && (
           <MbtiSelector
@@ -908,6 +998,16 @@ export default function SignupPage() {
 
         {/* 이상형 인트로 */}
         {step.type === 'intro' && <IntroScreen />}
+
+        {/* 학생 인증 */}
+        {step.type === 'student-id-verify' && (
+          <StudentIdVerify
+            onChange={v => setAnswers(prev => ({ ...prev, studentNumber: v }))}
+            onPreFill={(name) => {
+              if (name) setAnswers(prev => ({ ...prev, name }));
+            }}
+          />
+        )}
 
         {/* 에러 메시지 */}
         {error && (
