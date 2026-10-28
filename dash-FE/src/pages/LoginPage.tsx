@@ -47,7 +47,7 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     if (!canLogin || submitting) return;
-    if (!email.endsWith('@inha.edu')) {
+    if (!email.trim().toLowerCase().endsWith('@inha.edu')) {
       setError('인하대 이메일(@inha.edu)만 사용할 수 있어요');
       return;
     }

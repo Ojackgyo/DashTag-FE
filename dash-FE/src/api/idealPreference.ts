@@ -4,7 +4,8 @@ export interface IdealPreferenceRequest {
   faceType?: string | null;
   skinTone?: string | null;
   mbtiPattern?: string | null;
-  maxAgeDiff?: number | null;
+  maxYoungerAgeDiff?: number | null;
+  maxOlderAgeDiff?: number | null;
   tattooPreference?: string | null;
   smokingPreference?: string | null;
   militaryPreference?: string | null;

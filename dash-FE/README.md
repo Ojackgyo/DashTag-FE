@@ -7,6 +7,20 @@ development server is therefore pinned to that host and port and will fail
 instead of silently selecting another port. Before production go-live, add the
 deployed frontend origin to the backend CORS allowlist.
 
+## Backend integration
+
+See [backend handoff and verification status](docs/backend-integration.md) for API coverage, missing backend features, and temporary enum mappings.
+
+```sh
+npm run dev   # http://localhost:5173
+npm test      # API contract tests using the captured OpenAPI document (no live writes)
+npm run build
+npm run lint
+```
+
+Copy `.env.example` to `.env.local` only if you need to override the default API origin.
+Student verification sends the original JPEG/PNG with the entered name and student number to the backend. There is no frontend OCR or barcode comparison.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

@@ -1,7 +1,9 @@
+import QueryStatus from '../components/QueryStatus';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMe } from '../hooks/useMe';
 import { useDatingRequests } from '../hooks/useDatingRequests';
+import { faceTypes, skinTones, hairStyles, optionLabel } from '../api/profileOptions';
 import { faceTypeToEmoji } from '../api/user';
 import type { DatingRequestResponse } from '../api/home';
 import type { UserProfileResponse } from '../api/user';
@@ -12,8 +14,8 @@ function DetailRows({ p }: { p: UserProfileResponse }) {
     p.major               ? { label: '🎓 학과',        value: p.major }                               : null,
     p.height != null      ? { label: '📏 키',          value: `${p.height}cm` }                       : null,
     p.top_size            ? { label: '👕 상의 사이즈', value: p.top_size }                            : null,
-    p.skin_tone           ? { label: '🎨 피부톤',      value: p.skin_tone }                           : null,
-    p.hair_style          ? { label: '💇 헤어스타일',  value: p.hair_style }                          : null,
+    p.skin_tone           ? { label: '🎨 피부톤',      value: optionLabel(skinTones, p.skin_tone) }                           : null,
+    p.hair_style          ? { label: '💇 헤어스타일',  value: optionLabel(hairStyles, p.hair_style) }                          : null,
     p.tattoo != null      ? { label: '🖊️ 타투',       value: p.tattoo ? '있어요' : '없어요' }         : null,
     p.smoking != null     ? { label: '🚬 흡연',        value: p.smoking ? '흡연' : '비흡연' }          : null,
   ].filter(Boolean) as { label: string; value: string }[];
@@ -56,7 +58,7 @@ export default function SentDashPage() {
   const [flipped, setFlipped] = useState(false);
 
   const { data: me } = useMe();
-  const { data: allRequests = [] } = useDatingRequests();
+  const { data: allRequests = [], isLoading, error, refetch } = useDatingRequests();
   const sent = allRequests.filter(r => r.from_user_id === me?.id);
 
   const openCard = (r: DatingRequestResponse) => {
@@ -71,7 +73,7 @@ export default function SentDashPage() {
   };
 
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100vh', paddingBottom: 40 }}>
+    <div className="standalone-page" style={{ background: 'var(--bg)', minHeight: '100dvh', paddingBottom: 40 }}>
 
       {/* 헤더 */}
       <div style={{
@@ -80,7 +82,7 @@ export default function SentDashPage() {
         borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)',
         position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <button
+        <button className="icon-button"
           onClick={() => navigate(-1)}
           style={{
             width: 36, height: 36, borderRadius: '50%',
@@ -99,7 +101,8 @@ export default function SentDashPage() {
 
       {/* 리스트 */}
       <div style={{ padding: '16px 20px' }}>
-        {sent.length === 0 ? (
+        <QueryStatus loading={isLoading} error={error} retry={() => { void refetch(); }} />
+        {isLoading || error ? null : sent.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0' }}>
             <span style={{ fontSize: 52 }}>📤</span>
             <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-sub)', marginTop: 14 }}>아직 보낸 대쉬가 없어요</p>
@@ -166,7 +169,7 @@ export default function SentDashPage() {
               style={{ perspective: '1200px', width: '100%', maxWidth: '340px' }}
               onClick={e => e.stopPropagation()}
             >
-              <div style={{
+              <div className="card-flip" style={{
                 position: 'relative', height: '520px',
                 transformStyle: 'preserve-3d',
                 transition: 'transform 0.65s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -200,7 +203,7 @@ export default function SentDashPage() {
                   background: 'var(--bg-card)', border: '2px solid var(--border)',
                   display: 'flex', flexDirection: 'column', overflow: 'hidden',
                 }}>
-                  <button style={{
+                  <button className="icon-button" style={{
                     position: 'absolute', top: 14, right: 14,
                     width: 30, height: 30, borderRadius: '50%',
                     background: 'var(--bg-card2)', color: 'var(--text-muted)',
@@ -219,7 +222,7 @@ export default function SentDashPage() {
                         <p style={{ fontSize: 19, fontWeight: 800, color: 'var(--text)', marginBottom: 5 }}>{to?.nickname ?? '알 수 없음'}</p>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {to?.mbti && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-sub)', background: 'var(--bg-card2)', padding: '2px 9px', borderRadius: 7 }}>{to.mbti}</span>}
-                          {to?.face_type && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-sub)', background: 'var(--bg-card2)', padding: '2px 9px', borderRadius: 7 }}>{to.face_type}</span>}
+                          {to?.face_type && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-sub)', background: 'var(--bg-card2)', padding: '2px 9px', borderRadius: 7 }}>{optionLabel(faceTypes, to.face_type)}</span>}
                         </div>
                       </div>
                     </div>

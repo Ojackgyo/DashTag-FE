@@ -1,15 +1,5 @@
-import { api, BASE_URL, getToken } from './client';
+import { api } from './client';
 import { sanitizePlainText } from '../lib/security';
-
-// WebSocket 시도 (백엔드가 지원할 경우에만 연결됨 — 실패 시 onerror로 감지)
-export function createChatSocket(roomId: number): WebSocket {
-  const wsBase = BASE_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
-  const token = getToken();
-  const url = token
-    ? `${wsBase}/ws/chat/${roomId}?token=${encodeURIComponent(token)}`
-    : `${wsBase}/ws/chat/${roomId}`;
-  return new WebSocket(url);
-}
 
 export interface ChatRoomResponse {
   id: number;
@@ -31,6 +21,7 @@ export interface MessageResponse {
   sender_id: number;
   sender_nickname?: string | null;
   content: string;
+  client_message_id?: string;
   is_read: boolean;
   created_at: string;
 }
@@ -58,6 +49,7 @@ type ChatMessageApiResponse = {
   content: string;
   createdAt?: string;
   sentAt?: string;
+  clientMessageId: string;
 };
 
 type ChatMessagePageApiResponse = {
@@ -77,26 +69,38 @@ function toMessage(message: ChatMessageApiResponse, roomId: number): MessageResp
     sender_id: message.senderMemberId ?? message.senderId ?? 0,
     sender_nickname: message.senderNickname,
     content: message.content,
+    client_message_id: message.clientMessageId,
     is_read: false,
     created_at: message.sentAt ?? message.createdAt ?? new Date().toISOString(),
   };
 }
 
-// GET /api/chats
 export async function getChatRooms(): Promise<ChatRoomResponse[]> {
-  const rooms = await api.get<ChatRoomApiResponse[]>('/api/chat-rooms');
-  return rooms.map(toRoom);
+  return (await api.get<ChatRoomApiResponse[]>('/api/chat-rooms')).map(toRoom);
 }
-
-// GET /api/chats/{room_id}/messages
-export async function getChatMessages(roomId: number): Promise<MessageResponse[]> {
-  const page = await api.get<ChatMessagePageApiResponse>(`/api/chat-rooms/${roomId}/messages`);
-  return page.messages.map(message => toMessage(message, roomId));
+export async function getChatMessagePage(roomId: number, cursor?: number) {
+  const params = new URLSearchParams({ size: '50' });
+  if (cursor != null) params.set('cursor', String(cursor));
+  const page = await api.get<ChatMessagePageApiResponse>(`/api/chat-rooms/${roomId}/messages?${params}`);
+  return { ...page, messages: page.messages.map(m => toMessage(m, roomId)) };
 }
-
-// POST /api/chats/{room_id}/messages
-export async function sendMessage(roomId: number, content: string): Promise<MessageResponse> {
-  const message = await api.post<ChatMessageApiResponse>(`/api/chat-rooms/${roomId}/messages`, { content: sanitizePlainText(content, 2000) });
+// Catch up across pages when more than 50 messages arrived between polls.
+export async function getNewChatMessages(roomId: number, latestId: number) {
+  const messages: MessageResponse[] = [];
+  let cursor: number | undefined;
+  for (;;) {
+    const page = await getChatMessagePage(roomId, cursor);
+    messages.push(...page.messages.filter(m => m.id > latestId));
+    if (!page.hasNext || page.messages.some(m => m.id <= latestId)) break;
+    if (page.nextCursor == null || (cursor != null && page.nextCursor >= cursor)) throw new Error('채팅 다음 페이지를 불러올 수 없어요');
+    cursor = page.nextCursor;
+  }
+  return messages.sort((a, b) => a.id - b.id);
+}
+export async function sendMessage(roomId: number, content: string, clientMessageId: string): Promise<MessageResponse> {
+  const message = await api.post<ChatMessageApiResponse>(`/api/chat-rooms/${roomId}/messages`, {
+    content: sanitizePlainText(content, 2000), clientMessageId,
+  });
   return toMessage(message, roomId);
 }
 

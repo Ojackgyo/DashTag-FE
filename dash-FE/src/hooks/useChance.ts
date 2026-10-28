@@ -1,29 +1,21 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getChance, spendChance } from '../api/chance';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getChance } from '../api/chance';
 import { isLoggedIn } from '../api/client';
 import { queryKeys } from '../lib/queryKeys';
 
 export function useChance() {
   const queryClient = useQueryClient();
-
-  const { data, isLoading: chanceLoading } = useQuery({
-    queryKey: queryKeys.chance,
-    queryFn: getChance,
-    enabled: isLoggedIn(),
-    staleTime: 30 * 1000,
-  });
-
-  const { mutateAsync: spend, isPending: loading } = useMutation({
-    mutationFn: spendChance,
-    onSuccess: (res) => {
-      queryClient.setQueryData(queryKeys.chance, res);
-    },
-  });
-
+  const query = useQuery({ queryKey: queryKeys.chance, queryFn: getChance, enabled: isLoggedIn(),
+    staleTime: 10000, refetchInterval: 30000, refetchOnWindowFocus: true });
   return {
-    hasChance: data?.has_chance ?? false,
-    chanceLoading,
-    spend,
-    loading,
+    hasChance: query.data?.hasChance ?? false,
+    remainingCount: query.data?.remainingCount,
+    maxCount: query.data?.maxCount,
+    rechargeAt: query.data?.rechargeAt ?? [],
+    chanceLoading: query.isLoading,
+    error: query.error,
+    // The successful dating request spends a chance on the server.
+    spend: () => queryClient.invalidateQueries({ queryKey: queryKeys.chance }),
+    loading: query.isFetching,
   };
 }

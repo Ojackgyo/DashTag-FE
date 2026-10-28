@@ -1,8 +1,10 @@
 import { api } from './client';
+import { getColleges } from './college';
+import { faceTypes, skinTones, hairStyles, optionValue } from './profileOptions';
 
 export interface MemberProfileRequest {
   nickname: string; gender: string; birthdate: string; majorId: number;
-  faceType: string; height: number; skinTone: string; hairStyle: string;
+  faceType: string; height: number; topSize: string; skinTone: string; hairStyle: string;
   mbti: string; smokingStatus: string; tattooStatus: string;
   militaryStatus: string; charmPoints: string[];
 }
@@ -55,8 +57,9 @@ function fromApi(p: MemberProfileApiResponse): UserResponse {
     id: p.memberId ?? p.id ?? 0, nickname: p.nickname, birthdate: p.birthdate,
     age: calculateAge(p.birthdate), major: p.majorName ?? null, major_id: p.majorId,
     gender: p.gender.toLowerCase(), face_type: p.faceType, height: p.height,
+    top_size: (p.topSize === 'XXL' ? '2XL' : p.topSize) as UserResponse['top_size'],
     skin_tone: p.skinTone, hair_style: p.hairStyle,
-    smoking_status: p.smokingStatus, smoking: p.smokingStatus === 'SMOKER',
+    smoking_status: p.smokingStatus, smoking: p.smokingStatus !== 'NON_SMOKER',
     tattoo_status: p.tattooStatus, tattoo: p.tattooStatus !== 'NONE',
     military_status: p.militaryStatus, mbti: p.mbti, charm_points: p.charmPoints,
     ideal_type: null, is_profile_complete: true,
@@ -65,7 +68,10 @@ function fromApi(p: MemberProfileApiResponse): UserResponse {
 }
 
 export async function getMe(): Promise<UserResponse> {
-  return fromApi(await api.get<MemberProfileApiResponse>('/api/members/me/profile'));
+  const profile = fromApi(await api.get<MemberProfileApiResponse>('/api/members/me/profile'));
+  const colleges = await getColleges();
+  profile.major = colleges.flatMap(c => c.majors).find(m => m.id === profile.major_id)?.name ?? null;
+  return profile;
 }
 
 export async function saveMemberProfile(body: MemberProfileRequest): Promise<UserResponse> {
@@ -77,8 +83,9 @@ export async function updateMe(body: UserUpdate): Promise<UserResponse> {
   return saveMemberProfile({
     nickname: body.nickname ?? p.nickname, gender: body.gender ?? p.gender,
     birthdate: body.birthdate ?? p.birthdate, majorId: body.major_id ?? p.majorId,
-    faceType: body.face_type ?? p.faceType, height: body.height ?? p.height,
-    skinTone: body.skin_tone ?? p.skinTone, hairStyle: body.hair_style ?? p.hairStyle,
+    faceType: optionValue(faceTypes, body.face_type ?? p.faceType), height: body.height ?? p.height,
+    topSize: body.top_size === '2XL' ? 'XXL' : body.top_size ?? p.topSize,
+    skinTone: optionValue(skinTones, body.skin_tone ?? p.skinTone), hairStyle: optionValue(hairStyles, body.hair_style ?? p.hairStyle),
     mbti: body.mbti ?? p.mbti,
     smokingStatus: body.smoking_status ?? (body.smoking == null ? p.smokingStatus : body.smoking ? 'SMOKER' : 'NON_SMOKER'),
     tattooStatus: body.tattoo_status ?? (body.tattoo == null ? p.tattooStatus : body.tattoo ? 'SMALL' : 'NONE'),
@@ -91,9 +98,9 @@ export function getUserProfile(): Promise<UserProfileResponse> { return getMe();
 
 const FACE_EMOJI: Record<string, string> = {
   '늑대상': '🐺', '강아지상': '🐶', '여우상': '🦊', '고양이상': '🐱', '곰상': '🐻',
-  '토끼상': '🐰', '사슴상': '🦌', '공룡상': '🦕', '새상': '🦅', '물개상': '🦭',
+  '토끼상': '🐰', '사슴상': '🦌', '공룡상': '🦕', '말상': '🐴',
   WOLF: '🐺', DOG: '🐶', FOX: '🦊', CAT: '🐱', BEAR: '🐻', RABBIT: '🐰',
-  DEER: '🦌', DINOSAUR: '🦕', BIRD: '🦅', SEAL: '🦭',
+  DEER: '🦌', DINOSAUR: '🦕', HORSE: '🐴',
 };
 
 export function faceTypeToEmoji(faceType?: string | null): string {

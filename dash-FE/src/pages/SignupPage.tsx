@@ -6,7 +6,12 @@ import { confirmEmailVerification, requestEmailVerification, resendVerification,
 import { getMe, saveMemberProfile } from '../api/user';
 import { getIdealPreference, saveIdealPreference } from '../api/idealPreference';
 import { getColleges, type MajorResponse } from '../api/college';
-import { isLoggedIn } from '../api/client';
+import { ApiError, isLoggedIn } from '../api/client';
+import { getStudentVerificationStatus } from '../api/studentVerification';
+import { faceTypes, skinTones, hairStyles, smokingStatuses, tattooStatuses, tattooPreferences, smokingPreferences, militaryPreferences, optionLabel } from '../api/profileOptions';
+import { useQueryClient } from '@tanstack/react-query';
+import { buildOnboardingPayload } from '../api/onboarding';
+import { formatBirthdateInput, normalizeBirthdate } from '../lib/birthdate';
 import StudentIdVerify from '../components/StudentIdVerify';
 
 /* ─── 닉네임 목록 (CSV) ─── */
@@ -40,16 +45,15 @@ interface PwStrength { level: 0 | 1 | 2 | 3; label: string; color: string }
 function getPwStrength(pw: string): PwStrength {
   if (!pw) return { level: 0, label: '', color: 'transparent' };
   const checks = [
-    pw.length >= 8,
-    /[A-Z]/.test(pw),
-    /[a-z]/.test(pw),
+    pw.length >= 8 && pw.length <= 64,
+    /[A-Za-z]/.test(pw),
     /[0-9]/.test(pw),
     /[^A-Za-z0-9]/.test(pw),
   ];
   const passed = checks.filter(Boolean).length;
-  if (passed <= 2) return { level: 1, label: '약함', color: '#FF6B6B' };
-  if (passed === 3) return { level: 2, label: '보통', color: '#F5A623' };
-  if (passed === 4) return { level: 2, label: '양호', color: '#7ED321' };
+  if (passed <= 1) return { level: 1, label: '약함', color: '#FF6B6B' };
+  if (passed === 2) return { level: 2, label: '보통', color: '#F5A623' };
+  if (passed === 3) return { level: 2, label: '양호', color: '#7ED321' };
   return { level: 3, label: '강함', color: '#2ECC71' };
 }
 
@@ -85,8 +89,8 @@ function getSteps(gender: string): Step[] {
     },
     {
       type: 'password', key: 'password', question: '비밀번호를 설정해주세요 🔒',
-      placeholder: '8자 이상, 대/소문자·숫자·특수문자 포함',
-      sub: '보안을 위해 강력한 비밀번호를 설정해주세요',
+      placeholder: '8~64자 비밀번호',
+      sub: '대문자 없이도 사용할 수 있어요. 영문·숫자·특수문자 조합을 권장해요',
     },
     {
       type: 'student-id-verify', key: 'studentNumber', question: '학생 인증을 완료해주세요 🪪',
@@ -97,8 +101,8 @@ function getSteps(gender: string): Step[] {
       options: [{ label: '남성', emoji: '👨' }, { label: '여성', emoji: '👩' }],
     },
     { type: 'nickname-picker', key: 'nickname', question: '영어 닉네임을 골라봐요 ✨', sub: '앱에서 사용할 닉네임이에요' },
-    { type: 'text', key: 'name', question: '이름이 뭐예요? 👋', placeholder: '학생증에서 확인된 실명이에요' },
-    { type: 'text', key: 'birthdate', question: '생년월일을 확인해주세요 🎂', placeholder: 'YYYY-MM-DD', sub: '학생증에서 인식한 생년월일을 확인해주세요' },
+    { type: 'text', key: 'name', question: '이름이 뭐예요? 👋', placeholder: '학생 인증에 사용한 실명이에요' },
+    { type: 'text', key: 'birthdate', question: '생년월일을 입력해주세요 🎂', placeholder: '예: 20000102', sub: '숫자 8자리만 입력하면 -가 자동으로 들어가요' },
     {
       type: 'choice', key: 'faceType', question: '내 얼굴상은? 🐾',
       options: [
@@ -106,7 +110,7 @@ function getSteps(gender: string): Step[] {
         { label: '여우상', emoji: '🦊' }, { label: '고양이상', emoji: '🐱' },
         { label: '곰상', emoji: '🐻' },   { label: '토끼상', emoji: '🐰' },
         { label: '사슴상', emoji: '🦌' }, { label: '공룡상', emoji: '🦕' },
-        { label: '새상', emoji: '🦅' },   { label: '물개상', emoji: '🦭' },
+        { label: '말상', emoji: '🐴' },
       ],
     },
     { type: 'range', key: 'height', question: '키가 어떻게 돼요? 📏' },
@@ -125,8 +129,7 @@ function getSteps(gender: string): Step[] {
     {
       type: 'choice', key: 'hairStyle', question: '헤어스타일은 어떤 편인가요? 💇',
       options: [
-        { label: '짧은 머리', emoji: '✂️' }, { label: '중간 머리', emoji: '💇' },
-        { label: '긴 머리', emoji: '💁' }, { label: '펌', emoji: '🌀' },
+        ...Object.values(hairStyles).map(label => ({ label, emoji: '💇' })),
       ],
     },
     { type: 'mbti-selector', key: 'mbti', question: 'MBTI가 뭐예요? 🧠', sub: '각 항목에서 해당하는 쪽을 선택해주세요' },
@@ -175,7 +178,7 @@ function getSteps(gender: string): Step[] {
         { label: '여우상', emoji: '🦊' }, { label: '고양이상', emoji: '🐱' },
         { label: '곰상', emoji: '🐻' },   { label: '토끼상', emoji: '🐰' },
         { label: '사슴상', emoji: '🦌' }, { label: '공룡상', emoji: '🦕' },
-        { label: '새상', emoji: '🦅' },   { label: '물개상', emoji: '🦭' },
+        { label: '말상', emoji: '🐴' },
         { label: '상관없어요', emoji: '🤷' },
       ],
     },
@@ -315,23 +318,23 @@ function AgeRangeInput({ value, onChange }: { value: string; onChange: (v: strin
   const [youngerRaw = '2', olderRaw = '2'] = value.split(',');
   const younger = Number(youngerRaw) || 0;
   const older = Number(olderRaw) || 0;
-  const setRange = (nextYounger: number, nextOlder: number) => onChange(`${nextYounger},${nextOlder}`);
+  const setRange = (nextYounger: number | string, nextOlder: number | string) => onChange(`${nextYounger},${nextOlder}`);
 
   return (
     <div className="range-wrap" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div>
         <div className="range-display" style={{ marginBottom: 10 }}>
-          <span className="range-value">-{younger}</span><span className="range-unit">살까지 연하</span>
+          <span className="range-value">{youngerRaw === 'any' ? '제한 없음' : `-${younger}`}</span><span className="range-unit">살까지 연하</span>
         </div>
-        <input type="range" min="0" max="10" value={younger} className="range-slider" onChange={e => setRange(Number(e.target.value), older)} />
-        <div className="range-minmax"><span>동갑</span><span>10살 연하</span></div>
+        <input type="range" min="0" max="10" value={younger} className="range-slider" onChange={e => setRange(Number(e.target.value), olderRaw)} />
+        <div className="range-minmax"><span>동갑</span><span>10살 연하</span></div><button onClick={() => setRange(youngerRaw === 'any' ? 2 : 'any', olderRaw)}>연하 제한 {youngerRaw === 'any' ? '설정' : '없음'}</button>
       </div>
       <div>
         <div className="range-display" style={{ marginBottom: 10 }}>
-          <span className="range-value">+{older}</span><span className="range-unit">살까지 연상</span>
+          <span className="range-value">{olderRaw === 'any' ? '제한 없음' : `+${older}`}</span><span className="range-unit">살까지 연상</span>
         </div>
-        <input type="range" min="0" max="10" value={older} className="range-slider" onChange={e => setRange(younger, Number(e.target.value))} />
-        <div className="range-minmax"><span>동갑</span><span>10살 연상</span></div>
+        <input type="range" min="0" max="10" value={older} className="range-slider" onChange={e => setRange(youngerRaw, Number(e.target.value))} />
+        <div className="range-minmax"><span>동갑</span><span>10살 연상</span></div><button onClick={() => setRange(youngerRaw, olderRaw === 'any' ? 2 : 'any')}>연상 제한 {olderRaw === 'any' ? '설정' : '없음'}</button>
       </div>
     </div>
   );
@@ -466,23 +469,23 @@ function EmailVerifyInput({ email, value, onChange }: {
   email: string; value: string; onChange: (v: string) => void;
 }) {
   const [cooldown, setCooldown] = useState(60);
+  const [resending, setResending] = useState(false);
+  const [resendError, setResendError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => { inputRef.current?.focus(); }, []);
   useEffect(() => {
-    inputRef.current?.focus();
-    const interval = setInterval(() => {
-      setCooldown(c => {
-        if (c <= 1) { clearInterval(interval); return 0; }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleResend = () => {
-    if (cooldown > 0) return;
-    setCooldown(60);
-    resendVerification(email).catch(() => {});
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown(c => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
+  const handleResend = async () => {
+    if (cooldown > 0 || resending) return;
+    setResending(true);
+    setResendError('');
+    try { await resendVerification(email); setCooldown(60); }
+    catch (e) { setResendError(e instanceof Error ? e.message : '인증번호를 보내지 못했어요'); }
+    finally { setResending(false); }
   };
 
   return (
@@ -508,7 +511,7 @@ function EmailVerifyInput({ email, value, onChange }: {
       />
       <button
         onClick={handleResend}
-        disabled={cooldown > 0}
+        disabled={cooldown > 0 || resending}
         style={{
           marginTop: 12, width: '100%', padding: '12px',
           borderRadius: 14, border: '1.5px solid var(--border)',
@@ -519,8 +522,9 @@ function EmailVerifyInput({ email, value, onChange }: {
           cursor: cooldown > 0 ? 'not-allowed' : 'pointer',
         }}
       >
-        {cooldown > 0 ? `재전송 (${cooldown}초 후 가능)` : '인증번호 재전송'}
+        {resending ? '발송 중…' : cooldown > 0 ? `재전송 (${cooldown}초 후 가능)` : '인증번호 재전송'}
       </button>
+      {resendError && <p role="alert" style={{ color: '#FF6B6B', marginTop: 8 }}>{resendError}</p>}
     </div>
   );
 }
@@ -610,11 +614,10 @@ function MajorSelect({ value, majors, onChange }: { value: string; majors: Major
 function PasswordStrengthBar({ pw }: { pw: string }) {
   const strength = getPwStrength(pw);
   const checks = [
-    { label: '8자 이상', ok: pw.length >= 8 },
-    { label: '대문자 포함', ok: /[A-Z]/.test(pw) },
-    { label: '소문자 포함', ok: /[a-z]/.test(pw) },
-    { label: '숫자 포함', ok: /[0-9]/.test(pw) },
-    { label: '특수문자 포함', ok: /[^A-Za-z0-9]/.test(pw) },
+    { label: '8~64자 (필수)', ok: pw.length >= 8 && pw.length <= 64 },
+    { label: '영문 (권장)', ok: /[A-Za-z]/.test(pw) },
+    { label: '숫자 (권장)', ok: /[0-9]/.test(pw) },
+    { label: '특수문자 (권장)', ok: /[^A-Za-z0-9]/.test(pw) },
   ];
   if (!pw) return null;
   return (
@@ -663,34 +666,16 @@ function IntroScreen() {
   );
 }
 
-const FACE_TYPES: Record<string, string> = {
-  늑대상: 'WOLF', 강아지상: 'DOG', 여우상: 'FOX', 고양이상: 'CAT', 곰상: 'BEAR',
-  토끼상: 'RABBIT', 사슴상: 'DEER', 공룡상: 'DINOSAUR', 새상: 'BIRD', 물개상: 'SEAL',
-};
-const SKIN_TONES: Record<string, string> = {
-  '매우 밝음': 'VERY_LIGHT', 밝음: 'LIGHT', 중간: 'MEDIUM', '어두운 편': 'DARK', '매우 어두움': 'VERY_DARK',
-};
-const HAIR_STYLES: Record<string, string> = {
-  '짧은 머리': 'SHORT', '중간 머리': 'MEDIUM', '긴 머리': 'LONG', 펌: 'PERM',
-};
-const TATTOO_STATUSES: Record<string, string> = {
-  없어요: 'NONE', '작은 타투': 'SMALL', '큰 타투': 'LARGE', 많아요: 'MANY',
-};
-const SMOKING_STATUSES: Record<string, string> = {
-  비흡연: 'NON_SMOKER', '가끔 피워요': 'OCCASIONAL', '흡연자예요': 'SMOKER', '금연 중이에요': 'QUITTING',
-};
-
-function mbtiValue(value = ''): string {
-  return value.split(',').join('');
-}
-
 /* ─── 메인 컴포넌트 ─── */
 export default function SignupPage() {
   const navigate = useNavigate();
   const editMode = useRef(isLoggedIn()).current;
+  const queryClient = useQueryClient();
+  const [initializing, setInitializing] = useState(editMode);
+  const [studentVerified, setStudentVerified] = useState(false);
 
   const [currentStep, setCurrentStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>({ height: '170', idealAge: '2,2' });
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
   const [error, setError] = useState('');
@@ -703,56 +688,55 @@ export default function SignupPage() {
   const advancingRef = useRef(false);
 
   useEffect(() => {
+    if (!studentVerified) return;
     getColleges()
       .then(colleges => setMajors(colleges.flatMap(college => college.majors)))
       .catch(e => setError(e instanceof Error ? e.message : '학과 목록을 불러오지 못했어요'));
-  }, []);
+  }, [studentVerified]);
 
-  // 편집 모드: 기존 유저 데이터를 answers에 pre-fill
   useEffect(() => {
     if (!editMode) return;
-    getMe().then(u => {
-      const genderVal = u.gender === 'male' ? '남성' : u.gender === 'female' ? '여성' : '';
-      setAnswers(prev => ({
-        gender:       genderVal,
-        nickname:     u.nickname ?? '',
-        name:         u.name ?? '',
-        birthdate:    u.birthdate ?? '',
-        major:        u.major ?? '',
-        majorId:      u.major_id != null ? String(u.major_id) : '',
-        faceType:     u.face_type ?? '',
-        height:       u.height != null ? String(u.height) : '',
-        topSize:      u.top_size ?? '',
-        skinTone:     u.skin_tone ?? '',
-        hairStyle:    u.hair_style ?? '',
-        mbti:         u.mbti ? u.mbti.split('').join(',') : '',
-        tattoo:       u.tattoo === true ? '작은 타투' : u.tattoo === false ? '없어요' : '',
-        smoking:      u.smoking === true ? '흡연자예요' : u.smoking === false ? '비흡연' : '',
-        charmPoints:  u.charm_points?.join(',') ?? '',
-        idealFaceType:   (u.ideal_type?.face_type as string) ?? '',
-        idealSkinTone:   (u.ideal_type?.skin_tone as string) ?? '',
-        idealAge:        (u.ideal_type?.age_diff as string) ?? '',
-        idealTattoo:     (u.ideal_type?.tattoo as string) ?? '',
-        idealSmoking:    (u.ideal_type?.smoking as string) ?? '',
-        idealMilitary:   (u.ideal_type?.military as string) ?? '',
-        ...prev,
-      }));
-    }).catch(() => {});
-    getIdealPreference().then(ideal => setAnswers(prev => ({
-      ...prev,
-      idealFaceType: ideal.faceType ?? '',
-      idealSkinTone: ideal.skinTone ?? '',
-      idealMbti: ideal.mbtiPattern ? ideal.mbtiPattern.split('').join(',') : '',
-      idealAge: ideal.maxAgeDiff == null ? '2,2' : `${ideal.maxAgeDiff},${ideal.maxAgeDiff}`,
-      idealTattoo: ideal.tattooPreference ?? '',
-      idealSmoking: ideal.smokingPreference ?? '',
-      idealMilitary: ideal.militaryPreference ?? '',
-    }))).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let cancelled = false;
+    const load = async () => {
+      const status = await getStudentVerificationStatus();
+      if (cancelled) return;
+      setStudentVerified(status.verified);
+      if (!status.verified) return;
+      try {
+        const u = await getMe();
+        if (cancelled) return;
+        setAnswers(prev => ({ ...prev,
+          gender: u.gender === 'male' ? '남성' : '여성', nickname: u.nickname,
+          birthdate: u.birthdate ?? '', major: u.major ?? '', majorId: String(u.major_id ?? ''),
+          faceType: optionLabel(faceTypes, u.face_type), height: String(u.height ?? 170), topSize: u.top_size ?? '',
+          skinTone: optionLabel(skinTones, u.skin_tone), hairStyle: optionLabel(hairStyles, u.hair_style),
+          military: u.military_status === 'NOT_SERVED' ? '미필' : '군필',
+          mbti: u.mbti?.split('').join(',') ?? '',
+          tattoo: optionLabel(tattooStatuses, u.tattoo_status), smoking: optionLabel(smokingStatuses, u.smoking_status),
+          charmPoints: u.charm_points?.join(',') ?? '',
+        }));
+        try {
+          const ideal = await getIdealPreference();
+          if (cancelled) return;
+          setAnswers(prev => ({ ...prev,
+            idealFaceType: optionLabel(faceTypes, ideal.faceType) || '상관없어요',
+            idealSkinTone: optionLabel(skinTones, ideal.skinTone) || '상관없어요',
+            idealMbti: (ideal.mbtiPattern ?? '????').split('').join(','),
+            idealAge: `${ideal.maxYoungerAgeDiff ?? 'any'},${ideal.maxOlderAgeDiff ?? 'any'}`,
+            idealTattoo: optionLabel(tattooPreferences, ideal.tattooPreference) || '상관없어요',
+            idealSmoking: optionLabel(smokingPreferences, ideal.smokingPreference) || '상관없어요',
+            idealMilitary: optionLabel(militaryPreferences, ideal.militaryPreference) || '상관없어요',
+          }));
+        } catch (e) { if (!(e instanceof ApiError && e.status === 404)) throw e; }
+      } catch (e) { if (!(e instanceof ApiError && e.status === 404)) throw e; }
+    };
+    load().catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : '정보를 불러오지 못했어요'); })
+      .finally(() => { if (!cancelled) setInitializing(false); });
+    return () => { cancelled = true; };
+  }, [editMode]);
 
   const gender = answers['gender'] || '';
-  const steps  = useMemo(() => editMode ? getEditSteps(gender) : getSteps(gender), [editMode, gender]);
+  const steps  = useMemo(() => (editMode ? getEditSteps(gender) : getSteps(gender)).filter(s => !(editMode && studentVerified && (s.key === 'studentNumber' || s.key === 'name'))), [editMode, gender, studentVerified]);
   const step   = steps[currentStep] ?? steps[0];
   const isLast = currentStep === steps.length - 1;
   const progress = (currentStep / steps.length) * 100;
@@ -773,37 +757,10 @@ export default function SignupPage() {
   const currentValue = answers[step.key] || (step.type === 'age-range' ? '2,2' : '');
 
   const finishOnboarding = async (values: Record<string, string>) => {
-    const majorId = Number(values.majorId);
-    const birthdate = values.birthdate?.trim();
-    if (!Number.isInteger(majorId) || majorId <= 0) throw new Error('학과를 목록에서 다시 선택해주세요');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate) || Number.isNaN(new Date(birthdate).getTime())) {
-      throw new Error('생년월일을 YYYY-MM-DD 형식으로 입력해주세요');
-    }
-    const [younger = '2', older = '2'] = (values.idealAge || '2,2').split(',');
-    await saveMemberProfile({
-      nickname: values.nickname,
-      gender: values.gender === '남성' ? 'MALE' : 'FEMALE',
-      birthdate,
-      majorId,
-      faceType: FACE_TYPES[values.faceType] ?? values.faceType,
-      height: Number(values.height),
-      skinTone: SKIN_TONES[values.skinTone] ?? values.skinTone,
-      hairStyle: HAIR_STYLES[values.hairStyle] ?? values.hairStyle,
-      mbti: mbtiValue(values.mbti),
-      smokingStatus: SMOKING_STATUSES[values.smoking] ?? values.smoking,
-      tattooStatus: TATTOO_STATUSES[values.tattoo] ?? values.tattoo,
-      militaryStatus: values.gender === '남성' ? (values.military === '군필' ? 'COMPLETED' : 'NOT_COMPLETED') : 'NOT_APPLICABLE',
-      charmPoints: (values.charmPoints || '').split(',').map(v => v.trim()).filter(Boolean).slice(0, 3),
-    });
-    await saveIdealPreference({
-      faceType: values.idealFaceType === '상관없어요' ? null : FACE_TYPES[values.idealFaceType] ?? values.idealFaceType,
-      skinTone: values.idealSkinTone === '상관없어요' ? null : SKIN_TONES[values.idealSkinTone] ?? values.idealSkinTone,
-      mbtiPattern: mbtiValue(values.idealMbti).replace(/🤷/g, '?'),
-      maxAgeDiff: Math.max(Number(younger), Number(older)),
-      tattooPreference: values.idealTattoo === '없었으면 해요' ? 'NONE' : values.idealTattoo === '작은 건 괜찮아요' ? 'SMALL_OK' : 'ANY',
-      smokingPreference: values.idealSmoking === '비흡연만' ? 'NON_SMOKER_ONLY' : values.idealSmoking === '가끔은 괜찮아요' ? 'OCCASIONAL_OK' : 'ANY',
-      militaryPreference: values.idealMilitary === '군필 선호해요' ? 'COMPLETED_ONLY' : 'ANY',
-    });
+    const { profile, ideal } = buildOnboardingPayload(values);
+    await saveMemberProfile(profile);
+    await saveIdealPreference(ideal);
+    await queryClient.invalidateQueries();
   };
 
   const advance = () => {
@@ -822,6 +779,19 @@ export default function SignupPage() {
 
     setError('');
 
+    if (step.key === 'birthdate') {
+      try { setAnswers(prev => ({ ...prev, birthdate: normalizeBirthdate(currentValue) })); }
+      catch (e) { setError(e instanceof Error ? e.message : '생년월일을 확인해주세요'); return; }
+    }
+
+    if (step.type === 'mbti-selector' && !(step.ideal ? /^[EI?],[NS?],[FT?],[JP?]$/ : /^[EI],[NS],[FT],[JP]$/).test(currentValue)) { setError('MBTI의 네 항목을 모두 선택해주세요'); return; }
+    if (step.key === 'nickname' && (!currentValue.trim() || currentValue.trim().length > 30)) { setError('닉네임은 1~30자로 입력해주세요'); return; }
+    if (step.key === 'name' && (currentValue.trim().length < 2 || currentValue.trim().length > 20)) { setError('이름은 2~20자로 입력해주세요'); return; }
+    if (step.type === 'range' && (!Number.isInteger(Number(currentValue)) || Number(currentValue) <= 0)) { setError('올바른 숫자를 입력해주세요'); return; }
+    if (step.type === 'age-range' && currentValue.split(',').some(v => v !== 'any' && (!Number.isInteger(Number(v)) || Number(v) < 0))) { setError('나이 차이를 다시 선택해주세요'); return; }
+    if (step.type === 'student-id-verify' && !studentVerified) { setError('학생 인증을 먼저 완료해주세요'); return; }
+    if (step.key === 'major' && !majors.some(major => major.id === Number(answers.majorId))) { setError('목록에서 학과를 선택해주세요'); return; }
+    if (step.type !== 'intro' && step.type !== 'tags' && !currentValue) { setError('항목을 입력하거나 선택해주세요'); return; }
     if (!editMode) {
       try {
         if (step.key === 'email') {
@@ -855,7 +825,7 @@ export default function SignupPage() {
           setSubmitting(true);
           await signup(verificationToken, currentValue);
           setAccountCreated(true);
-        } else if (step.type !== 'intro' && !currentValue) {
+        } else if (step.type !== 'intro' && step.type !== 'tags' && !currentValue) {
           setError('항목을 입력하거나 선택해주세요');
           return;
         }
@@ -928,7 +898,9 @@ export default function SignupPage() {
     step.type === 'mbti-selector' ||
     step.type === 'student-id-verify';
 
-  const isNextEnabled = step.type === 'intro' || currentValue.length > 0;
+  const isNextEnabled = step.type === 'intro' || step.type === 'tags' || currentValue.length > 0;
+
+  if (initializing) return <div className="signup-page" role="status">가입 정보를 확인하고 있어요…</div>;
 
   return (
     <div className="signup-page">
@@ -974,9 +946,11 @@ export default function SignupPage() {
             ref={inputRef}
             className="signup-input"
             type={step.key === 'age' ? 'number' : step.key === 'email' ? 'email' : 'text'}
+            inputMode={step.key === 'birthdate' ? 'numeric' : undefined}
+            maxLength={step.key === 'birthdate' ? 10 : step.key === 'name' ? 20 : undefined}
             placeholder={'placeholder' in step ? step.placeholder : ''}
             value={currentValue}
-            onChange={e => { setAnswers(prev => ({ ...prev, [step.key]: e.target.value })); setError(''); }}
+            onChange={e => { setAnswers(prev => ({ ...prev, [step.key]: step.key === 'birthdate' ? formatBirthdateInput(e.target.value) : e.target.value })); setError(''); }}
             onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleNext(); }}
           />
         )}
@@ -1099,9 +1073,9 @@ export default function SignupPage() {
         {/* 학생 인증 */}
         {step.type === 'student-id-verify' && (
           <StudentIdVerify
-            onChange={v => setAnswers(prev => ({ ...prev, studentNumber: v }))}
+            onChange={v => { setAnswers(prev => ({ ...prev, studentNumber: v })); if (v) { setStudentVerified(true); queryClient.setQueryData(['studentVerification'], { verified: true }); } }}
             onPreFill={(name, birthdate) => {
-              setAnswers(prev => ({ ...prev, ...(name ? { name } : {}), ...(birthdate ? { birthdate } : {}) }));
+              setAnswers(prev => ({ ...prev, ...(name ? { name } : {}), ...(birthdate ? { birthdate: birthdate.replace(/[./]/g, '-') } : {}) }));
             }}
           />
         )}
@@ -1114,6 +1088,11 @@ export default function SignupPage() {
             borderRadius: 12,
           }}>
             <p style={{ fontSize: 13, color: '#FF6B6B', fontWeight: 600 }}>⚠️ {error}</p>
+            {error.includes('생년월일') && step.key !== 'birthdate' && (
+              <button style={{ marginTop: 10, color: 'var(--primary)', fontWeight: 700 }} onClick={() => {
+                setCurrentStep(steps.findIndex(item => item.key === 'birthdate'));
+              }}>생년월일 수정하기 (다른 입력은 유지돼요)</button>
+            )}
           </div>
         )}
       </div>

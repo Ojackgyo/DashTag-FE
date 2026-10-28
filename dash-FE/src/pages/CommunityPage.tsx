@@ -53,9 +53,9 @@ function DashboardSheet({ communityId, myUserId, onClose }: { communityId: numbe
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'var(--bg)', display: 'flex', flexDirection: 'column', animation: 'slideInFromRight 0.3s cubic-bezier(0.22,1,0.36,1)' }}>
+    <div className="mobile-screen" style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'var(--bg)', display: 'flex', flexDirection: 'column', animation: 'slideInFromRight 0.3s cubic-bezier(0.22,1,0.36,1)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', background: 'var(--header-bg)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
-        <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--text)' }}>‹</button>
+        <button className="icon-button" onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--text)' }}>‹</button>
         <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>호스트 대시보드</p>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', scrollbarWidth: 'none' }}>
@@ -139,7 +139,7 @@ function GroupDetailView({ group, onClose, onJoin, isCreator, userId, userGender
   };
 
   return (
-    <div style={{
+    <div className="mobile-screen" style={{
       position: 'fixed', inset: 0, zIndex: 300,
       background: 'var(--bg)', display: 'flex', flexDirection: 'column',
       animation: 'slideInFromRight 0.3s cubic-bezier(0.22,1,0.36,1)',
@@ -150,7 +150,7 @@ function GroupDetailView({ group, onClose, onJoin, isCreator, userId, userGender
         background: 'var(--header-bg)', backdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--text)' }}>‹</button>
+        <button className="icon-button" onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--text)' }}>‹</button>
         <p style={{ flex: 1, fontSize: 16, fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{group.title}</p>
         {isCreator && (
           <button onClick={() => setShowDashboard(true)} style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-bg)', border: '1px solid var(--primary-border)', padding: '6px 12px', borderRadius: 10 }}>대시보드</button>
@@ -159,7 +159,7 @@ function GroupDetailView({ group, onClose, onJoin, isCreator, userId, userGender
       {showDashboard && <DashboardSheet communityId={group.id} myUserId={userId} onClose={() => setShowDashboard(false)} />}
 
       {/* 스크롤 콘텐츠 */}
-      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 100, scrollbarWidth: 'none' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 24, scrollbarWidth: 'none' }}>
 
         {/* 헤더 배너 */}
         <div style={{ background: 'linear-gradient(160deg, var(--primary-bg) 0%, var(--bg-card2) 100%)', padding: '28px 20px 24px', borderBottom: '1px solid var(--border)' }}>
@@ -219,9 +219,9 @@ function GroupDetailView({ group, onClose, onJoin, isCreator, userId, userGender
       </div>
 
       {/* 하단 고정 버튼 */}
-      <div style={{
-        position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-        width: '100%', maxWidth: 520,
+      <div className="mobile-actions" style={{
+        position: 'static',
+        width: '100%', maxWidth: 'var(--app-max-width)',
         padding: '12px 20px 36px',
         background: 'linear-gradient(to top, var(--bg) 70%, transparent)',
         display: 'flex', flexDirection: 'column', gap: 8,
@@ -332,7 +332,7 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (da
   return (
     <div className="fixed inset-0 bg-black/55 flex items-end justify-center z-[200]" onClick={onClose}>
       <div
-        className="rounded-[28px_28px_0_0] px-5 pt-6 pb-9 w-full max-w-[520px] max-h-[92vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="mobile-sheet rounded-[28px_28px_0_0] px-5 pt-6 pb-9 w-full max-w-[var(--app-max-width)] max-h-[92dvh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ background: 'var(--bg-card)', animation: 'slideUpSheet 0.35s cubic-bezier(0.22,1,0.36,1)' }}
         onClick={e => e.stopPropagation()}
       >
@@ -523,8 +523,8 @@ export default function CommunityPage() {
       <button
         className="fixed w-[52px] h-[52px] rounded-full text-[26px] text-white flex items-center justify-center z-[100] active:scale-95"
         style={{
-          bottom: 'calc(72px + 20px)',
-          right: 'max(18px, calc(50vw - 195px + 18px))',
+          bottom: 'max(20px, var(--safe-bottom))',
+          right: 'max(var(--page-gutter), calc((100vw - var(--app-max-width)) / 2 + var(--page-gutter)))',
           background: 'var(--gradient)',
           boxShadow: '0 4px 16px rgba(255,128,171,0.45)',
         }}

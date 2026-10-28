@@ -92,7 +92,7 @@ function ParticipantProfileModal({ p, gender, onClose }: { p: MeetingParticipant
   const accent = isFemale ? '#FF80AB' : '#60AFFF';
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} onClick={onClose}>
-      <div style={{ width: '100%', maxWidth: 520, borderRadius: '28px 28px 0 0', background: 'var(--bg-card)', padding: '12px 24px 48px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }} onClick={e => e.stopPropagation()}>
+      <div style={{ width: '100%', maxWidth: 'var(--app-max-width)', borderRadius: '28px 28px 0 0', background: 'var(--bg-card)', padding: '12px 24px 48px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }} onClick={e => e.stopPropagation()}>
         <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border)', margin: '8px 0 4px' }} />
         <div style={{ width: 88, height: 88, borderRadius: 26, background: `${accent}15`, border: `2px solid ${accent}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48 }}>
           {faceTypeToEmoji(p.face_type)}
@@ -202,7 +202,7 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
   };
 
   return (
-    <div style={{
+    <div className="mobile-screen" style={{
       position: 'fixed', inset: 0, zIndex: 300,
       background: 'var(--bg)',
       display: 'flex', flexDirection: 'column',
@@ -216,7 +216,7 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
         borderBottom: '1px solid var(--border)',
         position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <button onClick={onClose} style={{
+        <button className="icon-button" onClick={onClose} style={{
           width: 36, height: 36, borderRadius: '50%',
           background: 'var(--bg-card2)', border: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -230,7 +230,7 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
       </div>
 
       {/* 스크롤 콘텐츠 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 140px', scrollbarWidth: 'none' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 20px 24px', scrollbarWidth: 'none' }}>
 
         {/* 키워드 */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -303,9 +303,9 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
       </div>
 
       {/* 하단 고정 버튼 */}
-      <div style={{
-        position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-        width: '100%', maxWidth: 520,
+      <div className="mobile-actions" style={{
+        position: 'static',
+        width: '100%', maxWidth: 'var(--app-max-width)',
         padding: '10px 18px 40px',
         background: 'var(--bg)',
         borderTop: '1px solid var(--border)',
@@ -362,7 +362,7 @@ function CreateSheet({ onClose, onSubmit }: {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
-      <div className="w-full max-w-[390px] rounded-[28px_28px_0_0] px-5 pt-6 pb-10 overflow-y-auto max-h-[88vh] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ background: 'var(--bg-card)' }} onClick={e => e.stopPropagation()}>
+      <div className="mobile-sheet w-full max-w-[var(--app-max-width)] rounded-[28px_28px_0_0] px-5 pt-6 pb-10 overflow-y-auto max-h-[88dvh] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ background: 'var(--bg-card)' }} onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-6">
           <span className="text-[18px] font-extrabold" style={{ color: 'var(--text)' }}>🎉 미팅 개설하기</span>
           <button className="w-8 h-8 rounded-full flex items-center justify-center text-[13px] border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-muted)' }} onClick={onClose}>✕</button>
@@ -540,7 +540,7 @@ export default function MeetingPage() {
     : sizeFiltered;
 
   return (
-    <div className="px-[18px] pb-6">
+    <div className="page-container px-[18px] pb-6">
       {/* 헤더 */}
       <div className="flex items-start justify-between pt-6 pb-[18px]">
         <div>

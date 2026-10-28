@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AcceptedDashProvider } from './context/AcceptedDashContext';
 
@@ -24,10 +25,46 @@ import ReceivedDashPage from './pages/ReceivedDashPage';
 import SentDashPage from './pages/SentDashPage';
 import LoginPage from './pages/LoginPage';
 import LegalPage from './pages/LegalPage';
-import { isLoggedIn } from './api/client';
+import { ApiError, getToken } from './api/client';
+import { getStudentVerificationStatus } from './api/studentVerification';
+import { useSession } from './hooks/useSession';
+import { useMe } from './hooks/useMe';
+import { useChatStore } from './store/chatStore';
+import QueryStatus from './components/QueryStatus';
+import ServicePending from './components/ServicePending';
+import { capabilities } from './api/capabilities';
+
+function SessionCache() {
+  useEffect(() => {
+    let previous = getToken();
+    const reset = () => {
+      const current = getToken();
+      if (current === previous) return;
+      previous = current;
+      queryClient.clear();
+      useChatStore.getState().setActiveRoom(null);
+    };
+    window.addEventListener('dashtag-auth', reset);
+    window.addEventListener('storage', reset);
+    return () => { window.removeEventListener('dashtag-auth', reset); window.removeEventListener('storage', reset); };
+  }, []);
+  return null;
+}
+
+function ProfileGate({ children }: { children: React.ReactNode }) {
+  const profile = useMe();
+  if (profile.error instanceof ApiError && profile.error.status === 404) return <Navigate to="/signup" replace />;
+  if (profile.isLoading || profile.error) return <QueryStatus loading={profile.isLoading} error={profile.error} retry={() => { void profile.refetch(); }} />;
+  return <>{children}</>;
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  return isLoggedIn() ? <>{children}</> : <Navigate to="/login" replace />;
+  const token = useSession();
+  const verification = useQuery({ queryKey: ['studentVerification'], queryFn: getStudentVerificationStatus, enabled: !!token, retry: false });
+  if (!token) return <Navigate to="/login" replace />;
+  if (verification.isLoading || verification.error) return <QueryStatus loading={verification.isLoading} error={verification.error} retry={() => { void verification.refetch(); }} />;
+  if (!verification.data?.verified) return <Navigate to="/signup" replace />;
+  return <ProfileGate>{children}</ProfileGate>;
 }
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -35,7 +72,7 @@ function Layout({ children }: { children: React.ReactNode }) {
     <>
       <Header />
       <GNB />
-      <main style={{ flex: 1 }}>
+      <main className="app-main" style={{ flex: 1 }}>
         {children}
       </main>
     </>
@@ -45,6 +82,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+    <SessionCache />
     <ThemeProvider>
       <AcceptedDashProvider>
       <BrowserRouter>
@@ -61,9 +99,9 @@ export default function App() {
                 <Layout>
                   <Routes>
                     <Route path="/" element={<HomePage />} />
-                    <Route path="/date" element={<DatePage />} />
-                    <Route path="/meeting" element={<MeetingPage />} />
-                    <Route path="/community" element={<CommunityPage />} />
+                    <Route path="/date" element={<ServicePending name="소개팅 상대 찾기" available={capabilities.profileDiscovery}><DatePage /></ServicePending>} />
+                    <Route path="/meeting" element={<ServicePending name="미팅" available={capabilities.meetings}><MeetingPage /></ServicePending>} />
+                    <Route path="/community" element={<ServicePending name="소모임" available={capabilities.communities}><CommunityPage /></ServicePending>} />
                     <Route path="/myinfo" element={<MyInfoPage />} />
                     <Route path="/chat" element={<ChatPage />} />
                   </Routes>

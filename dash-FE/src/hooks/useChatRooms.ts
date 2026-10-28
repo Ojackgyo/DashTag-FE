@@ -8,6 +8,8 @@ export function useChatRooms() {
     queryKey: queryKeys.chatRooms,
     queryFn: getChatRooms,
     enabled: isLoggedIn(),
-    staleTime: 30 * 1000,
+    staleTime: 10 * 1000,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 }

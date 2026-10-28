@@ -3,18 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { faceTypeToEmoji, updateMe } from '../api/user';
 import { clearTokens, isLoggedIn } from '../api/client';
+import { capabilities } from '../api/capabilities';
 import { getReceivedReviews } from '../api/review';
 import { useMe } from '../hooks/useMe';
 import { queryKeys } from '../lib/queryKeys';
 import type { UserResponse, UserUpdate } from '../api/user';
-import inhaMajorsRaw from '../data/inha_majors.json';
+import { getColleges } from '../api/college';
+import IdealPreferenceEditor from '../components/IdealPreferenceEditor';
+import QueryStatus from '../components/QueryStatus';
+import { faceTypes, skinTones, hairStyles, smokingStatuses, tattooStatuses, optionLabel } from '../api/profileOptions';
 
-const INHA_DEPARTMENTS: string[] = (inhaMajorsRaw as { college: string; majors?: string[]; major?: string[] }[])
-  .flatMap(c => c.majors ?? c.major ?? []);
-
-const FACE_TYPES = ['늑대상', '강아지상', '여우상', '고양이상', '곰상', '토끼상', '사슴상', '공룡상', '새상', '물개상'];
-const SKIN_TONES = ['밝은편', '중간', '어두운편'];
-const HAIR_STYLES = ['짧은머리', '단발', '중단발', '긴머리', '웨이브', '곱슬', '투블럭'];
+const FIELD_OPTIONS: Record<string, Record<string, string>> = {
+  face_type: faceTypes, skin_tone: skinTones, hair_style: hairStyles,
+  smoking_status: smokingStatuses, tattoo_status: tattooStatuses,
+  gender: { MALE: '남성', FEMALE: '여성' }, military_status: { ACTIVE_DUTY: '군필', NOT_SERVED: '미필', SOCIAL_SERVICE: '군필', EXEMPT: '면제', NOT_APPLICABLE: '해당 없음' },
+};
 const CHARM_OPTIONS = ['유머있는', '감성적인', '활발한', '조용한', '섬세한', '솔직한', '애교있는', '카리스마있는', '배려심있는', '지적인', '운동좋아하는', '음악좋아하는'];
 const MBTI_AXES = [['E', 'I'], ['N', 'S'], ['T', 'F'], ['J', 'P']];
 
@@ -34,26 +37,28 @@ const FIELD_GROUPS: { title: string; rows: FieldRow[] }[] = [
     title: '기본 정보',
     rows: [
       { key: 'nickname', label: '닉네임', displayValue: u => u?.nickname ?? '미설정', editorType: 'text' },
-      { key: 'age', label: '나이', displayValue: u => u?.age != null ? `${u.age}세` : '미설정', editorType: 'number', min: 18, max: 35, unit: '세' },
-      { key: 'major', label: '학과', displayValue: u => u?.major ?? '미설정', editorType: 'major-select' },
+      { key: 'gender', label: '성별', displayValue: u => optionLabel(FIELD_OPTIONS.gender, u?.gender?.toUpperCase()) || '미설정', editorType: 'choice', options: ['MALE', 'FEMALE'] },
+      { key: 'birthdate', label: '생년월일', displayValue: u => u?.birthdate ?? '미설정', editorType: 'text' },
+      { key: 'major_id', label: '학과', displayValue: u => u?.major ?? '미설정', editorType: 'major-select' },
       { key: 'mbti', label: 'MBTI', displayValue: u => u?.mbti ?? '미설정', editorType: 'mbti' },
     ],
   },
   {
     title: '외모 정보',
     rows: [
-      { key: 'face_type', label: '얼굴상', displayValue: u => u?.face_type ? `${faceTypeToEmoji(u.face_type)} ${u.face_type}` : '미설정', editorType: 'choice', options: FACE_TYPES },
+      { key: 'face_type', label: '얼굴상', displayValue: u => u?.face_type ? `${faceTypeToEmoji(u.face_type)} ${optionLabel(faceTypes, u.face_type)}` : '미설정', editorType: 'choice', options: Object.keys(faceTypes) },
       { key: 'height', label: '키', displayValue: u => u?.height != null ? `${u.height}cm` : '미설정', editorType: 'number', min: 150, max: 200, unit: 'cm' },
       { key: 'top_size', label: '상의 사이즈', displayValue: u => u?.top_size ?? '미설정', editorType: 'choice', options: ['XS', 'S', 'M', 'L', 'XL', '2XL'] },
-      { key: 'skin_tone', label: '피부톤', displayValue: u => u?.skin_tone ?? '미설정', editorType: 'choice', options: SKIN_TONES },
-      { key: 'hair_style', label: '헤어스타일', displayValue: u => u?.hair_style ?? '미설정', editorType: 'choice', options: HAIR_STYLES },
+      { key: 'skin_tone', label: '피부톤', displayValue: u => optionLabel(skinTones, u?.skin_tone) || '미설정', editorType: 'choice', options: Object.keys(skinTones) },
+      { key: 'hair_style', label: '헤어스타일', displayValue: u => optionLabel(hairStyles, u?.hair_style) || '미설정', editorType: 'choice', options: Object.keys(hairStyles) },
     ],
   },
   {
     title: '라이프스타일',
     rows: [
-      { key: 'smoking', label: '흡연', displayValue: u => u?.smoking != null ? (u.smoking ? '흡연' : '비흡연') : '미설정', editorType: 'boolean' },
-      { key: 'tattoo', label: '타투', displayValue: u => u?.tattoo != null ? (u.tattoo ? '있어요' : '없어요') : '미설정', editorType: 'boolean' },
+      { key: 'smoking_status', label: '흡연', displayValue: u => optionLabel(smokingStatuses, u?.smoking_status) || '미설정', editorType: 'choice', options: Object.keys(smokingStatuses) },
+      { key: 'tattoo_status', label: '타투', displayValue: u => optionLabel(tattooStatuses, u?.tattoo_status) || '미설정', editorType: 'choice', options: Object.keys(tattooStatuses) },
+      { key: 'military_status', label: '군필 여부', displayValue: u => optionLabel(FIELD_OPTIONS.military_status, u?.military_status) || '미설정', editorType: 'choice', options: ['ACTIVE_DUTY', 'NOT_SERVED'] },
       { key: 'charm_points', label: '매력포인트', displayValue: u => u?.charm_points?.join(', ') ?? '미설정', editorType: 'tags' },
     ],
   },
@@ -70,7 +75,7 @@ function FieldEditorSheet({ field, user, onSave, onClose }: {
 
   const [textVal, setTextVal] = useState<string>(typeof rawVal === 'string' ? rawVal : '');
   const [numVal, setNumVal] = useState<number>(typeof rawVal === 'number' ? rawVal : (field.min ?? 20));
-  const [choiceVal, setChoiceVal] = useState<string>(typeof rawVal === 'string' ? rawVal : '');
+  const [choiceVal, setChoiceVal] = useState<string>(rawVal == null ? '' : field.key === 'gender' ? String(rawVal).toUpperCase() : String(rawVal));
   const [boolVal, setBoolVal] = useState<boolean | null>(typeof rawVal === 'boolean' ? rawVal : null);
   const [mbtiVal, setMbtiVal] = useState<string[]>(() => {
     if (typeof rawVal === 'string' && rawVal.length === 4) return rawVal.split('');
@@ -81,10 +86,8 @@ function FieldEditorSheet({ field, user, onSave, onClose }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const filteredMajors = useMemo(
-    () => majorSearch ? INHA_DEPARTMENTS.filter(m => m.includes(majorSearch)) : INHA_DEPARTMENTS,
-    [majorSearch]
-  );
+  const collegesQuery = useQuery({ queryKey: ['colleges'], queryFn: getColleges, enabled: field.editorType === 'major-select', staleTime: 300000 });
+  const filteredMajors = useMemo(() => (collegesQuery.data ?? []).flatMap(c => c.majors).filter(m => m.name.includes(majorSearch)), [collegesQuery.data, majorSearch]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -94,12 +97,15 @@ function FieldEditorSheet({ field, user, onSave, onClose }: {
       case 'text': value = textVal.trim() || null; break;
       case 'number': value = numVal; break;
       case 'choice': value = choiceVal || null; break;
-      case 'major-select': value = choiceVal || null; break;
+      case 'major-select': value = Number(choiceVal); break;
       case 'boolean': value = boolVal; break;
       case 'mbti': value = mbtiVal.join(''); break;
-      case 'tags': value = tagsVal.length > 0 ? tagsVal : null; break;
+      case 'tags': value = tagsVal; break;
     }
     try {
+      if (field.key === 'nickname' && (!textVal.trim() || textVal.trim().length > 30)) throw new Error('닉네임은 1~30자로 입력해주세요');
+      if (field.key === 'birthdate' && (!/^\d{4}-\d{2}-\d{2}$/.test(textVal) || Number.isNaN(new Date(textVal).getTime()) || new Date(textVal).toISOString().slice(0, 10) !== textVal || new Date(textVal) >= new Date())) throw new Error('올바른 생년월일을 입력해주세요');
+      if (field.key === 'major_id' && !filteredMajors.some(m => m.id === Number(choiceVal))) throw new Error('학과를 목록에서 선택해주세요');
       await onSave(field.key, value);
       onClose();
     } catch (e) {
@@ -114,24 +120,27 @@ function FieldEditorSheet({ field, user, onSave, onClose }: {
       onClick={onClose}
     >
       <div
-        style={{ width: '100%', maxWidth: 520, borderRadius: '24px 24px 0 0', background: 'var(--bg-card)', maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        className="mobile-sheet"
+        style={{ width: '100%', maxWidth: 'var(--app-max-width)', borderRadius: '24px 24px 0 0', background: 'var(--bg-card)', maxHeight: '85dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
         onClick={e => e.stopPropagation()}
       >
         {/* 헤더 */}
         <div style={{ padding: '18px 20px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)' }}>{field.label} 수정</span>
-          <button
+          <button className="icon-button"
             onClick={onClose}
             style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--bg-card2)', border: '1px solid var(--border)', fontSize: 14, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >✕</button>
         </div>
 
         {/* 본문 */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', scrollbarWidth: 'none' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '18px 20px', scrollbarWidth: 'none' }}>
 
           {field.editorType === 'text' && (
             <input
               style={{ width: '100%', padding: '14px 16px', borderRadius: 14, fontSize: 16, background: 'var(--bg-card2)', border: '1px solid var(--border)', color: 'var(--text)', boxSizing: 'border-box' }}
+              type={field.key === 'birthdate' ? 'date' : 'text'}
+              maxLength={field.key === 'nickname' ? 30 : undefined}
               value={textVal}
               onChange={e => setTextVal(e.target.value)}
               placeholder={field.label}
@@ -170,7 +179,7 @@ function FieldEditorSheet({ field, user, onSave, onClose }: {
                     boxShadow: choiceVal === opt ? '0 3px 10px rgba(255,128,171,0.3)' : 'none',
                   }}
                 >
-                  {field.key === 'face_type' ? `${faceTypeToEmoji(opt)} ${opt}` : opt}
+                  {field.key === 'face_type' ? `${faceTypeToEmoji(opt)} ${optionLabel(faceTypes, opt)}` : optionLabel(FIELD_OPTIONS[field.key] ?? {}, opt)}
                 </button>
               ))}
             </div>
@@ -231,18 +240,19 @@ function FieldEditorSheet({ field, user, onSave, onClose }: {
                 onChange={e => setMajorSearch(e.target.value)}
                 autoFocus
               />
+              <QueryStatus loading={collegesQuery.isLoading} error={collegesQuery.error} retry={() => { void collegesQuery.refetch(); }} />
               <div style={{ maxHeight: 260, overflowY: 'auto', scrollbarWidth: 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {filteredMajors.map(m => (
                   <button
-                    key={m}
-                    onClick={() => setChoiceVal(m)}
+                    key={m.id}
+                    onClick={() => setChoiceVal(String(m.id))}
                     style={{
                       padding: '12px 14px', borderRadius: 10, fontSize: 14, fontWeight: 600, textAlign: 'left',
-                      background: choiceVal === m ? 'var(--primary-bg)' : 'transparent',
-                      color: choiceVal === m ? 'var(--primary)' : 'var(--text-sub)',
-                      border: choiceVal === m ? '1px solid var(--primary-border)' : '1px solid transparent',
+                      background: choiceVal === String(m.id) ? 'var(--primary-bg)' : 'transparent',
+                      color: choiceVal === String(m.id) ? 'var(--primary)' : 'var(--text-sub)',
+                      border: choiceVal === String(m.id) ? '1px solid var(--primary-border)' : '1px solid transparent',
                     }}
-                  >{m}</button>
+                  >{m.name}</button>
                 ))}
               </div>
             </div>
@@ -263,7 +273,7 @@ function FieldEditorSheet({ field, user, onSave, onClose }: {
                   ))}
                 </div>
               )}
-              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10 }}>선택하기 (최대 5개)</p>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10 }}>선택하기 (최대 3개)</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {CHARM_OPTIONS.map(opt => {
                   const selected = tagsVal.includes(opt);
@@ -272,17 +282,17 @@ function FieldEditorSheet({ field, user, onSave, onClose }: {
                       key={opt}
                       onClick={() => {
                         if (selected) setTagsVal(prev => prev.filter(t => t !== opt));
-                        else if (tagsVal.length < 5) setTagsVal(prev => [...prev, opt]);
+                        else if (tagsVal.length < 3) setTagsVal(prev => [...prev, opt]);
                       }}
                       style={{
                         padding: '9px 15px', borderRadius: 20, fontSize: 13, fontWeight: 700,
                         background: selected ? 'var(--gradient)' : 'var(--bg-card2)',
                         color: selected ? 'white' : 'var(--text-sub)',
                         border: selected ? '1.5px solid transparent' : '1.5px solid var(--border)',
-                        opacity: (!selected && tagsVal.length >= 5) ? 0.4 : 1,
+                        opacity: (!selected && tagsVal.length >= 3) ? 0.4 : 1,
                         boxShadow: selected ? '0 2px 8px rgba(255,128,171,0.3)' : 'none',
                       }}
-                    >{opt}</button>
+                    >{optionLabel(FIELD_OPTIONS[field.key] ?? {}, opt)}</button>
                   );
                 })}
               </div>
@@ -293,7 +303,7 @@ function FieldEditorSheet({ field, user, onSave, onClose }: {
         </div>
 
         {/* 저장 버튼 */}
-        <div style={{ padding: '12px 20px 40px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+        <div className="mobile-actions" style={{ padding: '12px 20px 40px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
           <button
             onClick={handleSave}
             disabled={saving}
@@ -319,10 +329,10 @@ function MyProfileSheet({ user, onClose, onSave }: {
   const [editField, setEditField] = useState<FieldRow | null>(null);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--bg)', display: 'flex', flexDirection: 'column', animation: 'slideInFromRight 0.3s cubic-bezier(0.22,1,0.36,1)' }}>
+    <div className="mobile-screen" style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--bg)', display: 'flex', flexDirection: 'column', animation: 'slideInFromRight 0.3s cubic-bezier(0.22,1,0.36,1)' }}>
       {/* 헤더 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', background: 'var(--header-bg)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
-        <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--text)' }}>‹</button>
+        <button className="icon-button" onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--text)' }}>‹</button>
         <p style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)' }}>내 정보</p>
         <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 'auto' }}>항목을 눌러 수정하세요</span>
       </div>
@@ -395,13 +405,14 @@ function Stars({ rating }: { rating: number }) {
 export default function MyInfoPage() {
   const navigate = useNavigate();
   const [showProfile, setShowProfile] = useState(false);
+  const [showIdeal, setShowIdeal] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: user = null } = useMe();
   const { data: reviews = [] } = useQuery({
     queryKey: queryKeys.reviews,
     queryFn: getReceivedReviews,
-    enabled: isLoggedIn(),
+    enabled: isLoggedIn() && capabilities.reviews,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -433,11 +444,13 @@ export default function MyInfoPage() {
   };
 
   return (
-    <div className="px-[18px] pb-6">
+    <div className="page-container px-[18px] pb-6">
       <div className="pt-6 pb-4">
         <h1 className="text-[clamp(20px,6vw,24px)] font-extrabold tracking-tight" style={{ color: 'var(--text)' }}>마이페이지</h1>
       </div>
 
+      {showIdeal && <IdealPreferenceEditor onClose={() => setShowIdeal(false)} />}
+      <button onClick={() => setShowIdeal(true)} style={{ width: '100%', padding: 14, marginBottom: 12, borderRadius: 14, background: 'var(--primary-bg)', color: 'var(--primary)', fontWeight: 700 }}>💕 이상형 수정</button>
       {/* 아바타 헤더 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 16,
@@ -464,7 +477,7 @@ export default function MyInfoPage() {
           <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', marginBottom: 3 }}>대쉬서클</p>
           <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>매칭 상대가 남긴 솔직한 리뷰예요</p>
         </div>
-        {reviews.length === 0 ? (
+        {!capabilities.reviews ? <p style={{ padding: 20, color: 'var(--text-muted)' }}>리뷰 기능 준비 중이에요.</p> : reviews.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
             <span style={{ fontSize: 36 }}>💌</span>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>아직 받은 리뷰가 없어요</p>
@@ -494,13 +507,15 @@ export default function MyInfoPage() {
             {group.items.map((item, i) => (
               <button
                 key={item.label}
+                disabled={group.section === '고객지원'}
+                onClick={() => navigate(item.label === '이용약관' ? '/legal/terms' : '/legal/privacy')}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', minHeight: 50, borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 16 }}>{item.icon}</span>
                   <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>{item.label}</span>
                 </div>
-                <span style={{ fontSize: 16, color: 'var(--text-muted)' }}>›</span>
+                <span style={{ fontSize: 16, color: 'var(--text-muted)' }}>{group.section === '고객지원' ? '준비 중' : '›'}</span>
               </button>
             ))}
           </div>

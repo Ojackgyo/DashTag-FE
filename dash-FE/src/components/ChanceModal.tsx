@@ -31,7 +31,7 @@ export default function ChanceModal({ label, onConfirm, onCancel }: Props) {
           {label}
         </p>
         <p className="text-[12px] mb-6" style={{ color: 'var(--text-muted)' }}>
-          기회는 하루에 딱 1번만 사용할 수 있어요
+          기회는 최대 2회이며, 사용한 기회는 24시간 후 회복돼요
         </p>
 
         {/* 버튼 */}

@@ -21,9 +21,9 @@ export default function LegalPage() {
   const sections = privacy ? PRIVACY : TERMS;
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', paddingBottom: 40 }}>
+    <div className="standalone-page" style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--text)', paddingBottom: 40 }}>
       <header style={{ position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', background: 'var(--header-bg)', borderBottom: '1px solid var(--border)', backdropFilter: 'blur(12px)' }}>
-        <button type="button" onClick={() => navigate(-1)} aria-label="뒤로 가기" style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-card2)', color: 'var(--text)', fontSize: 20 }}>‹</button>
+        <button className="icon-button" type="button" onClick={() => navigate(-1)} aria-label="뒤로 가기" style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--bg-card2)', color: 'var(--text)', fontSize: 20 }}>‹</button>
         <h1 style={{ fontSize: 18, fontWeight: 800 }}>{privacy ? '개인정보 처리방침' : '이용약관'}</h1>
       </header>
       <main style={{ padding: '24px 20px' }}>

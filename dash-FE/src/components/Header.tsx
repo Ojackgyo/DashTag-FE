@@ -39,7 +39,7 @@ export default function Header() {
 
   return (
     <header
-      className="sticky top-0 z-[100]"
+      className="app-header sticky top-0 z-[100]"
       style={{ background: 'var(--header-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
     >
       <div className="flex items-center justify-between gap-2.5 px-[18px] h-[54px]">
@@ -60,7 +60,8 @@ export default function Header() {
           {/* 테마 토글 */}
           <button
             onClick={() => setMode(isDark ? 'light' : 'dark')}
-            className="w-[34px] h-[34px] rounded-full flex items-center justify-center active:scale-95"
+            aria-label="화면 테마 변경"
+            className="icon-button w-[34px] h-[34px] rounded-full flex items-center justify-center active:scale-95"
             style={{ background: 'var(--bg-card2)', border: '1px solid var(--border)', color: 'var(--text-sub)' }}
           >
             {isDark ? <SunIcon /> : <MoonIcon />}

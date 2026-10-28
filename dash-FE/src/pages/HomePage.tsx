@@ -1,3 +1,4 @@
+import QueryStatus from '../components/QueryStatus';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChance } from '../hooks/useChance';
@@ -6,15 +7,12 @@ import { useDatingRequests } from '../hooks/useDatingRequests';
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { hasChance, chanceLoading } = useChance();
+  const { hasChance, chanceLoading, remainingCount, maxCount, rechargeAt, error: chanceError } = useChance();
   const { data: user } = useMe();
-  const { data: requests, isLoading } = useDatingRequests();
+  const { data: requests, isLoading, error, refetch } = useDatingRequests();
 
   const myId = user?.id;
-  const received = requests?.filter(r => {
-    const expiresAt = r.expires_at ? new Date(r.expires_at).getTime() : new Date(r.created_at).getTime() + 24 * 60 * 60 * 1000;
-    return r.status === 'pending' && r.to_user_id === myId && Date.now() < expiresAt;
-  }) ?? [];
+  const received = requests?.filter(r => r.status === 'pending' && r.to_user_id === myId) ?? [];
   const sent     = requests?.filter(r => r.from_user_id === myId) ?? [];
 
   const [viewMonth, setViewMonth] = useState(() => {
@@ -41,8 +39,9 @@ export default function HomePage() {
   ];
 
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100vh', paddingBottom: 80 }}>
-      <div style={{ padding: '16px 20px 0' }}>
+    <div style={{ background: 'var(--bg)', paddingBottom: 'max(24px, var(--safe-bottom))' }}>
+      <div className="home-content" style={{ padding: '16px 20px 0' }}>
+        <QueryStatus error={error ?? chanceError} retry={() => { void refetch(); }} />
 
         {/* ── 받은 대쉬 / 보낸 대쉬 카드 ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
@@ -126,17 +125,18 @@ export default function HomePage() {
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)', marginBottom: 3 }}>오늘의 기회</p>
             <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {chanceLoading ? '확인 중...' : hasChance ? '오늘 사용할 수 있는 기회가 있어요' : '오늘의 기회를 이미 사용했어요'}
+              {chanceLoading ? '확인 중...' : chanceError ? '기회를 불러오지 못했어요' : hasChance ? `최대 ${maxCount}회 · 사용 후 24시간마다 회복돼요` : '기회가 회복되면 다시 신청할 수 있어요'}
             </p>
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
             <p style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-1px', lineHeight: 1, color: (!chanceLoading && hasChance) ? 'var(--primary)' : 'var(--text-muted)' }}>
-              {chanceLoading ? '—' : hasChance ? '1' : '0'}
+              {chanceLoading || chanceError ? '—' : remainingCount}
             </p>
-            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>/1 남음</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>/{maxCount ?? '—'} 남음</p>
           </div>
         </div>
 
+        {rechargeAt.length > 0 && <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 12 }}>기회 회복: {rechargeAt.map(t => new Date(t).toLocaleString('ko-KR')).join(' / ')}</p>}
         {/* ── 캘린더 ── */}
         <div style={{
           background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -148,11 +148,11 @@ export default function HomePage() {
               {calYear}년 {calMonth + 1}월 일정
             </p>
             <div style={{ display: 'flex', gap: 6 }}>
-              <button
+              <button className="icon-button"
                 onClick={() => setViewMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
                 style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--bg-card2)', border: '1px solid var(--border)', fontSize: 16, color: 'var(--text-sub)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >‹</button>
-              <button
+              <button className="icon-button"
                 onClick={() => setViewMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
                 style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--bg-card2)', border: '1px solid var(--border)', fontSize: 16, color: 'var(--text-sub)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >›</button>
@@ -196,7 +196,7 @@ export default function HomePage() {
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 20, overflow: 'hidden', boxShadow: 'var(--shadow-card)' }}>
             <div style={{ padding: '28px 16px', textAlign: 'center' }}>
               <span style={{ fontSize: 28 }}>📅</span>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>채팅방에서 약속을 잡으면 여기에 표시돼요</p>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>일정 기능을 준비하고 있어요</p>
             </div>
           </div>
         </div>

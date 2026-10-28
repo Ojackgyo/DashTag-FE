@@ -8,6 +8,8 @@ export function useDatingRequests() {
     queryKey: queryKeys.datingRequests,
     queryFn: getDatingRequests,
     enabled: isLoggedIn(),
-    staleTime: 30 * 1000,
+    staleTime: 10 * 1000,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 }

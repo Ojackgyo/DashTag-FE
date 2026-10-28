@@ -1,14 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getChatMessages, sendMessage as apiSendMessage, createChatSocket, setSchedule, reportRoom } from '../api/chat';
+import { getChatMessagePage, getNewChatMessages, sendMessage as apiSendMessage, setSchedule, reportRoom } from '../api/chat';
 import type { ChatRoomResponse, MessageResponse } from '../api/chat';
 import { useMe } from '../hooks/useMe';
 import { useChatRooms } from '../hooks/useChatRooms';
+import QueryStatus from '../components/QueryStatus';
+import { capabilities } from '../api/capabilities';
 import { useChatStore } from '../store/chatStore';
 
 interface OpenRoomState {
   type: string;
   relatedId?: number;
+  roomId?: number;
 }
 
 type Category = '소개팅' | '미팅' | '소모임';
@@ -62,19 +65,20 @@ function DateModal({ roomId, onConfirm, onClose }: { roomId: number; onConfirm: 
   const dates = getSelectableDates();
   const [activeDateIdx, setActiveDateIdx] = useState(0);
   const [selectedTime, setSelectedTime] = useState('오후 3시');
+  const [error, setError] = useState<Error | null>(null);
 
   const handleConfirm = async () => {
     const label = `${dates[activeDateIdx].full} ${selectedTime}`;
     try {
       await setSchedule(roomId, toISOSchedule(activeDateIdx, selectedTime));
-    } catch { /* ignore */ }
-    onConfirm(label);
+      onConfirm(label);
+    } catch (e) { setError(e instanceof Error ? e : new Error('약속을 저장하지 못했어요')); }
   };
 
   return (
     <div className="fixed inset-0 bg-black/55 flex items-end justify-center z-[300]" onClick={onClose}>
       <div
-        className="rounded-[28px_28px_0_0] px-5 pt-6 pb-9 w-full max-w-[390px] max-h-[80vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="mobile-sheet rounded-[28px_28px_0_0] px-5 pt-6 pb-9 w-full max-w-[var(--app-max-width)] max-h-[80dvh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ background: 'var(--bg-card)' }}
         onClick={e => e.stopPropagation()}
       >
@@ -83,6 +87,7 @@ function DateModal({ roomId, onConfirm, onClose }: { roomId: number; onConfirm: 
           <button className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[13px]" style={{ background: 'var(--bg-card2)', color: 'var(--text-muted)' }} onClick={onClose}>✕</button>
         </div>
 
+        <QueryStatus error={error} />
         <p className="text-[13px] font-bold mb-2.5" style={{ color: 'var(--text-sub)' }}>날짜</p>
         <div className="flex gap-[7px] overflow-x-auto pb-1 mb-[18px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {dates.map((d, i) => (
@@ -141,13 +146,14 @@ function ReportModal({ roomId, roomName, reportedUserId, onClose }: { roomId: nu
   const [reason, setReason] = useState('');
   const [detail, setDetail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   const handleSubmit = async () => {
     if (!reason) return;
     try {
       await reportRoom(roomId, reportedUserId, reason, detail || undefined);
-    } catch { /* ignore */ }
-    setSubmitted(true);
+      setSubmitted(true);
+    } catch (e) { setError(e instanceof Error ? e : new Error('신고를 접수하지 못했어요')); }
   };
 
   return (
@@ -157,10 +163,11 @@ function ReportModal({ roomId, roomName, reportedUserId, onClose }: { roomId: nu
       onClick={onClose}
     >
       <div
-        className="rounded-[28px_28px_0_0] px-5 pt-6 pb-9 w-full max-w-[390px] max-h-[88vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="mobile-sheet rounded-[28px_28px_0_0] px-5 pt-6 pb-9 w-full max-w-[var(--app-max-width)] max-h-[88dvh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ background: 'var(--bg-card)' }}
         onClick={e => e.stopPropagation()}
       >
+        <QueryStatus error={error} />
         {submitted ? (
           <div className="flex flex-col items-center py-10 gap-4">
             <span style={{ fontSize: 56 }}>✅</span>
@@ -269,97 +276,87 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
   });
   const [showReport, setShowReport] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const wsLiveRef = useRef(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  const [sendError, setSendError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [olderLoading, setOlderLoading] = useState(false);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const latestId = useRef(0);
+  const sendLock = useRef(false);
+  const olderLock = useRef(false);
+  const pendingSend = useRef<{ content: string; id: string } | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const mounted = useRef(true);
 
   const mergeMessages = (incoming: MessageResponse[]) => {
-    setMessages(prev => {
-      const ids = new Set(prev.map(m => m.id));
-      const fresh = incoming.filter(m => !ids.has(m.id));
-      return fresh.length ? [...prev, ...fresh] : prev;
-    });
+    if (!mounted.current) return;
+    setMessages(prev => [...new Map([...prev, ...incoming].map(m => [m.id, m])).values()].sort((a, b) => a.id - b.id));
   };
 
   useEffect(() => {
-    // 초기 메시지 로드
-    getChatMessages(room.id).then(setMessages).catch(() => {});
-
-    // 폴링 즉시 시작 (WS 연결 여부와 무관하게 백그라운드 갱신 보장)
-    pollRef.current = setInterval(() => {
-      getChatMessages(room.id).then(mergeMessages).catch(() => {});
-    }, POLL_INTERVAL);
-
-    // WebSocket 추가 시도 — 연결되면 폴링 중단, 끊기면 폴링 재시작
-    const ws = createChatSocket(room.id);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      wsLiveRef.current = true;
-      clearInterval(pollRef.current);
-      pollRef.current = undefined;
-    };
-
-    ws.onmessage = (event) => {
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    let initialized = false;
+    mounted.current = true;
+    const poll = async () => {
       try {
-        const msg: MessageResponse = JSON.parse(event.data);
-        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
-      } catch { /* ignore */ }
+        if (!initialized) {
+          const page = await getChatMessagePage(room.id);
+          if (!active) return;
+          mergeMessages(page.messages);
+          latestId.current = Math.max(0, ...page.messages.map(m => m.id));
+          setNextCursor(page.hasNext ? page.nextCursor ?? null : null);
+          initialized = true;
+        } else {
+          const incoming = await getNewChatMessages(room.id, latestId.current);
+          if (!active) return;
+          mergeMessages(incoming);
+          latestId.current = Math.max(latestId.current, ...incoming.map(m => m.id));
+        }
+        setLoadError(null);
+      } catch (e) { if (active) setLoadError(e instanceof Error ? e : new Error('메시지를 불러오지 못했어요')); }
+      finally { if (active) { setLoading(false); timer = setTimeout(poll, POLL_INTERVAL); } }
     };
-
-    ws.onerror = () => { wsLiveRef.current = false; };
-    ws.onclose = () => {
-      wsLiveRef.current = false;
-      if (!pollRef.current) {
-        pollRef.current = setInterval(() => {
-          getChatMessages(room.id).then(mergeMessages).catch(() => {});
-        }, POLL_INTERVAL);
-      }
-    };
-
-    return () => {
-      ws.close();
-      wsRef.current = null;
-      clearInterval(pollRef.current);
-      pollRef.current = undefined;
-    };
+    void poll();
+    return () => { active = false; mounted.current = false; clearTimeout(timer); };
   }, [room.id]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  const lastMessageId = messages[messages.length - 1]?.id;
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [lastMessageId]);
+
+  const loadOlder = async () => {
+    if (nextCursor == null || olderLock.current) return;
+    olderLock.current = true;
+    setOlderLoading(true);
+    const container = scrollRef.current;
+    const oldHeight = container?.scrollHeight ?? 0;
+    try {
+      const page = await getChatMessagePage(room.id, nextCursor);
+      if (!mounted.current) return;
+      mergeMessages(page.messages);
+      setNextCursor(page.hasNext ? page.nextCursor ?? null : null);
+      setLoadError(null);
+      requestAnimationFrame(() => { if (container) container.scrollTop += container.scrollHeight - oldHeight; });
+    } catch (e) { if (mounted.current) setLoadError(e instanceof Error ? e : new Error('이전 메시지를 불러오지 못했어요')); }
+    finally { olderLock.current = false; if (mounted.current) setOlderLoading(false); }
+  };
 
   const handleSend = async () => {
     const text = input.trim();
-    if (!text) return;
-    setInput('');
-
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ content: text }));
-      const optimistic: MessageResponse = {
-        id: Date.now(),
-        room_id: room.id,
-        sender_id: userId,
-        content: text,
-        is_read: false,
-        created_at: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, optimistic]);
-    } else {
-      // REST fallback
-      const optimistic: MessageResponse = {
-        id: Date.now(),
-        room_id: room.id,
-        sender_id: userId,
-        content: text,
-        is_read: false,
-        created_at: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, optimistic]);
-      try {
-        const sent = await apiSendMessage(room.id, text);
-        setMessages(prev => prev.map(m => m.id === optimistic.id ? sent : m));
-      } catch { /* keep optimistic */ }
-    }
+    if (!text || sendLock.current) return;
+    sendLock.current = true;
+    setSending(true);
+    setSendError(null);
+    if (!pendingSend.current || pendingSend.current.content !== text) pendingSend.current = { content: text, id: crypto.randomUUID() };
+    try {
+      const sent = await apiSendMessage(room.id, text, pendingSend.current.id);
+      if (!mounted.current) return;
+      mergeMessages([sent]);
+      setInput('');
+      pendingSend.current = null;
+    } catch (e) { if (mounted.current) setSendError(e instanceof Error ? e : new Error('전송하지 못했어요. 다시 시도해주세요')); }
+    finally { sendLock.current = false; if (mounted.current) setSending(false); }
   };
 
   const handleConfirmDate = (label: string) => {
@@ -368,7 +365,7 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
   };
 
   const reportedUserId = messages.find(m => m.sender_id !== userId)?.sender_id ?? 0;
-  const allowSetDate = canSetDate(room, userId);
+  const allowSetDate = capabilities.chatSchedule && canSetDate(room, userId);
   const isGroup = room.room_type === 'meeting' || room.room_type === 'community';
 
   // sender_id → 닉네임 캐시 (sender_nickname 필드 있으면 그걸로, 없으면 ID 축약)
@@ -385,7 +382,7 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
   };
 
   return (
-    <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 54px - 50px)', position: 'relative' }}>
+    <div className="chat-room flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 54px - 50px)', position: 'relative' }}>
       {/* 로고 워터마크 */}
       <img src="/logo.svg" alt="" aria-hidden style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 180, opacity: 0.08, pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
 
@@ -410,10 +407,14 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
           className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[15px] border shrink-0 active:opacity-75"
           style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-muted)' }}
           onClick={() => setShowReport(true)}
-          title="신고하기"
+          disabled={!capabilities.chatReports}
+          title={capabilities.chatReports ? '신고하기' : '신고 기능 준비 중'}
+          aria-label={capabilities.chatReports ? '신고하기' : '신고 기능 준비 중'}
         >🚨</button>
       </div>
 
+      <QueryStatus loading={loading} error={loadError ?? sendError} />
+      {nextCursor != null && <button onClick={loadOlder} disabled={olderLoading}>{olderLoading ? '불러오는 중…' : '이전 메시지 더 보기'}</button>}
       {/* 약속 배너 */}
       {scheduledDate && (
         <button
@@ -431,7 +432,7 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
       )}
 
       {/* 메시지 */}
-      <div className="flex-1 overflow-y-auto px-[18px] py-4 flex flex-col gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ position: 'relative', zIndex: 1 }}>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-[18px] py-4 flex flex-col gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ position: 'relative', zIndex: 1 }}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <span className="text-[40px]">💬</span>
@@ -469,7 +470,7 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
       </div>
 
       {/* 입력창 */}
-      <div className="flex items-center gap-2 px-[18px] py-2.5 pb-3.5 border-t shrink-0" style={{ background: 'var(--gnb-bg)', borderColor: 'var(--border)' }}>
+      <div className="chat-composer flex items-center gap-2 px-[18px] py-2.5 pb-3.5 border-t shrink-0" style={{ background: 'var(--gnb-bg)', borderColor: 'var(--border)' }}>
         {allowSetDate && (
           <button className="w-10 h-10 rounded-[12px] flex items-center justify-center text-[18px] border shrink-0 active:opacity-70" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)' }} onClick={() => setShowDateModal(true)} title="날짜 정하기">📅</button>
         )}
@@ -477,6 +478,8 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
           className="flex-1 rounded-[20px] px-4 py-2.5 text-[14px] border min-w-0"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text)' }}
           placeholder="메시지 입력..."
+          disabled={sending}
+          maxLength={2000}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSend(); }}
@@ -485,7 +488,7 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
           className="w-10 h-10 rounded-full flex items-center justify-center text-[18px] font-bold shrink-0"
           style={input.trim() ? { background: 'var(--gradient)', color: 'white' } : { background: 'var(--bg-card2)', color: 'var(--text-muted)' }}
           onClick={handleSend}
-          disabled={!input.trim()}
+          disabled={!input.trim() || sending}
         >↑</button>
       </div>
 
@@ -515,7 +518,7 @@ export default function ChatPage() {
   const location = useLocation();
   const openRoomState = (location.state as { openRoom?: OpenRoomState } | null)?.openRoom;
 
-  const { data: rooms = [] } = useChatRooms();
+  const { data: rooms = [], isLoading, error, refetch } = useChatRooms();
   const { activeRoom, category, setActiveRoom, setCategory } = useChatStore();
 
   // openRoomState는 최초 1회만 처리 (rooms가 로드된 후)
@@ -525,12 +528,13 @@ export default function ChatPage() {
     openRoomHandled.current = true;
 
     const match = rooms.find(r => {
+      if (openRoomState.roomId != null) return r.id === openRoomState.roomId;
       if (r.room_type !== openRoomState.type) return false;
       if (openRoomState.relatedId != null) return r.related_id === openRoomState.relatedId;
       return true;
-    }) ?? rooms.filter(r => r.room_type === openRoomState.type).sort((a, b) =>
+    }) ?? (openRoomState.roomId == null ? rooms.filter(r => r.room_type === openRoomState.type).sort((a, b) =>
       new Date(b.last_message_at ?? b.created_at).getTime() - new Date(a.last_message_at ?? a.created_at).getTime()
-    )[0];
+    )[0] : undefined);
 
     if (match) {
       setActiveRoom(match);
@@ -542,12 +546,12 @@ export default function ChatPage() {
     }
   }, [rooms, openRoomState, setActiveRoom, setCategory]);
 
-  if (activeRoom) return <ChatRoomView room={activeRoom} onBack={() => setActiveRoom(null)} />;
+  if (activeRoom) return <ChatRoomView key={activeRoom.id} room={activeRoom} onBack={() => setActiveRoom(null)} />;
 
   const filtered = rooms.filter(r => roomCategory(r.room_type) === category);
 
   return (
-    <div className="px-[18px] pb-6">
+    <div className="page-container px-[18px] pb-6">
       {/* 헤더 */}
       <div className="flex items-center gap-2.5 pt-[22px] pb-4">
         <button className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center text-[16px] font-semibold border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-sub)' }} onClick={() => navigate(-1)}>←</button>
@@ -572,8 +576,9 @@ export default function ChatPage() {
         ))}
       </div>
 
+      <QueryStatus loading={isLoading} error={error} retry={() => { void refetch(); }} />
       {/* 목록 */}
-      {filtered.length === 0 ? (
+      {isLoading || error ? null : filtered.length === 0 ? (
         <div className="flex flex-col items-center py-16 gap-2.5">
           <span className="text-[52px]" style={{ animation: 'float 2.8s ease-in-out infinite' }}>{CATEGORY_EMOJI[category]}</span>
           <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>아직 채팅방이 없어요</p>

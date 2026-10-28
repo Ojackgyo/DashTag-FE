@@ -9,6 +9,6 @@ export function getDateProfiles(): Promise<UserProfileResponse[]> {
 
 // POST /api/dating/requests
 export function sendDateRequest(to_user_id: number, message?: string): Promise<{ id: number; status: string }> {
-  const safeMessage = message ? sanitizePlainText(message, 300) : '';
-  return api.post<{ id: number; status: string }>('/api/dating/requests', { to_user_id, message: safeMessage || null });
+  const safeMessage = message ? sanitizePlainText(message, 500) : '';
+  return api.post<{ id: number; status: string }>('/api/dating/requests', { receiverId: to_user_id, message: safeMessage || null });
 }

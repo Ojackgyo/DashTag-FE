@@ -4,23 +4,14 @@ import { useChance } from '../hooks/useChance';
 import { useThrottle } from '../lib/hooks';
 import ChanceModal from '../components/ChanceModal';
 import { getDateProfiles, sendDateRequest } from '../api/date';
+import { skinTones, hairStyles, optionLabel } from '../api/profileOptions';
 import { faceTypeToEmoji } from '../api/user';
 import { isLoggedIn } from '../api/client';
 import { queryKeys } from '../lib/queryKeys';
-import { useMe } from '../hooks/useMe';
+import QueryStatus from '../components/QueryStatus';
+import { capabilities } from '../api/capabilities';
+import { useQueryClient } from '@tanstack/react-query';
 import type { UserProfileResponse } from '../api/user';
-
-const MOCK_MALE: UserProfileResponse[] = [
-  { id: -1, nickname: 'Ryan',   age: 24, major: '인공지능공학과', gender: 'male', face_type: '늑대상', height: 170, top_size: 'L', skin_tone: '중간',   hair_style: '투블럭',   smoking: false, tattoo: false, mbti: 'INTJ', charm_points: ['지적인', '배려심있는'] },
-  { id: -2, nickname: 'Oscar',  age: 25, major: '데이터사이언스학과', gender: 'male', face_type: '강아지상', height: 181, top_size: 'XL', skin_tone: '밝은편', hair_style: '짧은머리', smoking: false, tattoo: false, mbti: 'ENFP', charm_points: ['유머있는', '활발한'] },
-  { id: -3, nickname: 'Ethan',  age: 21, major: '인공지능공학과', gender: 'male', face_type: '곰상', height: 167, top_size: 'M', skin_tone: '중간', hair_style: '단발', smoking: false, tattoo: false, mbti: 'ISFJ', charm_points: ['섬세한', '조용한'] },
-];
-
-const MOCK_FEMALE: UserProfileResponse[] = [
-  { id: -4, nickname: 'Olive', age: 21, major: '인공지능공학과', gender: 'female', face_type: '고양이상', height: 168, top_size: 'S', skin_tone: '밝은편', hair_style: '긴머리', smoking: false, tattoo: false, mbti: 'ENFJ', charm_points: ['감성적인', '애교있는'] },
-  { id: -5, nickname: 'Mia', age: 23, major: '심리학과', gender: 'female', face_type: '사슴상', height: 166, top_size: 'M', skin_tone: '중간', hair_style: '웨이브', smoking: false, tattoo: false, mbti: 'INFP', charm_points: ['섬세한', '지적인'] },
-  { id: -6, nickname: 'Lily', age: 21, major: '디자인학과', gender: 'female', face_type: '토끼상', height: 160, top_size: 'XS', skin_tone: '밝은편', hair_style: '단발', smoking: false, tattoo: false, mbti: 'ESFP', charm_points: ['활발한', '유머있는'] },
-];
 
 function detailRows(p: UserProfileResponse) {
   return [
@@ -28,8 +19,8 @@ function detailRows(p: UserProfileResponse) {
     p.major               ? { label: '🎓 학과',        value: p.major }                               : null,
     p.height != null      ? { label: '📏 키',          value: `${p.height}cm` }                       : null,
     p.top_size            ? { label: '👕 상의 사이즈', value: p.top_size }                            : null,
-    p.skin_tone           ? { label: '🎨 피부톤',      value: p.skin_tone }                           : null,
-    p.hair_style          ? { label: '💇 헤어스타일',  value: p.hair_style }                          : null,
+    p.skin_tone           ? { label: '🎨 피부톤',      value: optionLabel(skinTones, p.skin_tone) }                           : null,
+    p.hair_style          ? { label: '💇 헤어스타일',  value: optionLabel(hairStyles, p.hair_style) }                          : null,
     p.tattoo != null      ? { label: '🖊️ 타투',       value: p.tattoo ? '있어요' : '없어요' }         : null,
     p.smoking != null     ? { label: '🚬 흡연',        value: p.smoking ? '흡연' : '비흡연' }          : null,
   ].filter(Boolean) as { label: string; value: string }[];
@@ -43,19 +34,19 @@ export default function DatePage() {
   const [showChanceModal, setShowChanceModal] = useState(false);
   const [introMsg, setIntroMsg] = useState('');
   const { hasChance, spend } = useChance();
-  const { data: me } = useMe();
+  const queryClient = useQueryClient();
+  const [sendError, setSendError] = useState<Error | null>(null);
 
-  const { data: fetchedProfiles = [], isLoading: profilesLoading, isError: profilesError } = useQuery({
+  const { data: fetchedProfiles = [], isLoading: profilesLoading, error: profilesError } = useQuery({
     queryKey: queryKeys.dateProfiles,
     queryFn: getDateProfiles,
-    enabled: isLoggedIn(),
+    enabled: isLoggedIn() && capabilities.profileDiscovery,
     staleTime: 2 * 60 * 1000,
   });
 
-  const mockProfiles = me?.gender === 'female' ? MOCK_MALE : MOCK_FEMALE.slice(0, 1);
-  const profiles = profilesError ? mockProfiles : fetchedProfiles;
+  const profiles = fetchedProfiles;
 
-  const { mutateAsync: doSendRequest } = useMutation({
+  const { mutateAsync: doSendRequest, isPending: sending } = useMutation({
     mutationFn: ({ id, message }: { id: number; message: string }) => sendDateRequest(id, message),
   });
 
@@ -75,13 +66,19 @@ export default function DatePage() {
   const isMock = selectedId !== null && selectedId < 0;
 
   const handleChatRequest = () => {
-    if (isMock || chatSentId !== null || !hasChance) return;
+    if (isMock || chatSentId === selectedId || !hasChance) return;
     setShowMsgSheet(true);
   };
 
   const confirmChat = useThrottle(async () => {
-    if (!selectedId) return;
-    try { await doSendRequest({ id: selectedId, message: introMsg }); } catch { /* ignore */ }
+    if (!selectedId || sending || !hasChance) return;
+    setSendError(null);
+    try { await doSendRequest({ id: selectedId, message: introMsg }); } catch (e) {
+      setSendError(e instanceof Error ? e : new Error('신청을 보내지 못했어요'));
+      setShowChanceModal(false);
+      return;
+    }
+    void queryClient.invalidateQueries({ queryKey: queryKeys.datingRequests });
     spend();
     setChatSentId(selectedId);
     setShowChanceModal(false);
@@ -90,10 +87,10 @@ export default function DatePage() {
   }, 2000);
 
   const isChatSent = selectedId !== null && chatSentId === selectedId;
-  const chatDisabled = (chatSentId !== null && chatSentId !== selectedId) || (!hasChance && chatSentId === null);
+  const chatDisabled = sending || (!hasChance && !isChatSent);
 
   return (
-    <div className="px-[18px] pb-6">
+    <div className="page-container px-[18px] pb-6">
       <div className="pt-6 pb-[18px]">
         <h1 className="text-[clamp(20px,6vw,24px)] font-extrabold tracking-tight mb-1" style={{ color: 'var(--text)' }}>
           1대1 소개팅 💘
@@ -101,7 +98,8 @@ export default function DatePage() {
         <p className="text-[13px]" style={{ color: 'var(--text-sub)' }}>나랑 꼭 맞는 한 사람을 만나보세요</p>
       </div>
 
-      {profilesLoading ? (
+      <QueryStatus error={profilesError ?? sendError} />
+      {profilesError ? null : profilesLoading ? (
         <div className="flex flex-col items-center py-16 gap-2.5">
           <span className="text-[52px]">💘</span>
           <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>불러오는 중이에요...</p>
@@ -154,7 +152,7 @@ export default function DatePage() {
           onClick={() => setShowMsgSheet(false)}
         >
           <div
-            className="w-full max-w-[390px] rounded-[28px_28px_0_0] px-5 pt-5 pb-10"
+            className="mobile-sheet w-full max-w-[var(--app-max-width)] rounded-[28px_28px_0_0] px-5 pt-5 pb-10"
             style={{ background: 'var(--bg-card)' }}
             onClick={e => e.stopPropagation()}
           >
@@ -211,7 +209,7 @@ export default function DatePage() {
             className="absolute inset-0 flex items-center justify-center px-5"
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ position: 'relative', width: '100%', maxWidth: '340px', height: '520px' }}>
+            <div className="card-flip" style={{ position: 'relative', width: '100%', maxWidth: '340px', height: '520px' }}>
 
               {/* 앞면 */}
               <div
@@ -352,7 +350,7 @@ export default function DatePage() {
                   </button>
                   {!isMock && !isChatSent && !chatDisabled && (
                     <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
-                      하루에 한 명에게만 채팅을 보낼 수 있어요
+                      남은 기회만큼 신청할 수 있고, 사용한 기회는 24시간 후 회복돼요
                     </p>
                   )}
                 </div>

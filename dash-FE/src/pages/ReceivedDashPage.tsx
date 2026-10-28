@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import QueryStatus from '../components/QueryStatus';
 import { useMe } from '../hooks/useMe';
 import { useDatingRequests } from '../hooks/useDatingRequests';
-import { useThrottle } from '../lib/hooks';
-import { updateDatingRequest } from '../api/home';
+import { acceptDatingRequest, rejectDatingRequest } from '../api/home';
+import { faceTypes, skinTones, hairStyles, optionLabel } from '../api/profileOptions';
 import { faceTypeToEmoji } from '../api/user';
 import { queryKeys } from '../lib/queryKeys';
 import type { DatingRequestResponse } from '../api/home';
@@ -16,8 +17,8 @@ function DetailRows({ p }: { p: UserProfileResponse }) {
     p.major               ? { label: '🎓 학과',        value: p.major }                               : null,
     p.height != null      ? { label: '📏 키',          value: `${p.height}cm` }                       : null,
     p.top_size            ? { label: '👕 상의 사이즈', value: p.top_size }                            : null,
-    p.skin_tone           ? { label: '🎨 피부톤',      value: p.skin_tone }                           : null,
-    p.hair_style          ? { label: '💇 헤어스타일',  value: p.hair_style }                          : null,
+    p.skin_tone           ? { label: '🎨 피부톤',      value: optionLabel(skinTones, p.skin_tone) }                           : null,
+    p.hair_style          ? { label: '💇 헤어스타일',  value: optionLabel(hairStyles, p.hair_style) }                          : null,
     p.tattoo != null      ? { label: '🖊️ 타투',       value: p.tattoo ? '있어요' : '없어요' }         : null,
     p.smoking != null     ? { label: '🚬 흡연',        value: p.smoking ? '흡연' : '비흡연' }          : null,
   ].filter(Boolean) as { label: string; value: string }[];
@@ -48,59 +49,53 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hours / 24)}일 전`;
 }
 
-const DASH_TTL_MS = 24 * 60 * 60 * 1000;
-
-function remainingTime(r: DatingRequestResponse): string {
-  const remaining = expiresAt(r) - Date.now();
-  if (remaining <= 0) return '만료됨';
-  const hours = Math.floor(remaining / 3_600_000);
-  const minutes = Math.ceil((remaining % 3_600_000) / 60_000);
-  return hours > 0 ? `${hours}시간 ${minutes}분 남음` : `${minutes}분 남음`;
-}
-
-function expiresAt(r: DatingRequestResponse): number {
-  return r.expires_at ? new Date(r.expires_at).getTime() : new Date(r.created_at).getTime() + DASH_TTL_MS;
-}
-
 export default function ReceivedDashPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
-  const { data: allRequests = [] } = useDatingRequests();
+  const { data: allRequests = [], isLoading, error, refetch } = useDatingRequests();
+  const [actionError, setActionError] = useState<Error | null>(null);
+  const actionLock = useRef(false);
   const [selected, setSelected] = useState<DatingRequestResponse | null>(null);
   const [acceptedIds, setAcceptedIds] = useState<Set<number>>(new Set());
 
   const received = allRequests.filter(r =>
     r.status === 'pending' &&
-    r.to_user_id === me?.id &&
-    Date.now() < expiresAt(r)
+    r.to_user_id === me?.id
   );
 
-  const { mutateAsync: doUpdate } = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: 'accepted' | 'rejected' }) => updateDatingRequest(id, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.datingRequests }),
-  });
-
+  const { mutateAsync: doAccept, isPending: accepting } = useMutation({ mutationFn: acceptDatingRequest });
+  const { mutateAsync: doReject, isPending: rejecting } = useMutation({ mutationFn: rejectDatingRequest });
   const isAccepted = (r: DatingRequestResponse) => acceptedIds.has(r.id);
   const closeCard = () => setSelected(null);
-
-  const confirmAccept = useThrottle(async () => {
-    if (!selected) return;
+  const refresh = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.datingRequests }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.chatRooms }),
+  ]);
+  const confirmAccept = async () => {
+    if (!selected || actionLock.current) return;
+    actionLock.current = true;
+    setActionError(null);
     try {
-      await doUpdate({ id: selected.id, status: 'accepted' as const });
+      const result = await doAccept(selected.id);
       setAcceptedIds(prev => new Set([...prev, selected.id]));
+      await refresh();
       closeCard();
-      navigate('/chat', { state: { openRoom: { type: 'dating' } } });
-    } catch { /* 서버 오류는 기존 화면을 유지 */ }
-  }, 2000);
-
-  const handleReject = useThrottle(async (r: DatingRequestResponse) => {
-    try { await doUpdate({ id: r.id, status: 'rejected' as const }); } catch { /* ignore */ }
-    closeCard();
-  }, 1000);
+      navigate('/chat', { state: { openRoom: { type: 'dating', roomId: result.chatRoomId } } });
+    } catch (e) { setActionError(e instanceof Error ? e : new Error('수락하지 못했어요')); }
+    finally { actionLock.current = false; }
+  };
+  const handleReject = async (r: DatingRequestResponse) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setActionError(null);
+    try { await doReject(r.id); await refresh(); closeCard(); }
+    catch (e) { setActionError(e instanceof Error ? e : new Error('거절하지 못했어요')); }
+    finally { actionLock.current = false; }
+  };
 
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100vh', paddingBottom: 40 }}>
+    <div className="standalone-page" style={{ background: 'var(--bg)', minHeight: '100dvh', paddingBottom: 40 }}>
 
       {/* 헤더 */}
       <div style={{
@@ -109,7 +104,7 @@ export default function ReceivedDashPage() {
         borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)',
         position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <button
+        <button className="icon-button"
           onClick={() => navigate(-1)}
           style={{
             width: 36, height: 36, borderRadius: '50%',
@@ -128,7 +123,8 @@ export default function ReceivedDashPage() {
 
       {/* 리스트 */}
       <div style={{ padding: '16px 20px' }}>
-        {received.length === 0 ? (
+        <QueryStatus loading={isLoading} error={error ?? actionError} retry={() => { void refetch(); }} />
+        {isLoading || error ? null : received.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0' }}>
             <span style={{ fontSize: 52 }}>💌</span>
             <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-sub)', marginTop: 14 }}>아직 받은 대쉬가 없어요</p>
@@ -146,7 +142,7 @@ export default function ReceivedDashPage() {
               return (
                 <button
                   key={r.id}
-                  onClick={() => setSelected(r)}
+                  onClick={() => { setActionError(null); setSelected(r); }}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center',
                     gap: 13, padding: '16px', background: 'none',
@@ -173,12 +169,12 @@ export default function ReceivedDashPage() {
                       )}
                     </div>
                     <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                      {from?.face_type ?? ''} {from?.mbti ? `· ${from.mbti}` : ''}
+                      {optionLabel(faceTypes, from?.face_type)} {from?.mbti ? `· ${from.mbti}` : ''}
                     </p>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{timeAgo(r.created_at)}</p>
-                    <p style={{ fontSize: 10, color: 'var(--primary)', fontWeight: 700, marginBottom: 4 }}>{remainingTime(r)}</p>
+                    <p style={{ fontSize: 10, color: 'var(--primary)', fontWeight: 700, marginBottom: 4 }}>{r.status === 'pending' ? '응답 대기 중' : ''}</p>
                     {!accepted && (
                       <span style={{
                         fontSize: 10, fontWeight: 700, color: 'white',
@@ -211,7 +207,7 @@ export default function ReceivedDashPage() {
             <div
               style={{
                 background: 'var(--bg-card)', borderRadius: '28px 28px 0 0',
-                width: '100%', maxWidth: 520, maxHeight: '88vh',
+                width: '100%', maxWidth: 'var(--app-max-width)', maxHeight: '88dvh',
                 display: 'flex', flexDirection: 'column',
                 animation: 'slideUpSheet 0.35s cubic-bezier(0.22,1,0.36,1)',
               }}
@@ -237,11 +233,11 @@ export default function ReceivedDashPage() {
                         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-bg)', padding: '3px 10px', borderRadius: 8, border: '1px solid var(--primary-border)' }}>{from.mbti}</span>
                       )}
                       {from?.face_type && (
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-sub)', background: 'var(--bg-card2)', padding: '3px 10px', borderRadius: 8 }}>{from.face_type}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-sub)', background: 'var(--bg-card2)', padding: '3px 10px', borderRadius: 8 }}>{optionLabel(faceTypes, from.face_type)}</span>
                       )}
                     </div>
                   </div>
-                  <button
+                  <button className="icon-button"
                     style={{
                       width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
                       background: 'var(--bg-card2)', color: 'var(--text-muted)',
@@ -254,7 +250,7 @@ export default function ReceivedDashPage() {
               </div>
 
               {/* 스크롤 콘텐츠 */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 8px', scrollbarWidth: 'none' }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 8px', scrollbarWidth: 'none' }}>
                 {(from?.charm_points?.length ?? 0) > 0 && (
                   <div style={{ marginBottom: 14 }}>
                     <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600 }}>✨ 매력포인트</p>
@@ -269,11 +265,13 @@ export default function ReceivedDashPage() {
                     </div>
                   </div>
                 )}
+                {selected.message && <p style={{ padding: 14, marginBottom: 12, borderRadius: 12, background: 'var(--bg-card2)', whiteSpace: 'pre-wrap', color: 'var(--text)' }}>{selected.message}</p>}
                 {from && <DetailRows p={from} />}
               </div>
 
+              <div style={{ padding: '0 20px' }}><QueryStatus error={actionError} /></div>
               {/* 액션 버튼 */}
-              <div style={{ padding: '12px 20px 36px', borderTop: '1px solid var(--border)' }}>
+              <div className="mobile-actions" style={{ padding: '12px 20px 36px', borderTop: '1px solid var(--border)' }}>
                 {accepted ? (
                   <button style={{
                     width: '100%', padding: 14, borderRadius: 16,
@@ -289,7 +287,7 @@ export default function ReceivedDashPage() {
                         fontSize: 15, fontWeight: 700,
                         background: 'var(--bg-card2)', color: 'var(--text-muted)',
                         border: '1px solid var(--border)',
-                      }} onClick={() => handleReject(selected)}>거절하기</button>
+                      }} disabled={accepting || rejecting} onClick={() => handleReject(selected)}>거절하기</button>
                       <button style={{
                         flex: 1, padding: 14, borderRadius: 16,
                         fontSize: 15, fontWeight: 700,
@@ -297,7 +295,7 @@ export default function ReceivedDashPage() {
                         background: 'var(--gradient)',
                         border: '1.5px solid transparent',
                         boxShadow: '0 4px 16px rgba(255,128,171,0.35)',
-                      }} onClick={confirmAccept}>
+                      }} disabled={accepting || rejecting} onClick={confirmAccept}>
                         수락하기
                       </button>
                     </div>

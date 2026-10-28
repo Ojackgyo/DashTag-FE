@@ -81,7 +81,8 @@ export default function GNB() {
 
   return (
     <nav
-      className="sticky top-[54px] z-[99] w-full h-[50px] flex items-center px-1"
+      className="app-tabs sticky z-[99] w-full h-[50px] flex items-center px-1"
+      aria-label="주 메뉴"
       style={{
         background: 'var(--gnb-bg)',
         backdropFilter: 'blur(20px)',
@@ -94,6 +95,7 @@ export default function GNB() {
         return (
           <button
             key={path}
+            aria-current={active ? 'page' : undefined}
             onClick={() => navigate(path)}
             className="flex-1 flex flex-col items-center justify-center gap-[3px] min-h-[44px] rounded-[10px] text-[10px] font-medium active:scale-90"
             style={{
