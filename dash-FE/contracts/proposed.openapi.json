@@ -1,0 +1,6326 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "DashTag 프론트 선구현 추가 API 제안",
+    "version": "0.1.0-proposed",
+    "description": "2026-11-09 프론트 구현 기준 요청서. 실제 배포 계약 아님. 리뷰/소모임/일정/신고/지원/계정은 서버 합의 후 활성화. WebSocket 프로토콜은 별도 backend-api-request.md 참조."
+  },
+  "servers": [
+    {
+      "url": "https://dashtag.duckdns.org",
+      "description": "기존 서버 주소. 아래 제안 경로의 배포를 의미하지 않음."
+    }
+  ],
+  "paths": {
+    "/api/profiles": {
+      "get": {
+        "summary": "상대 탐색: 알고리즘 팀과 응답 합의 필요",
+        "operationId": "get__api_profiles",
+        "tags": [
+          "profiles"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/DiscoveryPage"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": "이 ID 미만. 첫 요청은 생략. 제안 기본 ID 내림차순; 추천 정렬과 별도 합의 필요."
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/communities": {
+      "get": {
+        "summary": "소모임 목록",
+        "operationId": "get__api_communities",
+        "tags": [
+          "communities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/CommunityPage"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": "이 ID 미만. 첫 요청은 생략. 제안 기본 ID 내림차순; 추천 정렬과 별도 합의 필요."
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "description": ""
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 100
+            },
+            "description": ""
+          },
+          {
+            "name": "gender",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MALE",
+                "FEMALE"
+              ]
+            },
+            "description": ""
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20
+            },
+            "description": ""
+          },
+          {
+            "name": "joinedOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": ""
+          }
+        ]
+      },
+      "post": {
+        "summary": "소모임 생성",
+        "operationId": "post__api_communities",
+        "tags": [
+          "communities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Community"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}": {
+      "get": {
+        "summary": "소모임 상세",
+        "operationId": "get__api_communities_communityId",
+        "tags": [
+          "communities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Community"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ]
+      },
+      "put": {
+        "summary": "소모임 전체 수정",
+        "operationId": "put__api_communities_communityId",
+        "tags": [
+          "communities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Community"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/join": {
+      "post": {
+        "summary": "소모임 및 채팅 참여",
+        "operationId": "post__api_communities_communityId_join",
+        "tags": [
+          "communities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Community"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/communities/{communityId}/leave": {
+      "delete": {
+        "summary": "소모임 및 채팅 나가기",
+        "operationId": "delete__api_communities_communityId_leave",
+        "tags": [
+          "communities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Empty"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/communities/{communityId}/close": {
+      "post": {
+        "summary": "소모임 종료",
+        "operationId": "post__api_communities_communityId_close",
+        "tags": [
+          "communities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Community"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/communities/{communityId}/dashboard": {
+      "get": {
+        "summary": "개설자 운영 대시보드",
+        "operationId": "get__api_communities_communityId_dashboard",
+        "tags": [
+          "communities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/CommunityDashboard"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/communities/{communityId}/members/{memberId}": {
+      "delete": {
+        "summary": "멤버 내보내기",
+        "operationId": "delete__api_communities_communityId_members_memberId",
+        "tags": [
+          "communities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Empty"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          },
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/reviews": {
+      "post": {
+        "summary": "리뷰 작성",
+        "operationId": "post__api_reviews",
+        "tags": [
+          "reviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Review"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reviews/eligible": {
+      "get": {
+        "summary": "내 리뷰 작성 가능 대상",
+        "operationId": "get__api_reviews_eligible",
+        "tags": [
+          "reviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReviewTarget"
+                      }
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reviews/received": {
+      "get": {
+        "summary": "받은 리뷰와 전체 집계",
+        "operationId": "get__api_reviews_received",
+        "tags": [
+          "reviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/ReviewPage"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": "이 ID 미만. 첫 요청은 생략. 제안 기본 ID 내림차순; 추천 정렬과 별도 합의 필요."
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/reviews/written": {
+      "get": {
+        "summary": "쓴 리뷰와 전체 집계",
+        "operationId": "get__api_reviews_written",
+        "tags": [
+          "reviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/ReviewPage"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": "이 ID 미만. 첫 요청은 생략. 제안 기본 ID 내림차순; 추천 정렬과 별도 합의 필요."
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/reviews/users/{memberId}": {
+      "get": {
+        "summary": "회원별 받은 리뷰와 집계",
+        "operationId": "get__api_reviews_users_memberId",
+        "tags": [
+          "reviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/ReviewPage"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": "이 ID 미만. 첫 요청은 생략. 제안 기본 ID 내림차순; 추천 정렬과 별도 합의 필요."
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/reviews/{reviewId}": {
+      "put": {
+        "summary": "내 리뷰 수정",
+        "operationId": "put__api_reviews_reviewId",
+        "tags": [
+          "reviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Review"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "reviewId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewUpdate"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "내 리뷰 삭제",
+        "operationId": "delete__api_reviews_reviewId",
+        "tags": [
+          "reviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Empty"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "reviewId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/chat-rooms/{roomId}": {
+      "get": {
+        "summary": "참여자·관계·권한 포함 채팅방 상세",
+        "operationId": "get__api_chat-rooms_roomId",
+        "tags": [
+          "chat-rooms"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/ChatRoom"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/chat-rooms/{roomId}/leave": {
+      "delete": {
+        "summary": "채팅방 및 연결 모임 나가기",
+        "operationId": "delete__api_chat-rooms_roomId_leave",
+        "tags": [
+          "chat-rooms"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Empty"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/chat-rooms/{roomId}/close": {
+      "post": {
+        "summary": "채팅방 종료",
+        "operationId": "post__api_chat-rooms_roomId_close",
+        "tags": [
+          "chat-rooms"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Empty"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/chat-rooms/{roomId}/schedule": {
+      "get": {
+        "summary": "채팅방 일정",
+        "operationId": "get__api_chat-rooms_roomId_schedule",
+        "tags": [
+          "chat-rooms"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "format": "int64"
+                        },
+                        "roomId": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "format": "int64"
+                        },
+                        "roomType": {
+                          "type": "string",
+                          "enum": [
+                            "DATING",
+                            "MEETING",
+                            "COMMUNITY"
+                          ]
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "scheduledAt": {
+                          "type": "string",
+                          "minLength": 0,
+                          "format": "date-time",
+                          "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+                        },
+                        "location": {
+                          "type": "string",
+                          "minLength": 0,
+                          "maxLength": 200
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "minLength": 0,
+                          "format": "date-time",
+                          "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+                        },
+                        "canEdit": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "roomId",
+                        "roomType",
+                        "title",
+                        "scheduledAt",
+                        "location",
+                        "updatedAt",
+                        "canEdit"
+                      ],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ]
+      },
+      "put": {
+        "summary": "채팅방 일정 저장",
+        "operationId": "put__api_chat-rooms_roomId_schedule",
+        "tags": [
+          "chat-rooms"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Schedule"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "채팅방 일정 취소",
+        "operationId": "delete__api_chat-rooms_roomId_schedule",
+        "tags": [
+          "chat-rooms"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Empty"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/members/me/schedules": {
+      "get": {
+        "summary": "내 홈 달력 일정",
+        "operationId": "get__api_members_me_schedules",
+        "tags": [
+          "members"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Schedule"
+                      }
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 0,
+              "format": "date"
+            },
+            "description": "한국 현지 날짜 포함 시작"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 0,
+              "format": "date"
+            },
+            "description": "한국 현지 날짜 포함 종료. 최대 93일"
+          }
+        ]
+      }
+    },
+    "/api/chat-rooms/{roomId}/reports": {
+      "post": {
+        "summary": "상대 회원 신고",
+        "operationId": "post__api_chat-rooms_roomId_reports",
+        "tags": [
+          "chat-rooms"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/ReportReceipt"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": ""
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/support/notices": {
+      "get": {
+        "summary": "공지 목록·본문",
+        "operationId": "get__api_support_notices",
+        "tags": [
+          "support"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/NoticePage"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": "이 ID 미만. 첫 요청은 생략. 제안 기본 ID 내림차순; 추천 정렬과 별도 합의 필요."
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/support/faqs": {
+      "get": {
+        "summary": "FAQ 목록·본문",
+        "operationId": "get__api_support_faqs",
+        "tags": [
+          "support"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Faq"
+                      }
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/support/inquiries": {
+      "post": {
+        "summary": "내 문의 접수",
+        "operationId": "post__api_support_inquiries",
+        "tags": [
+          "support"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Inquiry"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InquiryInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/support/inquiries/me": {
+      "get": {
+        "summary": "내 문의·답변 목록",
+        "operationId": "get__api_support_inquiries_me",
+        "tags": [
+          "support"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/InquiryPage"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "format": "int64"
+            },
+            "description": "이 ID 미만. 첫 요청은 생략. 제안 기본 ID 내림차순; 추천 정렬과 별도 합의 필요."
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "description": ""
+          }
+        ]
+      }
+    },
+    "/api/support/feedback": {
+      "post": {
+        "summary": "의견 접수",
+        "operationId": "post__api_support_feedback",
+        "tags": [
+          "support"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/FeedbackReceipt"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "summary": "HttpOnly refresh cookie로 access token 갱신",
+        "operationId": "post__api_auth_refresh",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/AccessToken"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "HttpOnly refresh cookie 세션 무효화",
+        "operationId": "post__api_auth_logout",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Empty"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password-resets": {
+      "post": {
+        "summary": "비밀번호 재설정 인증번호 발송",
+        "operationId": "post__api_auth_password-resets",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Empty"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailInput"
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "새 비밀번호 설정",
+        "operationId": "put__api_auth_password-resets",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Empty"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password-resets/confirm": {
+      "post": {
+        "summary": "비밀번호 재설정 코드 확인",
+        "operationId": "post__api_auth_password-resets_confirm",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/ResetToken"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetConfirmInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/members/me/withdrawal": {
+      "post": {
+        "summary": "회원 탈퇴",
+        "operationId": "post__api_members_me_withdrawal",
+        "tags": [
+          "members"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "example": "SUCCESS"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 0
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/Empty"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "요청 검증 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "인증 만료",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "이용 조건 또는 권한 부족",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "대상 없음",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "중복 또는 상태 충돌",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "요청 제한",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawalInput"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "result": {
+            "type": "object",
+            "nullable": true
+          },
+          "fieldErrors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "message": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "field",
+                "message"
+              ]
+            }
+          }
+        },
+        "required": [
+          "isSuccess",
+          "code",
+          "message",
+          "result"
+        ]
+      },
+      "Empty": {
+        "type": "object",
+        "nullable": true,
+        "enum": [
+          null
+        ],
+        "description": "빈 쓰기 응답 result는 null. HTTP 204도 허용."
+      },
+      "CommunityInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16,
+            "example": "☕"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "example": "주말 카페 탐방"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20
+            },
+            "maxItems": 5,
+            "uniqueItems": true
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "ANY",
+              "MALE",
+              "FEMALE"
+            ]
+          },
+          "maxMembers": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "emoji",
+          "title",
+          "description",
+          "tags",
+          "gender",
+          "maxMembers"
+        ]
+      },
+      "CommunityUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16,
+            "example": "☕"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "example": "주말 카페 탐방"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20
+            },
+            "maxItems": 5,
+            "uniqueItems": true
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "ANY",
+              "MALE",
+              "FEMALE"
+            ]
+          },
+          "maxMembers": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 100
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "emoji",
+          "title",
+          "description",
+          "tags",
+          "gender",
+          "maxMembers",
+          "active"
+        ]
+      },
+      "Community": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "creatorId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "emoji": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16,
+            "example": "☕"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "example": "주말 카페 탐방"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20
+            },
+            "maxItems": 5,
+            "uniqueItems": true
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "ANY",
+              "MALE",
+              "FEMALE"
+            ]
+          },
+          "maxMembers": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 100
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RECRUITING",
+              "PAUSED",
+              "CLOSED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          },
+          "memberCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "joined": {
+            "type": "boolean"
+          },
+          "chatRoomId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "canJoin": {
+            "type": "boolean"
+          },
+          "canLeave": {
+            "type": "boolean"
+          },
+          "canManageMembers": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "creatorId",
+          "emoji",
+          "title",
+          "description",
+          "tags",
+          "gender",
+          "maxMembers",
+          "active",
+          "status",
+          "createdAt",
+          "memberCount",
+          "joined",
+          "chatRoomId",
+          "canEdit",
+          "canJoin",
+          "canLeave",
+          "canManageMembers"
+        ]
+      },
+      "CommunityMember": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "memberId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "nickname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "majorName": {
+            "type": "string",
+            "minLength": 0
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "MALE",
+              "FEMALE"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "MEMBER"
+            ]
+          },
+          "joinedAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          }
+        },
+        "required": [
+          "memberId",
+          "nickname",
+          "age",
+          "majorName",
+          "gender",
+          "role",
+          "joinedAt"
+        ]
+      },
+      "CommunityDashboard": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "community": {
+            "$ref": "#/components/schemas/Community"
+          },
+          "maleCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "femaleCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommunityMember"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "community",
+          "maleCount",
+          "femaleCount",
+          "members"
+        ]
+      },
+      "ReviewInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reviewedMemberId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "datingRequestId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "rating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "content": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "reviewedMemberId",
+          "datingRequestId",
+          "rating",
+          "content"
+        ]
+      },
+      "ReviewUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "content": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "rating",
+          "content"
+        ]
+      },
+      "Review": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "reviewerId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "reviewerNickname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "reviewedMemberId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "datingRequestId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "rating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "content": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          },
+          "updatedAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "canDelete": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "reviewerId",
+          "reviewerNickname",
+          "reviewedMemberId",
+          "datingRequestId",
+          "rating",
+          "content",
+          "createdAt",
+          "updatedAt",
+          "canEdit",
+          "canDelete"
+        ]
+      },
+      "ReviewTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "datingRequestId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "memberId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "nickname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul.",
+            "nullable": true
+          },
+          "canReview": {
+            "type": "boolean"
+          },
+          "unavailableReason": {
+            "type": "string",
+            "minLength": 0,
+            "nullable": true
+          },
+          "reviewId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          }
+        },
+        "required": [
+          "datingRequestId",
+          "memberId",
+          "nickname",
+          "roomId",
+          "scheduledAt",
+          "canReview",
+          "unavailableReason",
+          "reviewId"
+        ]
+      },
+      "ChatParticipant": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "memberId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "nickname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "MALE",
+              "FEMALE"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "MEMBER"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "lastReadMessageId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          }
+        },
+        "required": [
+          "memberId",
+          "nickname",
+          "gender",
+          "role",
+          "active",
+          "lastReadMessageId"
+        ]
+      },
+      "ChatRoom": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "roomType": {
+            "type": "string",
+            "enum": [
+              "DATING",
+              "MEETING",
+              "COMMUNITY"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          },
+          "lastMessageId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          },
+          "lastMessageContent": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul.",
+            "nullable": true
+          },
+          "unreadCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "creatorId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          },
+          "datingRequestId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          },
+          "meetingId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          },
+          "communityId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatParticipant"
+            }
+          },
+          "scheduledAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul.",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "canSetSchedule": {
+            "type": "boolean"
+          },
+          "canLeave": {
+            "type": "boolean"
+          },
+          "canClose": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "roomType",
+          "name",
+          "createdAt",
+          "lastMessageId",
+          "lastMessageContent",
+          "lastMessageAt",
+          "unreadCount",
+          "creatorId",
+          "datingRequestId",
+          "meetingId",
+          "communityId",
+          "participants",
+          "scheduledAt",
+          "active",
+          "canSetSchedule",
+          "canLeave",
+          "canClose"
+        ]
+      },
+      "ChatMessage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "senderId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "senderNickname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "clientMessageId": {
+            "type": "string",
+            "minLength": 0,
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          }
+        },
+        "required": [
+          "id",
+          "roomId",
+          "senderId",
+          "senderNickname",
+          "content",
+          "clientMessageId",
+          "createdAt"
+        ]
+      },
+      "ScheduleInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "scheduledAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          },
+          "location": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "title",
+          "scheduledAt",
+          "location"
+        ]
+      },
+      "Schedule": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "roomType": {
+            "type": "string",
+            "enum": [
+              "DATING",
+              "MEETING",
+              "COMMUNITY"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "scheduledAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          },
+          "location": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 200
+          },
+          "updatedAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          },
+          "canEdit": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "roomId",
+          "roomType",
+          "title",
+          "scheduledAt",
+          "location",
+          "updatedAt",
+          "canEdit"
+        ]
+      },
+      "ReportInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reportedMemberId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ABUSE",
+              "INAPPROPRIATE",
+              "SPAM",
+              "FRAUD",
+              "OTHER"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000,
+            "description": "OTHER인 경우 trim 후 1자 이상 필수."
+          },
+          "messageId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          }
+        },
+        "required": [
+          "reportedMemberId",
+          "reason",
+          "detail",
+          "messageId"
+        ]
+      },
+      "ReportReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RECEIVED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "createdAt"
+        ]
+      },
+      "Notice": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "HTML 아닌 평문"
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "content",
+          "createdAt",
+          "pinned"
+        ]
+      },
+      "Faq": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "answer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "description": "HTML 아닌 평문"
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "question",
+          "answer"
+        ]
+      },
+      "InquiryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "ACCOUNT",
+              "VERIFICATION",
+              "DATING",
+              "COMMUNITY",
+              "CHAT",
+              "OTHER"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 3000
+          }
+        },
+        "required": [
+          "category",
+          "title",
+          "content"
+        ]
+      },
+      "Inquiry": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "ACCOUNT",
+              "VERIFICATION",
+              "DATING",
+              "COMMUNITY",
+              "CHAT",
+              "OTHER"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 3000
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "ANSWERED",
+              "CLOSED"
+            ]
+          },
+          "answer": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 5000,
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          },
+          "answeredAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "title",
+          "content",
+          "status",
+          "answer",
+          "createdAt",
+          "answeredAt"
+        ]
+      },
+      "FeedbackInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "FeedbackReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          }
+        },
+        "required": [
+          "id",
+          "createdAt"
+        ]
+      },
+      "EmailInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 0,
+            "format": "email"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ResetConfirmInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 0,
+            "format": "email"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 6,
+            "pattern": "^[0-9]{6}$"
+          }
+        },
+        "required": [
+          "email",
+          "code"
+        ]
+      },
+      "ResetToken": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "resetToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expiresAt": {
+            "type": "string",
+            "minLength": 0,
+            "format": "date-time",
+            "description": "RFC3339 UTC 또는 +09:00 오프셋 필수. 화면은 Asia/Seoul."
+          }
+        },
+        "required": [
+          "resetToken",
+          "expiresAt"
+        ]
+      },
+      "PasswordInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "resetToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "resetToken",
+          "password"
+        ]
+      },
+      "AccessToken": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "accessToken"
+        ]
+      },
+      "WithdrawalInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "confirmation": {
+            "type": "string",
+            "enum": [
+              "WITHDRAW"
+            ]
+          }
+        },
+        "required": [
+          "password",
+          "confirmation"
+        ]
+      },
+      "DiscoveryProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "memberId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "nickname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "majorId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64"
+          },
+          "majorName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "MALE",
+              "FEMALE"
+            ]
+          },
+          "faceType": {
+            "type": "string",
+            "enum": [
+              "WOLF",
+              "DOG",
+              "FOX",
+              "CAT",
+              "BEAR",
+              "RABBIT",
+              "DEER",
+              "DINOSAUR",
+              "HORSE"
+            ]
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "topSize": {
+            "type": "string",
+            "enum": [
+              "XS",
+              "S",
+              "M",
+              "L",
+              "XL",
+              "XXL"
+            ]
+          },
+          "skinTone": {
+            "type": "string",
+            "enum": [
+              "VERY_LIGHT",
+              "LIGHT",
+              "MEDIUM",
+              "DARK",
+              "VERY_DARK"
+            ]
+          },
+          "hairStyle": {
+            "type": "string",
+            "enum": [
+              "SHORT",
+              "BOB",
+              "MEDIUM_LENGTH",
+              "LONG",
+              "WAVY",
+              "CURLY",
+              "TWO_BLOCK"
+            ]
+          },
+          "mbti": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 4,
+            "pattern": "^[EI][NS][FT][JP]$"
+          },
+          "smokingStatus": {
+            "type": "string",
+            "enum": [
+              "NON_SMOKER",
+              "OCCASIONAL",
+              "SMOKER",
+              "QUITTING"
+            ]
+          },
+          "tattooStatus": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "SMALL",
+              "LARGE",
+              "MANY"
+            ]
+          },
+          "militaryStatus": {
+            "type": "string",
+            "enum": [
+              "COMPLETED",
+              "ACTIVE_DUTY",
+              "SOCIAL_SERVICE",
+              "NOT_SERVED",
+              "EXEMPT",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "charmPoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30
+            },
+            "maxItems": 3
+          },
+          "canRequest": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "memberId",
+          "nickname",
+          "age",
+          "majorId",
+          "majorName",
+          "gender",
+          "faceType",
+          "height",
+          "topSize",
+          "skinTone",
+          "hairStyle",
+          "mbti",
+          "smokingStatus",
+          "tattooStatus",
+          "militaryStatus",
+          "charmPoints",
+          "canRequest"
+        ]
+      },
+      "CommunityPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Community"
+            }
+          },
+          "nextCursor": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "hasNext"
+        ]
+      },
+      "ReviewPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Review"
+            }
+          },
+          "nextCursor": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          },
+          "hasNext": {
+            "type": "boolean"
+          },
+          "averageRating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "hasNext",
+          "averageRating",
+          "totalCount"
+        ]
+      },
+      "NoticePage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notice"
+            }
+          },
+          "nextCursor": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "hasNext"
+        ]
+      },
+      "InquiryPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Inquiry"
+            }
+          },
+          "nextCursor": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "hasNext"
+        ]
+      },
+      "DiscoveryPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscoveryProfile"
+            }
+          },
+          "nextCursor": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "format": "int64",
+            "nullable": true
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "hasNext"
+        ]
+      }
+    }
+  }
+}

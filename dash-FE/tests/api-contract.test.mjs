@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { createServer } from 'vite';
 
 const schema = JSON.parse(await readFile(new URL('./fixtures/openapi.json', import.meta.url), 'utf8'));
-const server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom' });
+const server = await createServer({ cacheDir: '/private/tmp/dashtag-existing-tests-cache', server: { middlewareMode: true, hmr: false, ws: false, watch: null }, appType: 'custom' });
 after(() => server.close());
 const modules = {};
 for (const name of ['client', 'auth', 'home', 'date', 'chat', 'chance', 'user', 'college', 'idealPreference', 'studentVerification', 'onboarding', 'meeting']) {

@@ -21,6 +21,29 @@ npm run lint
 Copy `.env.example` to `.env.local` only if you need to override the default API origin.
 Student verification sends the original JPEG/PNG with the entered name and student number to the backend. There is no frontend OCR or barcode comparison.
 
+## Frontend-first feature contracts (2026-11-09)
+
+- [Backend request and policies](docs/backend-api-request.md)
+- [Complete field dictionary](contracts/FIELDS.md)
+- [Proposed OpenAPI 3.0.3 JSON](contracts/proposed.openapi.json) — 36 additional REST operations; proposals, not deployed endpoints.
+
+```sh
+npm run dev:preview  # http://localhost:5174, isolated local fixtures; no backend writes
+npm run dev          # http://localhost:5173, deployed APIs
+```
+
+Preview includes discovery, community creation/edit/join/leave/close/member management,
+review eligibility/create/update/delete/summary, chat events/read indicators/participants,
+schedule editing and home calendar, reports, notices/FAQ/inquiries/feedback, and account forms.
+A visible preview banner and reset control identify synthetic data. The preview server lives
+only in development; a production build cannot activate it. Preview verification is distinct
+from authenticated backend integration.
+
+`VITE_ENABLED_FEATURES` enables individual proposed live contracts after deployment;
+see `.env.example`. Chat uses a configurable WebSocket adapter with reconnect and REST
+catch-up/fallback. The actual WebSocket URL and raw JSON/STOMP protocol still require
+backend confirmation; the frontend does not guess a route.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

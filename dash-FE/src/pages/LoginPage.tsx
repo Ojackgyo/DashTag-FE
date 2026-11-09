@@ -153,6 +153,7 @@ export default function LoginPage() {
               </div>
             </div>
 
+            <button type="button" onClick={() => navigate('/password-reset')} style={{ color: 'var(--text-muted)', fontSize: 13, padding: 8 }}>비밀번호를 잊으셨나요?</button>
             {error && <p className="login-error">{error}</p>}
 
             <button

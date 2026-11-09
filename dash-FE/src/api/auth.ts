@@ -1,4 +1,5 @@
 import { api, setTokens, clearTokens } from './client';
+import { capabilities } from './capabilities';
 
 export interface AccessTokenResponse {
   accessToken: string;
@@ -41,6 +42,7 @@ export async function login(email: string, password: string): Promise<AccessToke
   return res;
 }
 
-export function logout() {
+export async function logout() {
+  if (capabilities.account) await api.post<void>('/api/auth/logout');
   clearTokens();
 }
