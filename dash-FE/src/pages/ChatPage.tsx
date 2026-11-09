@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getChatMessagePage, getNewChatMessages, sendMessage as apiSendMessage, setSchedule, reportRoom } from '../api/chat';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../lib/queryKeys';
+import { getChatMessagePage, getNewChatMessages, updateReadPosition, sendMessage as apiSendMessage, setSchedule, reportRoom } from '../api/chat';
 import type { ChatRoomResponse, MessageResponse } from '../api/chat';
 import { useMe } from '../hooks/useMe';
 import { useChatRooms } from '../hooks/useChatRooms';
@@ -68,6 +70,7 @@ function DateModal({ roomId, onConfirm, onClose }: { roomId: number; onConfirm: 
   const [error, setError] = useState<Error | null>(null);
 
   const handleConfirm = async () => {
+    if (!capabilities.chatSchedule) return;
     const label = `${dates[activeDateIdx].full} ${selectedTime}`;
     try {
       await setSchedule(roomId, toISOSchedule(activeDateIdx, selectedTime));
@@ -88,6 +91,7 @@ function DateModal({ roomId, onConfirm, onClose }: { roomId: number; onConfirm: 
         </div>
 
         <QueryStatus error={error} />
+        {!capabilities.chatSchedule && <p role="status" style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>일정 저장 기능을 준비하고 있어요.</p>}
         <p className="text-[13px] font-bold mb-2.5" style={{ color: 'var(--text-sub)' }}>날짜</p>
         <div className="flex gap-[7px] overflow-x-auto pb-1 mb-[18px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {dates.map((d, i) => (
@@ -131,8 +135,9 @@ function DateModal({ roomId, onConfirm, onClose }: { roomId: number; onConfirm: 
           className="w-full text-[15px] font-bold py-[15px] rounded-[16px] min-h-[52px] text-white active:opacity-80"
           style={{ background: 'var(--gradient)', boxShadow: '0 4px 16px rgba(255,128,171,0.35)' }}
           onClick={handleConfirm}
+          disabled={!capabilities.chatSchedule}
         >
-          약속 잡기
+          {capabilities.chatSchedule ? '약속 잡기' : '일정 저장 준비 중'}
         </button>
       </div>
     </div>
@@ -149,7 +154,7 @@ function ReportModal({ roomId, roomName, reportedUserId, onClose }: { roomId: nu
   const [error, setError] = useState<Error | null>(null);
 
   const handleSubmit = async () => {
-    if (!reason) return;
+    if (!reason || !capabilities.chatReports || !reportedUserId) return;
     try {
       await reportRoom(roomId, reportedUserId, reason, detail || undefined);
       setSubmitted(true);
@@ -194,6 +199,7 @@ function ReportModal({ roomId, roomName, reportedUserId, onClose }: { roomId: nu
             <p className="text-[13px] mb-5" style={{ color: 'var(--text-muted)' }}>
               "{roomName}" 신고 이유를 선택해주세요.
             </p>
+            {!capabilities.chatReports && <p role="status" style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>신고 접수 기능을 준비하고 있어요.</p>}
             <div className="flex flex-col gap-2 mb-4">
               {REPORT_REASONS.map(r => (
                 <button
@@ -235,9 +241,9 @@ function ReportModal({ roomId, roomName, reportedUserId, onClose }: { roomId: nu
                 color: reason ? 'white' : 'var(--text-muted)',
                 boxShadow: reason ? '0 4px 14px rgba(255,60,60,0.3)' : 'none',
               }}
-              disabled={!reason}
+              disabled={!reason || !capabilities.chatReports || !reportedUserId}
               onClick={handleSubmit}
-            >신고 제출</button>
+            >{capabilities.chatReports ? '신고 제출' : '신고 접수 준비 중'}</button>
           </>
         )}
       </div>
@@ -249,15 +255,16 @@ const POLL_INTERVAL = 5000;
 
 /* 날짜 설정 권한:
  * - 소개팅: 둘 다 가능
- * - 미팅/소모임: creator만 가능 (creator_id가 없으면 허용) */
+ * - 미팅/소모임: creator만 가능 */
 function canSetDate(room: ChatRoomResponse, userId: number): boolean {
   if (room.room_type === 'dating') return true;
-  if (room.creator_id == null) return true; // 백엔드 미지원 시 허용
+  if (room.creator_id == null) return false;
   return room.creator_id === userId;
 }
 
 /* ── 채팅방 뷰 ── */
 function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => void }) {
+  const queryClient = useQueryClient();
   const { data: user } = useMe();
   const userId = user?.id ?? 0;
   const [messages, setMessages] = useState<MessageResponse[]>([]);
@@ -278,6 +285,10 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
   const bottomRef = useRef<HTMLDivElement>(null);
   const [loadError, setLoadError] = useState<Error | null>(null);
   const [sendError, setSendError] = useState<Error | null>(null);
+  const [readError, setReadError] = useState<Error | null>(null);
+  const acknowledgedId = useRef(0);
+  const initiallyScrolled = useRef(false);
+  const readLock = useRef(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [olderLoading, setOlderLoading] = useState(false);
@@ -323,7 +334,41 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
   }, [room.id]);
 
   const lastMessageId = messages[messages.length - 1]?.id;
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [lastMessageId]);
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container || container.scrollHeight - container.scrollTop - container.clientHeight < 180 || !initiallyScrolled.current) {
+      bottomRef.current?.scrollIntoView({ behavior: initiallyScrolled.current ? 'smooth' : 'instant' });
+      if (lastMessageId != null) initiallyScrolled.current = true;
+    }
+  }, [lastMessageId]);
+
+  // A room is read only while its latest message is visible in the foreground.
+  useEffect(() => {
+    const bottom = bottomRef.current;
+    if (!bottom || lastMessageId == null) return;
+    let active = true;
+    let visible = false;
+    const acknowledge = async () => {
+      if (!active || !visible || document.visibilityState !== 'visible' || readLock.current || acknowledgedId.current >= lastMessageId) return;
+      readLock.current = true;
+      try {
+        const result = await updateReadPosition(room.id, lastMessageId);
+        acknowledgedId.current = Math.max(acknowledgedId.current, result.lastReadMessageId);
+        void queryClient.invalidateQueries({ queryKey: queryKeys.chatRooms });
+        if (active) setReadError(null);
+      } catch (e) { if (active) setReadError(e instanceof Error ? e : new Error('읽음 상태를 갱신하지 못했어요')); }
+      finally { readLock.current = false; }
+    };
+    const observer = new IntersectionObserver(entries => {
+      visible = entries.some(entry => entry.isIntersecting);
+      void acknowledge();
+    }, { root: scrollRef.current });
+    observer.observe(bottom);
+    const onVisible = () => { void acknowledge(); };
+    document.addEventListener('visibilitychange', onVisible);
+    const timer = setInterval(onVisible, POLL_INTERVAL);
+    return () => { active = false; observer.disconnect(); document.removeEventListener('visibilitychange', onVisible); clearInterval(timer); };
+  }, [lastMessageId, room.id, queryClient]);
 
   const loadOlder = async () => {
     if (nextCursor == null || olderLock.current) return;
@@ -351,6 +396,7 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
     if (!pendingSend.current || pendingSend.current.content !== text) pendingSend.current = { content: text, id: crypto.randomUUID() };
     try {
       const sent = await apiSendMessage(room.id, text, pendingSend.current.id);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chatRooms });
       if (!mounted.current) return;
       mergeMessages([sent]);
       setInput('');
@@ -394,7 +440,7 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
             {room.emoji ? `${room.emoji} ` : ''}{room.name || `${roomCategory(room.room_type)} #${room.id}`}
           </p>
         </div>
-        {allowSetDate && (
+        {(!capabilities.chatSchedule || allowSetDate) && (
           <button
             className="text-[11px] font-bold px-2.5 py-1.5 rounded-[10px] border shrink-0 whitespace-nowrap active:opacity-75"
             style={{ background: 'var(--primary-bg)', borderColor: 'var(--primary-border)', color: 'var(--primary)' }}
@@ -407,13 +453,12 @@ function ChatRoomView({ room, onBack }: { room: ChatRoomResponse; onBack: () => 
           className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[15px] border shrink-0 active:opacity-75"
           style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-muted)' }}
           onClick={() => setShowReport(true)}
-          disabled={!capabilities.chatReports}
           title={capabilities.chatReports ? '신고하기' : '신고 기능 준비 중'}
           aria-label={capabilities.chatReports ? '신고하기' : '신고 기능 준비 중'}
         >🚨</button>
       </div>
 
-      <QueryStatus loading={loading} error={loadError ?? sendError} />
+      <QueryStatus loading={loading} error={loadError ?? sendError ?? readError} />
       {nextCursor != null && <button onClick={loadOlder} disabled={olderLoading}>{olderLoading ? '불러오는 중…' : '이전 메시지 더 보기'}</button>}
       {/* 약속 배너 */}
       {scheduledDate && (

@@ -9,7 +9,7 @@ deployed frontend origin to the backend CORS allowlist.
 
 ## Backend integration
 
-See [backend handoff and verification status](docs/backend-integration.md) for API coverage, missing backend features, and temporary enum mappings.
+See [backend handoff and verification status](docs/backend-integration.md) for current API coverage, enabled screens, and remaining backend dependencies.
 
 ```sh
 npm run dev   # http://localhost:5173

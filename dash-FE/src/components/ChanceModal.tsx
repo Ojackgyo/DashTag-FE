@@ -2,14 +2,15 @@ interface Props {
   label: string;
   onConfirm: () => void;
   onCancel: () => void;
+  busy?: boolean;
 }
 
-export default function ChanceModal({ label, onConfirm, onCancel }: Props) {
+export default function ChanceModal({ label, onConfirm, onCancel, busy = false }: Props) {
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center px-6"
+      className="fixed inset-0 z-[500] flex items-center justify-center px-6"
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(10px)' }}
-      onClick={onCancel}
+      onClick={busy ? undefined : onCancel}
     >
       <div
         className="w-full max-w-[320px] rounded-[28px] p-6 text-center"
@@ -40,6 +41,7 @@ export default function ChanceModal({ label, onConfirm, onCancel }: Props) {
             className="flex-1 py-[14px] rounded-[16px] text-[15px] font-bold active:opacity-75"
             style={{ background: 'var(--bg-card2)', color: 'var(--text-sub)' }}
             onClick={onCancel}
+            disabled={busy}
           >
             취소
           </button>
@@ -47,8 +49,9 @@ export default function ChanceModal({ label, onConfirm, onCancel }: Props) {
             className="flex-1 py-[14px] rounded-[16px] text-[15px] font-bold text-white active:opacity-80"
             style={{ background: 'var(--gradient)', boxShadow: '0 4px 16px rgba(255,128,171,0.4)' }}
             onClick={onConfirm}
+            disabled={busy}
           >
-            사용하기 ⚡
+            {busy ? '처리 중…' : '사용하기 ⚡'}
           </button>
         </div>
       </div>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { getIdealPreference, saveIdealPreference, type IdealPreferenceRequest } from '../api/idealPreference';
-import { faceTypes, skinTones, tattooPreferences, smokingPreferences, militaryPreferences } from '../api/profileOptions';
+import { faceTypes, skinTones, hairStyles, tattooPreferences, smokingPreferences, militaryPreferences } from '../api/profileOptions';
 import QueryStatus from './QueryStatus';
 
 const fieldStyle = { width: '100%', padding: 12, marginTop: 8, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card2)', color: 'var(--text)' };
@@ -21,6 +21,8 @@ function PreferenceForm({ initial, onClose }: { initial: IdealPreferenceRequest;
     { key: 'tattooPreference', label: '타투', options: tattooPreferences },
     { key: 'smokingPreference', label: '흡연', options: smokingPreferences },
     { key: 'militaryPreference', label: '군필 여부', options: militaryPreferences },
+    { key: 'topSize', label: '상의 사이즈', options: { XS: 'XS', S: 'S', M: 'M', L: 'L', XL: 'XL', XXL: '2XL' } },
+    { key: 'hairStyle', label: '헤어스타일', options: hairStyles },
   ] as const;
   return <form style={{ display: 'flex', flexDirection: 'column', gap: 18 }} onSubmit={event => {
     event.preventDefault();
@@ -28,10 +30,13 @@ function PreferenceForm({ initial, onClose }: { initial: IdealPreferenceRequest;
     setValidation(null);
     if (value.mbtiPattern && !/^[EI?][NS?][FT?][JP?]$/.test(value.mbtiPattern)) { setValidation(new Error('MBTI는 네 자리로 입력해주세요. 상관없는 자리는 ?를 사용할 수 있어요.')); return; }
     if ([value.maxYoungerAgeDiff, value.maxOlderAgeDiff].some(n => n != null && (!Number.isInteger(n) || n < 0))) { setValidation(new Error('나이 차이는 0 이상의 정수로 입력해주세요')); return; }
+    if ([value.minHeight, value.maxHeight].some(n => n != null && (!Number.isInteger(n) || n <= 0))) { setValidation(new Error('키는 0보다 큰 정수로 입력해주세요')); return; }
+    if (value.minHeight != null && value.maxHeight != null && value.minHeight > value.maxHeight) { setValidation(new Error('최소 키는 최대 키보다 클 수 없어요')); return; }
     save.mutate({ faceType: value.faceType ?? null, skinTone: value.skinTone ?? null,
       mbtiPattern: value.mbtiPattern || null,
       maxYoungerAgeDiff: value.maxYoungerAgeDiff ?? null, maxOlderAgeDiff: value.maxOlderAgeDiff ?? null,
       tattooPreference: value.tattooPreference ?? null, smokingPreference: value.smokingPreference ?? null, militaryPreference: value.militaryPreference ?? null,
+      topSize: value.topSize ?? null, minHeight: value.minHeight ?? null, maxHeight: value.maxHeight ?? null, hairStyle: value.hairStyle ?? null,
     });
   }}>
     {selectFields.map(field => <label key={field.key} style={{ color: 'var(--text)', fontWeight: 700 }}>
@@ -40,6 +45,10 @@ function PreferenceForm({ initial, onClose }: { initial: IdealPreferenceRequest;
         <option value="">조건 없음</option>
         {Object.entries(field.options).map(([code, label]) => <option value={code} key={code}>{label}</option>)}
       </select>
+    </label>)}
+    {([{ key: 'minHeight', label: '최소 키 (cm)' }, { key: 'maxHeight', label: '최대 키 (cm)' }] as const).map(field => <label key={field.key} style={{ color: 'var(--text)', fontWeight: 700 }}>
+      {field.label}
+      <input aria-label={field.label} type="number" min={1} step={1} style={fieldStyle} placeholder="제한 없음" disabled={save.isPending} value={value[field.key] ?? ''} onChange={e => setValue(v => ({ ...v, [field.key]: e.target.value === '' ? null : Number(e.target.value) }))} />
     </label>)}
     <label style={{ color: 'var(--text)', fontWeight: 700 }}>MBTI
       <input aria-label="이상형 MBTI" style={fieldStyle} placeholder="예: I?F? (빈칸은 조건 없음)" maxLength={4} disabled={save.isPending} value={value.mbtiPattern ?? ''} onChange={e => setValue(v => ({ ...v, mbtiPattern: e.target.value.toUpperCase() }))} />

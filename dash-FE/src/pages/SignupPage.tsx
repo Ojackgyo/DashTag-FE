@@ -59,7 +59,7 @@ function getPwStrength(pw: string): PwStrength {
 
 /* ─── Step types ─── */
 type Step =
-  | { type: 'text';            key: string; question: string; placeholder: string; sub?: string }
+  | { type: 'text';            key: string; question: string; placeholder: string; sub?: string; optional?: boolean }
   | { type: 'password';        key: string; question: string; placeholder: string; sub?: string }
   | { type: 'email-verify';    key: string; question: string; sub?: string }
   | { type: 'nickname-picker'; key: string; question: string; sub?: string }
@@ -191,6 +191,10 @@ function getSteps(gender: string): Step[] {
       ],
     },
     { type: 'mbti-selector', key: 'idealMbti', question: '선호하는 MBTI는? 🧠', ideal: true, sub: '상관없으면 🤷를 선택해주세요' },
+    { type: 'choice', key: 'idealTopSize', question: '선호하는 상의 사이즈는? 👕', options: ['XS', 'S', 'M', 'L', 'XL', '2XL', '상관없어요'].map(label => ({ label, emoji: '👕' })) },
+    { type: 'choice', key: 'idealHairStyle', question: '선호하는 헤어스타일은? 💇', options: [...Object.values(hairStyles), '상관없어요'].map(label => ({ label, emoji: '💇' })) },
+    { type: 'text', key: 'idealMinHeight', question: '선호하는 최소 키는? 📏', placeholder: '예: 160', sub: 'cm 단위로 입력하세요. 빈칸은 제한 없음이에요.', optional: true },
+    { type: 'text', key: 'idealMaxHeight', question: '선호하는 최대 키는? 📏', placeholder: '예: 185', sub: 'cm 단위로 입력하세요. 빈칸은 제한 없음이에요.', optional: true },
     {
       type: 'age-range', key: 'idealAge', question: '선호하는 나이 차이는? 🎂',
       sub: '내 나이를 기준으로 연하·연상 범위를 각각 정해주세요',
@@ -710,7 +714,7 @@ export default function SignupPage() {
           birthdate: u.birthdate ?? '', major: u.major ?? '', majorId: String(u.major_id ?? ''),
           faceType: optionLabel(faceTypes, u.face_type), height: String(u.height ?? 170), topSize: u.top_size ?? '',
           skinTone: optionLabel(skinTones, u.skin_tone), hairStyle: optionLabel(hairStyles, u.hair_style),
-          military: u.military_status === 'NOT_SERVED' ? '미필' : '군필',
+          military: u.military_status === 'NOT_SERVED' ? '미필' : u.military_status === 'COMPLETED' ? '군필' : '',
           mbti: u.mbti?.split('').join(',') ?? '',
           tattoo: optionLabel(tattooStatuses, u.tattoo_status), smoking: optionLabel(smokingStatuses, u.smoking_status),
           charmPoints: u.charm_points?.join(',') ?? '',
@@ -726,6 +730,10 @@ export default function SignupPage() {
             idealTattoo: optionLabel(tattooPreferences, ideal.tattooPreference) || '상관없어요',
             idealSmoking: optionLabel(smokingPreferences, ideal.smokingPreference) || '상관없어요',
             idealMilitary: optionLabel(militaryPreferences, ideal.militaryPreference) || '상관없어요',
+            idealTopSize: ideal.topSize === 'XXL' ? '2XL' : ideal.topSize || '상관없어요',
+            idealHairStyle: optionLabel(hairStyles, ideal.hairStyle) || '상관없어요',
+            idealMinHeight: ideal.minHeight == null ? '' : String(ideal.minHeight),
+            idealMaxHeight: ideal.maxHeight == null ? '' : String(ideal.maxHeight),
           }));
         } catch (e) { if (!(e instanceof ApiError && e.status === 404)) throw e; }
       } catch (e) { if (!(e instanceof ApiError && e.status === 404)) throw e; }
@@ -787,11 +795,13 @@ export default function SignupPage() {
     if (step.type === 'mbti-selector' && !(step.ideal ? /^[EI?],[NS?],[FT?],[JP?]$/ : /^[EI],[NS],[FT],[JP]$/).test(currentValue)) { setError('MBTI의 네 항목을 모두 선택해주세요'); return; }
     if (step.key === 'nickname' && (!currentValue.trim() || currentValue.trim().length > 30)) { setError('닉네임은 1~30자로 입력해주세요'); return; }
     if (step.key === 'name' && (currentValue.trim().length < 2 || currentValue.trim().length > 20)) { setError('이름은 2~20자로 입력해주세요'); return; }
+    if (['idealMinHeight', 'idealMaxHeight'].includes(step.key) && currentValue && (!Number.isInteger(Number(currentValue)) || Number(currentValue) <= 0)) { setError('키는 0보다 큰 정수로 입력해주세요'); return; }
+    if (step.key === 'idealMaxHeight' && answers.idealMinHeight && currentValue && Number(answers.idealMinHeight) > Number(currentValue)) { setError('최대 키는 최소 키보다 작을 수 없어요'); return; }
     if (step.type === 'range' && (!Number.isInteger(Number(currentValue)) || Number(currentValue) <= 0)) { setError('올바른 숫자를 입력해주세요'); return; }
     if (step.type === 'age-range' && currentValue.split(',').some(v => v !== 'any' && (!Number.isInteger(Number(v)) || Number(v) < 0))) { setError('나이 차이를 다시 선택해주세요'); return; }
     if (step.type === 'student-id-verify' && !studentVerified) { setError('학생 인증을 먼저 완료해주세요'); return; }
     if (step.key === 'major' && !majors.some(major => major.id === Number(answers.majorId))) { setError('목록에서 학과를 선택해주세요'); return; }
-    if (step.type !== 'intro' && step.type !== 'tags' && !currentValue) { setError('항목을 입력하거나 선택해주세요'); return; }
+    if (step.type !== 'intro' && step.type !== 'tags' && !('optional' in step && step.optional) && !currentValue) { setError('항목을 입력하거나 선택해주세요'); return; }
     if (!editMode) {
       try {
         if (step.key === 'email') {
@@ -898,7 +908,7 @@ export default function SignupPage() {
     step.type === 'mbti-selector' ||
     step.type === 'student-id-verify';
 
-  const isNextEnabled = step.type === 'intro' || step.type === 'tags' || currentValue.length > 0;
+  const isNextEnabled = step.type === 'intro' || step.type === 'tags' || ('optional' in step && step.optional) || currentValue.length > 0;
 
   if (initializing) return <div className="signup-page" role="status">가입 정보를 확인하고 있어요…</div>;
 
@@ -945,8 +955,8 @@ export default function SignupPage() {
           <input
             ref={inputRef}
             className="signup-input"
-            type={step.key === 'age' ? 'number' : step.key === 'email' ? 'email' : 'text'}
-            inputMode={step.key === 'birthdate' ? 'numeric' : undefined}
+            type={step.key === 'age' || ['idealMinHeight', 'idealMaxHeight'].includes(step.key) ? 'number' : step.key === 'email' ? 'email' : 'text'}
+            inputMode={step.key === 'birthdate' || ['idealMinHeight', 'idealMaxHeight'].includes(step.key) ? 'numeric' : undefined}
             maxLength={step.key === 'birthdate' ? 10 : step.key === 'name' ? 20 : undefined}
             placeholder={'placeholder' in step ? step.placeholder : ''}
             value={currentValue}

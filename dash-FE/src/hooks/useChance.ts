@@ -14,7 +14,7 @@ export function useChance() {
     rechargeAt: query.data?.rechargeAt ?? [],
     chanceLoading: query.isLoading,
     error: query.error,
-    // The successful dating request spends a chance on the server.
+    // Successful dating and meeting mutations spend chances on the server.
     spend: () => queryClient.invalidateQueries({ queryKey: queryKeys.chance }),
     loading: query.isFetching,
   };

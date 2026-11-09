@@ -8,6 +8,7 @@ export interface ChatRoomResponse {
   name?: string | null;
   emoji?: string | null;
   created_at: string;
+  last_message_id?: number | null;
   last_message?: string | null;
   last_message_at?: string | null;
   unread_count: number;
@@ -38,6 +39,10 @@ type ChatRoomApiResponse = {
   roomType: string;
   name?: string | null;
   createdAt: string;
+  lastMessageId?: number | null;
+  lastMessageContent?: string | null;
+  lastMessageAt?: string | null;
+  unreadCount?: number;
 };
 
 type ChatMessageApiResponse = {
@@ -59,7 +64,9 @@ type ChatMessagePageApiResponse = {
 };
 
 function toRoom(room: ChatRoomApiResponse): ChatRoomResponse {
-  return { id: room.id, room_type: room.roomType.toLowerCase(), name: room.name, created_at: room.createdAt, unread_count: 0 };
+  return { id: room.id, room_type: room.roomType.toLowerCase(), name: room.name, created_at: room.createdAt,
+    last_message_id: room.lastMessageId, last_message: room.lastMessageContent,
+    last_message_at: room.lastMessageAt, unread_count: room.unreadCount ?? 0 };
 }
 
 function toMessage(message: ChatMessageApiResponse, roomId: number): MessageResponse {
@@ -102,6 +109,10 @@ export async function sendMessage(roomId: number, content: string, clientMessage
     content: sanitizePlainText(content, 2000), clientMessageId,
   });
   return toMessage(message, roomId);
+}
+
+export function updateReadPosition(roomId: number, lastReadMessageId: number): Promise<{ roomId: number; lastReadMessageId: number }> {
+  return api.patch(`/api/chat-rooms/${roomId}/read-position`, { lastReadMessageId });
 }
 
 // PUT /api/chats/{room_id}/schedule

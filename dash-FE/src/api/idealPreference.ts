@@ -9,6 +9,10 @@ export interface IdealPreferenceRequest {
   tattooPreference?: string | null;
   smokingPreference?: string | null;
   militaryPreference?: string | null;
+  topSize?: string | null;
+  minHeight?: number | null;
+  maxHeight?: number | null;
+  hairStyle?: string | null;
 }
 
 export type IdealPreferenceResponse = IdealPreferenceRequest;

@@ -1,3 +1,4 @@
+import { capabilities } from '../api/capabilities';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -433,7 +434,7 @@ export default function CommunityPage() {
   const { data: groups = [], isLoading: groupsLoading } = useQuery({
     queryKey: queryKeys.communities,
     queryFn: getCommunities,
-    enabled: isLoggedIn(),
+    enabled: isLoggedIn() && capabilities.communities,
     staleTime: 60 * 1000,
   });
 
@@ -511,7 +512,7 @@ export default function CommunityPage() {
       <div className="flex flex-col gap-2.5">
         {groupsLoading
           ? <p className="text-center py-12 text-[14px]" style={{ color: 'var(--text-muted)' }}>불러오는 중이에요...</p>
-          : filtered.length === 0
+          : !capabilities.communities ? null : filtered.length === 0
             ? <p className="text-center py-12 text-[14px]" style={{ color: 'var(--text-muted)' }}>{search || genderFilter !== '전체' || tagFilter !== '전체' ? '검색 결과가 없어요' : '아직 소모임이 없어요'}</p>
             : filtered.map(g => (
               <GroupCard key={g.id} g={g} onOpen={() => setSelectedGroup(g)} />
@@ -528,6 +529,8 @@ export default function CommunityPage() {
           background: 'var(--gradient)',
           boxShadow: '0 4px 16px rgba(255,128,171,0.45)',
         }}
+        disabled={!capabilities.communities}
+        aria-label={capabilities.communities ? '소모임 개설' : '소모임 개설 준비 중'}
         onClick={() => setShowCreate(true)}
       >
         +

@@ -16,7 +16,7 @@ import { faceTypes, skinTones, hairStyles, smokingStatuses, tattooStatuses, opti
 const FIELD_OPTIONS: Record<string, Record<string, string>> = {
   face_type: faceTypes, skin_tone: skinTones, hair_style: hairStyles,
   smoking_status: smokingStatuses, tattoo_status: tattooStatuses,
-  gender: { MALE: '남성', FEMALE: '여성' }, military_status: { ACTIVE_DUTY: '군필', NOT_SERVED: '미필', SOCIAL_SERVICE: '군필', EXEMPT: '면제', NOT_APPLICABLE: '해당 없음' },
+  gender: { MALE: '남성', FEMALE: '여성' }, military_status: { COMPLETED: '군필', ACTIVE_DUTY: '현역', NOT_SERVED: '미필', SOCIAL_SERVICE: '사회복무', EXEMPT: '면제', NOT_APPLICABLE: '해당 없음' },
 };
 const CHARM_OPTIONS = ['유머있는', '감성적인', '활발한', '조용한', '섬세한', '솔직한', '애교있는', '카리스마있는', '배려심있는', '지적인', '운동좋아하는', '음악좋아하는'];
 const MBTI_AXES = [['E', 'I'], ['N', 'S'], ['T', 'F'], ['J', 'P']];
@@ -58,7 +58,7 @@ const FIELD_GROUPS: { title: string; rows: FieldRow[] }[] = [
     rows: [
       { key: 'smoking_status', label: '흡연', displayValue: u => optionLabel(smokingStatuses, u?.smoking_status) || '미설정', editorType: 'choice', options: Object.keys(smokingStatuses) },
       { key: 'tattoo_status', label: '타투', displayValue: u => optionLabel(tattooStatuses, u?.tattoo_status) || '미설정', editorType: 'choice', options: Object.keys(tattooStatuses) },
-      { key: 'military_status', label: '군필 여부', displayValue: u => optionLabel(FIELD_OPTIONS.military_status, u?.military_status) || '미설정', editorType: 'choice', options: ['ACTIVE_DUTY', 'NOT_SERVED'] },
+      { key: 'military_status', label: '군필 여부', displayValue: u => optionLabel(FIELD_OPTIONS.military_status, u?.military_status) || '미설정', editorType: 'choice', options: ['COMPLETED', 'NOT_SERVED'] },
       { key: 'charm_points', label: '매력포인트', displayValue: u => u?.charm_points?.join(', ') ?? '미설정', editorType: 'tags' },
     ],
   },

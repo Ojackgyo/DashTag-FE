@@ -7,7 +7,7 @@ const schema = JSON.parse(await readFile(new URL('./fixtures/openapi.json', impo
 const server = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom' });
 after(() => server.close());
 const modules = {};
-for (const name of ['client', 'auth', 'home', 'date', 'chat', 'chance', 'user', 'college', 'idealPreference', 'studentVerification', 'onboarding']) {
+for (const name of ['client', 'auth', 'home', 'date', 'chat', 'chance', 'user', 'college', 'idealPreference', 'studentVerification', 'onboarding', 'meeting']) {
   modules[name] = await server.ssrLoadModule(`/src/api/${name}.ts`);
 }
 const birthdateHelpers = await server.ssrLoadModule('/src/lib/birthdate.ts');
@@ -23,7 +23,7 @@ beforeEach(() => {
     const request = { path: new URL(url).pathname, query: new URL(url).searchParams, method: init.method ?? 'GET', headers: new Headers(init.headers), body: init.body };
     calls.push(request);
     const result = await reply(request);
-    return new Response(result.raw ?? JSON.stringify({ isSuccess: true, code: 'SUCCESS', message: '성공', result: result.result }), { status: result.status ?? 200 });
+    return new Response(result.status === 204 ? null : result.raw ?? JSON.stringify({ isSuccess: true, code: 'SUCCESS', message: '성공', result: result.result }), { status: result.status ?? 200 });
   };
 });
 function documented(request) {
@@ -53,7 +53,7 @@ test('onboarding matches deployed enums, required topSize and separate age limit
   const result = modules.onboarding.buildOnboardingPayload(answers);
   matches('MemberProfileRequest', result.profile); matches('IdealPreferenceRequest', result.ideal);
   assert.equal(result.profile.topSize, 'XXL'); assert.equal(result.profile.hairStyle, 'MEDIUM_LENGTH');
-  assert.equal(result.profile.militaryStatus, 'ACTIVE_DUTY'); assert.equal(result.ideal.tattooPreference, 'NONE_ONLY');
+  assert.equal(result.profile.militaryStatus, 'COMPLETED'); assert.equal(result.ideal.tattooPreference, 'NONE_ONLY');
   assert.equal(result.ideal.maxYoungerAgeDiff, 1); assert.equal(result.ideal.maxOlderAgeDiff, 7);
   assert.equal(result.ideal.militaryPreference, 'COMPLETED_PREFERRED');
 });
@@ -167,4 +167,83 @@ test('chat rooms and ideal preference use deployed contracts', async () => {
 test('non-progressing pagination fails instead of looping indefinitely', async () => {
   reply = () => ({ result: { messages: [message(52)], nextCursor: 52, hasNext: true } });
   await assert.rejects(modules.chat.getNewChatMessages(42, 1), /다음 페이지/); assert.equal(calls.length, 2);
+});
+
+function meeting(id = 20, joined = false) {
+  return { id, creatorId: 7, title: '카페 미팅', requiredMale: 2, requiredFemale: 3,
+    scheduledAt: '2099-12-01T18:30:00', active: true, createdAt: '2026-11-09T12:00:00',
+    participantCount: 1, maleCount: 1, femaleCount: 0, joined,
+    inviteCode: joined ? '0123456789ABCDEF0123456789ABCDEF' : null, chatRoomId: joined ? 42 : null };
+}
+test('meeting cursor pages, details and public participants adapt camelCase fields', async () => {
+  reply = req => ({ result: req.path.endsWith('/participants') ? [{ memberId: 7, nickname: '개설자', gender: 'MALE', faceType: 'DOG', mbti: 'INTJ', charmPoints: ['친절'], joinedAt: '2026-11-09T12:00:00' }]
+    : req.path === '/api/meetings' ? { items: [meeting(req.query.has('cursor') ? 10 : 20)], nextCursor: req.query.has('cursor') ? null : 20, hasNext: !req.query.has('cursor') }
+    : meeting(20, true) });
+  const first = await modules.meeting.getMeetingPage();
+  assert.equal(first.items[0].required_female, 3); assert.equal(first.items[0].male_count, 1);
+  assert.equal(first.items[0].is_joined, false); assert.equal(first.items[0].invite_code, null);
+  assert.equal(first.items[0].chat_room_id, null); assert.deepEqual(first.items[0].keywords, []);
+  const second = await modules.meeting.getMeetingPage(first.nextCursor);
+  assert.equal(second.items[0].id, 10); assert.equal(second.hasNext, false); assert.equal(calls[1].query.get('cursor'), '20');
+  const detail = await modules.meeting.getMeeting(20); assert.equal(detail.chat_room_id, 42); assert.equal(detail.creator_id, 7);
+  const participants = await modules.meeting.getMeetingParticipants(20);
+  assert.equal(participants[0].user_id, 7); assert.equal(participants[0].gender, 'male'); assert.equal(participants[0].face_type, 'DOG'); assert.deepEqual(participants[0].charm_points, ['친절']);
+  calls.forEach(documented);
+});
+test('meeting creation sends only the new required contract and Korean local schedule', async () => {
+  const { participantCount, maleCount, femaleCount, joined, ...created } = meeting(21, true);
+  reply = () => ({ status: 201, result: created });
+  const result = await modules.meeting.createMeeting({ title: ' 카페 미팅 ', required_male: 2, required_female: 3, scheduled_at: '2099-12-01T18:30:00' });
+  assert.equal(result.id, 21); assert.equal(result.chat_room_id, 42);
+  assert.deepEqual(JSON.parse(calls[0].body), { title: '카페 미팅', requiredMale: 2, requiredFemale: 3, scheduledAt: '2099-12-01T18:30:00' });
+  matches('MeetingCreateRequest', JSON.parse(calls[0].body)); calls.forEach(documented);
+});
+test('meeting join, normalized invite code and leave use documented operations', async () => {
+  reply = req => req.method === 'DELETE' ? { status: 204, raw: '' } : { result: meeting(20, true) };
+  assert.equal((await modules.meeting.joinMeeting(20)).is_joined, true); assert.equal(calls[0].body, undefined);
+  const result = await modules.meeting.joinMeetingByCode('  0123456789abcdef0123456789abcdef  ');
+  assert.equal(result.chat_room_id, 42);
+  assert.deepEqual(JSON.parse(calls[1].body), { inviteCode: '0123456789ABCDEF0123456789ABCDEF' });
+  matches('MeetingJoinByCodeRequest', JSON.parse(calls[1].body));
+  await modules.meeting.leaveMeeting(20); assert.equal(calls[2].method, 'DELETE'); calls.forEach(documented);
+});
+test('invalid meeting inputs and non-progressing cursors fail without a mutation', async () => {
+  for (const code of ['bad', 'G'.repeat(32), 'A'.repeat(31)]) await assert.rejects(modules.meeting.joinMeetingByCode(code), /초대코드/);
+  for (const patch of [{ title: ' ' }, { required_male: 1 }, { required_female: 6 }, { scheduled_at: '2000-01-01T18:00:00' }, { scheduled_at: '2099-12-01T18:30:00Z' }]) {
+    await assert.rejects(modules.meeting.createMeeting({ title: '카페', required_male: 2, required_female: 2, scheduled_at: '2099-12-01T18:30:00', ...patch }));
+  }
+  assert.equal(calls.length, 0);
+  reply = () => ({ result: { items: [], nextCursor: 20, hasNext: true } });
+  await assert.rejects(modules.meeting.getMeetingPage(20), /다음 페이지/);
+});
+test('meeting capacity and chance errors preserve server messages and session', async () => {
+  modules.client.setTokens('session');
+  reply = () => ({ status: 409, raw: JSON.stringify({ code: 'MEETING_FULL', message: '성별 정원이 찼어요' }) });
+  await assert.rejects(modules.meeting.joinMeeting(20), e => e.status === 409 && e.code === 'MEETING_FULL' && e.message === '성별 정원이 찼어요');
+  assert.equal(modules.client.getToken(), 'session');
+});
+test('chat room preview and unread count retain server values including empty rooms', async () => {
+  reply = () => ({ result: [
+    { id: 42, roomType: 'MEETING', name: '카페', createdAt: '2026-11-09T12:00:00', lastMessageId: 100, lastMessageContent: '반가워요', lastMessageAt: '2026-11-09T13:00:00', unreadCount: 3 },
+    { id: 43, roomType: 'DATING', name: '대쉬', createdAt: '2026-11-09T12:00:00', lastMessageId: null, lastMessageContent: null, lastMessageAt: null, unreadCount: 0 },
+  ] });
+  const rooms = await modules.chat.getChatRooms();
+  assert.equal(rooms[0].room_type, 'meeting'); assert.equal(rooms[0].last_message, '반가워요'); assert.equal(rooms[0].unread_count, 3); assert.equal(rooms[0].last_message_id, 100);
+  assert.equal(rooms[1].last_message, null); assert.equal(rooms[1].unread_count, 0); calls.forEach(documented);
+});
+test('chat read position uses PATCH and accepts a higher stored position from the server', async () => {
+  reply = () => ({ result: { roomId: 42, lastReadMessageId: 110 } });
+  assert.deepEqual(await modules.chat.updateReadPosition(42, 100), { roomId: 42, lastReadMessageId: 110 });
+  assert.equal(calls[0].method, 'PATCH'); assert.equal(calls[0].path, '/api/chat-rooms/42/read-position');
+  matches('UpdateReadPositionRequest', JSON.parse(calls[0].body)); calls.forEach(documented);
+});
+test('new ideal preferences normalize XXL, retain fields on save and clear limits with null', async () => {
+  const ideal = modules.onboarding.buildOnboardingPayload({ ...answers, idealTopSize: '2XL', idealMinHeight: '160', idealMaxHeight: '185', idealHairStyle: '긴 머리' }).ideal;
+  assert.equal(ideal.topSize, 'XXL'); assert.equal(ideal.hairStyle, 'LONG'); assert.equal(ideal.minHeight, 160); assert.equal(ideal.maxHeight, 185); matches('IdealPreferenceRequest', ideal);
+  reply = req => ({ result: req.method === 'PUT' ? JSON.parse(req.body) : ideal });
+  assert.deepEqual(await modules.idealPreference.saveIdealPreference(await modules.idealPreference.getIdealPreference()), ideal);
+  const cleared = modules.onboarding.buildOnboardingPayload({ ...answers, idealTopSize: '상관없어요', idealHairStyle: '상관없어요', idealMinHeight: '', idealMaxHeight: '' }).ideal;
+  for (const key of ['topSize', 'hairStyle', 'minHeight', 'maxHeight']) assert.equal(cleared[key], null);
+  for (const extra of [{ idealMinHeight: '190', idealMaxHeight: '150' }, { idealMinHeight: '-1' }, { idealMaxHeight: 'NaN' }, { idealTopSize: '3XL' }]) assert.throws(() => modules.onboarding.buildOnboardingPayload({ ...answers, ...extra }));
+  calls.forEach(documented);
 });

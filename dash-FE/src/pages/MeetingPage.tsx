@@ -1,41 +1,26 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useChance } from '../hooks/useChance';
-import { useDebounce, useThrottle } from '../lib/hooks';
+import { useMe } from '../hooks/useMe';
+import QueryStatus from '../components/QueryStatus';
 import { isLoggedIn } from '../api/client';
 import { queryKeys } from '../lib/queryKeys';
 import ChanceModal from '../components/ChanceModal';
-import { getMeetings, createMeeting, joinMeeting, joinMeetingByCode, getMeetingParticipants } from '../api/meeting';
+import { getMeetingPage, getMeeting, createMeeting, joinMeeting, joinMeetingByCode, leaveMeeting, getMeetingParticipants } from '../api/meeting';
 import { faceTypeToEmoji } from '../api/user';
 import type { MeetingResponse, MeetingParticipant } from '../api/meeting';
 
-const DAYS_KR = ['일', '월', '화', '수', '목', '금', '토'];
-
-function getWeekDays() {
-  const today = new Date();
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    return {
-      label: `${d.getMonth() + 1}/${d.getDate()}`,
-      day: DAYS_KR[d.getDay()],
-      short: i === 0 ? '오늘' : i === 1 ? '내일' : DAYS_KR[d.getDay()],
-      dateObj: d,
-    };
-  });
+function koreanToday() {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
-
+function scheduledInstant(iso: string) {
+  return new Date(/(?:Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}+09:00`).getTime();
+}
 function formatScheduledAt(iso?: string | null): string {
   if (!iso) return '날짜 미정';
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()}(${DAYS_KR[d.getDay()]})`;
-}
-
-function dayToISO(dayOffset: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + dayOffset);
-  d.setHours(18, 0, 0, 0);
-  return d.toISOString();
+  const d = new Date(scheduledInstant(iso));
+  return `${new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).format(d)}`;
 }
 
 /* ── 미팅 카드 (클릭 시 상세 시트 열림) ── */
@@ -160,38 +145,41 @@ function ParticipantCard({ p, gender, onTap }: { p: MeetingParticipant | null; g
 }
 
 /* ── 미팅 상세 시트 ── */
-function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
-  m: MeetingResponse;
-  onClose: () => void;
-  onJoin: (m: MeetingResponse) => void;
-  hasChance: boolean;
-  chanceLoading: boolean;
+function MeetingDetailSheet({ id, onClose, onJoin, onChat, onLeave, busy, hasChance, chanceLoading, myGender, myId }: {
+  id: number; onClose: () => void; onJoin: (m: MeetingResponse) => void;
+  onChat: (id: number) => void; onLeave: (m: MeetingResponse) => void; busy: boolean;
+  hasChance: boolean; chanceLoading: boolean; myGender?: string | null; myId?: number;
 }) {
-  const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
+  const detail = useQuery({ queryKey: [...queryKeys.meetings, id], queryFn: () => getMeeting(id), refetchInterval: 15000 });
+  const people = useQuery({ queryKey: [...queryKeys.meetings, id, 'participants'], queryFn: () => getMeetingParticipants(id), refetchInterval: 15000 });
+  const participants = people.data ?? [];
   const [selectedP, setSelectedP] = useState<{ p: MeetingParticipant; gender: 'female' | 'male' } | null>(null);
-
-  useEffect(() => {
-    getMeetingParticipants(m.id).then(setParticipants).catch(() => {});
-  }, [m.id]);
+  const m = detail.data;
+  if (!m) return <div className="mobile-screen" style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--bg)', padding: 20 }}>
+    <button className="icon-button" onClick={onClose} aria-label="닫기">‹</button>
+    <QueryStatus loading={detail.isLoading} error={detail.error} retry={() => { void detail.refetch(); }} />
+  </div>;
 
   const total  = m.required_male + m.required_female;
   const filledF = Math.min(m.female_count, m.required_female);
   const filledM = Math.min(m.male_count, m.required_male);
   const fFull  = filledF >= m.required_female;
   const mFull  = filledM >= m.required_male;
-  const full   = !m.is_active || m.participant_count >= total;
+  const full = !m.is_active || scheduledInstant(m.scheduled_at) <= Date.now() || m.participant_count >= total;
+  const myTeamFull = myGender === 'male' ? mFull : myGender === 'female' ? fFull : true;
+  const creatorCannotLeave = myId === m.creator_id && scheduledInstant(m.scheduled_at) > Date.now();
 
   const femaleFromAPI = participants.filter(p => p.gender === 'female' || p.gender === '여성');
   const maleFromAPI   = participants.filter(p => p.gender === 'male'   || p.gender === '남성');
 
   const femaleSlots: (MeetingParticipant | null)[] = Array.from({ length: m.required_female }, (_, i) => {
     if (femaleFromAPI[i]) return femaleFromAPI[i];
-    if (i < filledF) return { user_id: -(i + 1), nickname: '참여중', gender: 'female', face_type: null, mbti: null, charm_points: null };
+    if (i < filledF) return { user_id: -(i + 1), nickname: '참여중', gender: 'female', face_type: null, mbti: null, charm_points: [] };
     return null;
   });
   const maleSlots: (MeetingParticipant | null)[] = Array.from({ length: m.required_male }, (_, i) => {
     if (maleFromAPI[i]) return maleFromAPI[i];
-    if (i < filledM) return { user_id: -(i + 1), nickname: '참여중', gender: 'male', face_type: null, mbti: null, charm_points: null };
+    if (i < filledM) return { user_id: -(i + 1), nickname: '참여중', gender: 'male', face_type: null, mbti: null, charm_points: [] };
     return null;
   });
 
@@ -229,6 +217,7 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
         </span>
       </div>
 
+      <QueryStatus error={detail.error ?? people.error} retry={() => { void detail.refetch(); void people.refetch(); }} />
       {/* 스크롤 콘텐츠 */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 20px 24px', scrollbarWidth: 'none' }}>
 
@@ -294,9 +283,9 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
         {m.is_joined && m.invite_code && (
           <div style={{ marginTop: 12, borderRadius: 16, padding: '14px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>🔑 초대코드</p>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>친구에게 공유하세요</span>
-              <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: 6, color: 'var(--primary)' }}>{m.invite_code}</span>
+              <span style={{ fontSize: 15, fontWeight: 800, overflowWrap: 'anywhere', color: 'var(--primary)' }}>{m.invite_code}</span>
             </div>
           </div>
         )}
@@ -311,352 +300,121 @@ function MeetingDetailSheet({ m, onClose, onJoin, hasChance, chanceLoading }: {
         borderTop: '1px solid var(--border)',
         display: 'flex', flexDirection: 'column', gap: 8,
       }}>
-        <button
-          style={{ width: '100%', padding: '13px', borderRadius: 14, fontSize: 14, fontWeight: 700, color: 'var(--text-sub)', background: 'var(--bg-card2)', border: '1px solid var(--border)' }}
+        {m.is_joined && m.invite_code && <button
+          style={{ width: '100%', padding: 13, borderRadius: 14, fontWeight: 700, color: 'var(--text-sub)', background: 'var(--bg-card2)', border: '1px solid var(--border)' }}
           onClick={handleInvite}
-        >👫 친구 초대하기</button>
+        >👫 친구 초대하기</button>}
+        {m.is_joined ? <>
+          {m.chat_room_id != null && <button className="action-button" style={{ background: 'var(--gradient)', color: 'white', borderRadius: 14 }} onClick={() => onChat(m.chat_room_id!)}>💬 미팅 채팅방으로 이동</button>}
+          <button className="action-button" disabled={busy || creatorCannotLeave} onClick={() => onLeave(m)} style={{ color: 'var(--text-muted)', borderRadius: 14, border: '1px solid var(--border)' }}>
+            {creatorCannotLeave ? '개설자는 예정 시각부터 나갈 수 있어요' : '미팅 나가기'}
+          </button>
+        </> : <button className="action-button" style={{ width: '100%', padding: 16, borderRadius: 14, fontWeight: 800, color: 'white', background: 'var(--gradient)', opacity: full || myTeamFull || !hasChance || busy ? 0.6 : 1 }}
+          disabled={full || myTeamFull || chanceLoading || !hasChance || busy} onClick={() => onJoin(m)}>
+          {full ? '마감된 미팅이에요' : myTeamFull ? '내 성별의 정원이 찼어요' : chanceLoading ? '기회 확인 중…' : !hasChance ? '남은 기회가 없어요' : '⚡ 기회 1회 사용하고 참여하기'}
+        </button>}
 
-        {full ? (
-          <button style={{ width: '100%', padding: '15px', borderRadius: 14, fontSize: 15, fontWeight: 800, color: 'var(--text-muted)', background: 'var(--bg-card2)', border: '1px solid var(--border)', cursor: 'not-allowed' }} disabled>🔒 마감된 미팅이에요</button>
-        ) : m.is_joined ? (
-          <button style={{ width: '100%', padding: '15px', borderRadius: 14, fontSize: 15, fontWeight: 800, color: 'var(--primary)', background: 'var(--primary-bg)', border: '1.5px solid var(--primary-border)' }} disabled>✓ 참여 중이에요</button>
-        ) : !chanceLoading && !hasChance ? (
-          <button style={{ width: '100%', padding: '15px', borderRadius: 14, fontSize: 15, fontWeight: 800, color: 'var(--text-muted)', background: 'var(--bg-card2)', border: '1px solid var(--border)', cursor: 'not-allowed' }} disabled>⚡ 오늘의 기회를 이미 사용했어요</button>
-        ) : (
-          <button
-            style={{ width: '100%', padding: '16px', borderRadius: 14, fontSize: 15, fontWeight: 800, color: 'white', background: 'var(--gradient)', boxShadow: '0 4px 16px rgba(255,128,171,0.35)', opacity: chanceLoading ? 0.7 : 1 }}
-            disabled={chanceLoading}
-            onClick={() => onJoin(m)}
-          >{chanceLoading ? '확인 중...' : '⚡ 기회 사용하고 참여하기'}</button>
-        )}
       </div>
     </div>
   );
 }
 
-/* ── 개설 폼 (바텀시트) ── */
-function CreateSheet({ onClose, onSubmit }: {
-  onClose: () => void;
-  onSubmit: (data: { title: string; keywords: string[]; femaleCount: number; maleCount: number; dayOffset: number }) => void;
-}) {
-  const weekDays = getWeekDays();
-  const [title, setTitle] = useState('');
-  const [keywordInput, setKeywordInput] = useState('');
-  const [keywords, setKeywords] = useState<string[]>([]);
-  const [femaleCount, setFemaleCount] = useState(2);
-  const [maleCount, setMaleCount] = useState(2);
-  const [selectedDay, setSelectedDay] = useState(0);
-
-  const addKeyword = () => {
-    const k = keywordInput.trim();
-    if (!k || keywords.includes(k) || keywords.length >= 3) return;
-    setKeywords(prev => [...prev, k]);
-    setKeywordInput('');
-  };
-  const removeKeyword = (k: string) => setKeywords(prev => prev.filter(x => x !== k));
-
-  const selectSize = (size: number) => {
-    setFemaleCount(size);
-    setMaleCount(size);
-  };
-
-  return (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
-      <div className="mobile-sheet w-full max-w-[var(--app-max-width)] rounded-[28px_28px_0_0] px-5 pt-6 pb-10 overflow-y-auto max-h-[88dvh] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ background: 'var(--bg-card)' }} onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-6">
-          <span className="text-[18px] font-extrabold" style={{ color: 'var(--text)' }}>🎉 미팅 개설하기</span>
-          <button className="w-8 h-8 rounded-full flex items-center justify-center text-[13px] border" style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-muted)' }} onClick={onClose}>✕</button>
-        </div>
-
-        <p className="text-[13px] font-bold mb-3" style={{ color: 'var(--text-sub)' }}>인원 구성</p>
-        <div className="grid grid-cols-3 gap-2 mb-5">
-          {[2, 3, 4].map(size => (
-            <button key={size} type="button" onClick={() => selectSize(size)} className="rounded-[14px] py-3 text-[14px] font-extrabold border"
-              style={femaleCount === size ? { background: 'var(--gradient)', color: 'white', borderColor: 'transparent' } : { background: 'var(--bg-card2)', color: 'var(--text-sub)', borderColor: 'var(--border)' }}>
-              {size} 대 {size}
-            </button>
-          ))}
-        </div>
-
-        <p className="text-[13px] font-bold mb-3" style={{ color: 'var(--text-sub)' }}>날짜</p>
-        <div className="flex gap-2 overflow-x-auto pb-1 mb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {weekDays.map((d, i) => (
-            <button key={i} className="flex flex-col items-center gap-[3px] rounded-[14px] px-3 py-2.5 min-w-[54px] shrink-0 border"
-              style={selectedDay === i
-                ? { background: 'var(--gradient)', borderColor: 'transparent', color: 'white' }
-                : { background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text-sub)' }
-              }
-              onClick={() => setSelectedDay(i)}
-            >
-              <span className="text-[13px] font-bold">{d.short}</span>
-              <span className="text-[10px] opacity-70">{d.label}</span>
-              <span className="text-[10px] opacity-60">{d.day}요일</span>
-            </button>
-          ))}
-        </div>
-
-        <p className="text-[13px] font-bold mb-2" style={{ color: 'var(--text-sub)' }}>미팅 제목</p>
-        <input
-          className="w-full rounded-[14px] px-4 py-3 text-[14px] font-medium border mb-5"
-          style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)' }}
-          placeholder="ex. 공대생 카페 미팅 구해요 ☕"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-        />
-
-        <p className="text-[13px] font-bold mb-2" style={{ color: 'var(--text-sub)' }}>키워드 <span className="text-[11px] font-normal ml-1.5" style={{ color: 'var(--text-muted)' }}>최대 3개</span></p>
-        <div className="flex gap-2 mb-3">
-          <input
-            placeholder={keywords.length >= 3 ? '최대 3개까지 입력할 수 있어요' : 'ex. 카페, 운동, 감성적…'}
-            value={keywordInput}
-            onChange={e => setKeywordInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); addKeyword(); } }}
-            disabled={keywords.length >= 3}
-            style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)', flex: 1, borderRadius: '12px', padding: '11px 16px', fontSize: '14px', border: '1px solid var(--border)', opacity: keywords.length >= 3 ? 0.45 : 1 }}
-          />
-          <button className="px-4 rounded-[12px] text-[13px] font-bold shrink-0"
-            style={keywordInput.trim() && keywords.length < 3
-              ? { background: 'var(--gradient)', color: 'white' }
-              : { background: 'var(--bg-card2)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
-            }
-            onClick={addKeyword} disabled={!keywordInput.trim() || keywords.length >= 3}
-          >추가</button>
-        </div>
-        {keywords.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-5">
-            {keywords.map(k => (
-              <span key={k} className="inline-flex items-center gap-1.5 text-[13px] font-bold px-3 py-[7px] rounded-[20px]" style={{ background: 'var(--primary-bg)', border: '1.5px solid var(--primary-border)', color: 'var(--primary)' }}>
-                #{k}<button className="text-[14px] opacity-60 hover:opacity-100" onClick={() => removeKeyword(k)}>×</button>
-              </span>
-            ))}
-          </div>
-        )}
-        {keywords.length === 0 && <div className="mb-5" />}
-
-        <button
-          className="w-full text-[15px] font-bold py-[15px] rounded-[16px] min-h-[52px] text-white active:opacity-80"
-          style={title.trim() ? { background: 'var(--gradient)', boxShadow: '0 4px 16px rgba(255,128,171,0.35)' } : { background: 'var(--bg-card2)', color: 'var(--text-muted)' }}
-          disabled={!title.trim()}
-          onClick={() => onSubmit({ title, keywords, femaleCount, maleCount, dayOffset: selectedDay })}
-        >
-          개설하기 🎉
-        </button>
+type CreateForm = { title: string; femaleCount: number; maleCount: number; date: string; time: string };
+const inputStyle = { width: '100%', padding: 12, borderRadius: 12, background: 'var(--bg-card2)', color: 'var(--text)', border: '1px solid var(--border)', minWidth: 0 };
+function CreateSheet({ onClose, onSubmit }: { onClose: () => void; onSubmit: (data: CreateForm) => void }) {
+  const [value, setValue] = useState<CreateForm>({ title: '', femaleCount: 2, maleCount: 2, date: koreanToday(), time: '18:00' });
+  const [error, setError] = useState<Error | null>(null);
+  return <div className="fixed inset-0 z-[200] flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+    <form className="mobile-sheet w-full rounded-[28px_28px_0_0] px-5 pt-6 pb-10 overflow-y-auto max-h-[88dvh]" style={{ background: 'var(--bg-card)' }} onClick={e => e.stopPropagation()} onSubmit={e => {
+      e.preventDefault();
+      if (scheduledInstant(`${value.date}T${value.time}:00`) <= Date.now()) { setError(new Error('현재보다 미래인 한국 시간 일정을 선택해주세요')); return; }
+      onSubmit(value);
+    }}>
+      <div className="flex justify-between items-center mb-5"><h2 style={{ color: 'var(--text)', fontSize: 18, fontWeight: 800 }}>🎉 미팅 개설하기</h2><button type="button" className="icon-button" onClick={onClose} aria-label="닫기">✕</button></div>
+      <label style={{ color: 'var(--text)', fontWeight: 700 }}>미팅 제목<input aria-label="미팅 제목" required maxLength={100} style={{ ...inputStyle, margin: '8px 0 18px' }} placeholder="같이 카페 갈 사람 ☕" value={value.title} onChange={e => setValue(v => ({ ...v, title: e.target.value }))} /></label>
+      <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 10 }}>개설자를 포함한 성별 총 정원이에요.</p>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
+        {([{ key: 'femaleCount', label: '여성 정원' }, { key: 'maleCount', label: '남성 정원' }] as const).map(f => <label key={f.key} style={{ flex: 1, minWidth: 0, color: 'var(--text)', fontWeight: 700 }}>{f.label}<select aria-label={f.label} style={{ ...inputStyle, marginTop: 8 }} value={value[f.key]} onChange={e => setValue(v => ({ ...v, [f.key]: Number(e.target.value) }))}>{[2,3,4,5].map(n => <option key={n} value={n}>{n}명</option>)}</select></label>)}
       </div>
-    </div>
-  );
+      <label style={{ color: 'var(--text)', fontWeight: 700 }}>날짜 (한국 시간)<input aria-label="미팅 날짜" type="date" required min={koreanToday()} style={{ ...inputStyle, margin: '8px 0 18px' }} value={value.date} onChange={e => setValue(v => ({ ...v, date: e.target.value }))} /></label>
+      <label style={{ color: 'var(--text)', fontWeight: 700 }}>시간 (한국 시간)<input aria-label="미팅 시간" type="time" required style={{ ...inputStyle, margin: '8px 0 18px' }} value={value.time} onChange={e => setValue(v => ({ ...v, time: e.target.value }))} /></label>
+      <QueryStatus error={error} />
+      <button className="action-button w-full rounded-[16px] text-white font-bold" style={{ background: 'var(--gradient)' }} disabled={!value.title.trim()}>기회 1회 사용하고 개설하기</button>
+    </form>
+  </div>;
 }
 
-/* ── 메인 ── */
 export default function MeetingPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [searchInput, setSearchInput] = useState('');
+  const { data: me } = useMe();
+  const { hasChance, chanceLoading } = useChance();
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [showJoinModal, setShowJoinModal] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [showCode, setShowCode] = useState(false);
   const [codeInput, setCodeInput] = useState('');
-  const [pendingJoin, setPendingJoin] = useState<MeetingResponse | null>(null);
-  const [pendingCreate, setPendingCreate] = useState<{ title: string; keywords: string[]; femaleCount: number; maleCount: number; dayOffset: number } | null>(null);
-  const [selectedMeeting, setSelectedMeeting] = useState<MeetingResponse | null>(null);
-  const [sizeFilter, setSizeFilter] = useState<0 | 2 | 3 | 4>(0);
-  const { spend, hasChance, chanceLoading } = useChance();
-
-  const { data: meetings = [], isLoading: meetingsLoading } = useQuery({
-    queryKey: queryKeys.meetings,
-    queryFn: getMeetings,
-    enabled: isLoggedIn(),
-    staleTime: 60 * 1000,
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [sizeFilter, setSizeFilter] = useState(0);
+  const [pending, setPending] = useState<{ kind: 'join'; meeting: MeetingResponse } | { kind: 'code'; code: string } | { kind: 'create'; data: CreateForm } | { kind: 'leave'; meeting: MeetingResponse } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const [error, setError] = useState<Error | null>(null);
+  const query = useInfiniteQuery({ queryKey: queryKeys.meetings, initialPageParam: undefined as number | undefined,
+    queryFn: ({ pageParam }) => getMeetingPage(pageParam),
+    getNextPageParam: page => page.hasNext ? page.nextCursor ?? undefined : undefined,
+    enabled: isLoggedIn(), staleTime: 15000,
   });
-
-  const { mutateAsync: doJoinMeeting } = useMutation({
-    mutationFn: joinMeeting,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.meetings }),
-  });
-
-  const { mutateAsync: doJoinByCode } = useMutation({
-    mutationFn: joinMeetingByCode,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.meetings }),
-  });
-
-  const { mutateAsync: doCreateMeeting } = useMutation({
-    mutationFn: createMeeting,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.meetings }),
-  });
-
-  const debouncedSetSearch = useDebounce((v: string) => setSearch(v), 300);
-
-  const handleJoin = (m: MeetingResponse) => {
-    setPendingJoin(m);
-    setShowJoinModal(true);
+  const meetings = [...new Map((query.data?.pages.flatMap(p => p.items) ?? []).map(m => [m.id, m])).values()];
+  const filtered = meetings.filter(m => (!sizeFilter || (m.required_male === sizeFilter && m.required_female === sizeFilter)) && m.title.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.meetings });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.chance });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.chatRooms });
   };
-
-  const confirmJoin = useThrottle(async () => {
-    if (!pendingJoin) return;
+  const confirm = async () => {
+    if (!pending || lock.current) return;
+    lock.current = true; setBusy(true); setError(null);
     try {
-      const updated = await doJoinMeeting(pendingJoin.id);
-      setSelectedMeeting(updated);
-      spend();
-    } catch { /* ignore */ }
-    setShowJoinModal(false);
-    setPendingJoin(null);
-  }, 2000);
-
-  const handleCreateSubmit = (data: { title: string; keywords: string[]; femaleCount: number; maleCount: number; dayOffset: number }) => {
-    setPendingCreate(data);
-    setShowCreateModal(true);
-    setShowCreate(false);
+      if (pending.kind === 'create') {
+        const { data } = pending;
+        const created = await createMeeting({ title: data.title, required_female: data.femaleCount, required_male: data.maleCount, scheduled_at: `${data.date}T${data.time}:00` });
+        setShowCreate(false); setSelectedId(created.id);
+      } else if (pending.kind === 'leave') {
+        await leaveMeeting(pending.meeting.id); setSelectedId(null);
+      } else {
+        const joined = pending.kind === 'code' ? await joinMeetingByCode(pending.code) : await joinMeeting(pending.meeting.id);
+        setShowCode(false); setCodeInput(''); setSelectedId(joined.id);
+      }
+      refresh(); setPending(null);
+    } catch (e) {
+      setError(e instanceof Error ? e : new Error('처리하지 못했어요. 다시 시도해주세요'));
+      refresh(); setPending(null);
+    } finally { lock.current = false; setBusy(false); }
   };
-
-  const handleJoinByCode = useThrottle(async () => {
-    const code = codeInput.trim();
-    if (!code) return;
-    try { await doJoinByCode(code); } catch { /* ignore */ }
-    setShowCodeModal(false);
-    setCodeInput('');
-  }, 2000);
-
-  const confirmCreate = useThrottle(async () => {
-    if (!pendingCreate) return;
-    try {
-      await doCreateMeeting({
-        title: pendingCreate.title,
-        keywords: pendingCreate.keywords,
-        required_female: pendingCreate.femaleCount,
-        required_male: pendingCreate.maleCount,
-        scheduled_at: dayToISO(pendingCreate.dayOffset),
-      });
-      spend();
-    } catch { /* ignore */ }
-    setShowCreateModal(false);
-    setPendingCreate(null);
-  }, 2000);
-
-  const sizeFiltered = sizeFilter === 0
-    ? meetings
-    : meetings.filter(m => m.required_female === sizeFilter && m.required_male === sizeFilter);
-  const filtered = search.trim()
-    ? sizeFiltered.filter(m => m.title.includes(search.trim()) || m.keywords.some(k => k.includes(search.trim())))
-    : sizeFiltered;
-
-  return (
-    <div className="page-container px-[18px] pb-6">
-      {/* 헤더 */}
-      <div className="flex items-start justify-between pt-6 pb-[18px]">
-        <div>
-          <h1 className="text-[clamp(20px,6vw,24px)] font-extrabold tracking-tight mb-1" style={{ color: 'var(--text)' }}>미팅 / 과팅 🎉</h1>
-          <p className="text-[13px]" style={{ color: 'var(--text-sub)' }}>마음 맞는 사람들과 함께해요</p>
-        </div>
-        <div className="flex gap-2 mt-1">
-          <button
-            className="flex items-center gap-1 text-[13px] font-bold px-3 py-[10px] rounded-[14px] shrink-0 active:opacity-75 border"
-            style={{ background: 'var(--bg-card2)', color: 'var(--text-sub)', borderColor: 'var(--border)' }}
-            onClick={() => setShowCodeModal(true)}
-          >
-            🔑 코드입장
-          </button>
-          <button
-            className="flex items-center gap-1.5 text-[13px] font-bold px-[14px] py-[10px] rounded-[14px] shrink-0 active:opacity-75"
-            style={(!chanceLoading && hasChance)
-              ? { background: 'var(--gradient)', color: 'white', boxShadow: '0 3px 12px rgba(255,128,171,0.35)' }
-              : { background: 'var(--bg-card2)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
-            }
-            onClick={() => hasChance && setShowCreate(true)}
-          >
-            <span className="text-[15px]">＋</span>
-            {chanceLoading ? '...' : hasChance ? '개설' : '기회 없음'}
-          </button>
-        </div>
+  const openChat = (roomId: number) => navigate('/chat', { state: { openRoom: { type: 'meeting', roomId } } });
+  const reset = () => { if (!lock.current) { setPending(null); setError(null); } };
+  return <div className="page-container px-[18px] pb-6">
+    <div className="flex flex-wrap gap-3 items-start justify-between pt-6 pb-[18px]">
+      <div><h1 className="text-[clamp(20px,6vw,24px)] font-extrabold" style={{ color: 'var(--text)' }}>미팅 / 과팅 🎉</h1><p className="text-[13px] mt-1" style={{ color: 'var(--text-sub)' }}>마음 맞는 사람들과 함께해요</p></div>
+      <div className="flex gap-2">
+        <button className="action-button rounded-[14px] px-3 text-[13px] font-bold" style={{ background: 'var(--bg-card2)', color: 'var(--text)' }} onClick={() => { setError(null); setShowCode(true); }}>🔑 코드입장</button>
+        <button className="action-button rounded-[14px] px-3 text-[13px] font-bold" disabled={chanceLoading || !hasChance} style={{ background: 'var(--gradient)', color: 'white', opacity: hasChance ? 1 : 0.5 }} onClick={() => { setError(null); setShowCreate(true); }}>{chanceLoading ? '확인 중…' : hasChance ? '＋ 개설' : '기회 없음'}</button>
       </div>
-
-      {/* 검색 */}
-      <div className="grid grid-cols-4 gap-2 mb-3">
-        {([{ value: 0, label: '전체' }, { value: 2, label: '2:2' }, { value: 3, label: '3:3' }, { value: 4, label: '4:4' }] as const).map(item => (
-          <button key={item.value} type="button" onClick={() => setSizeFilter(item.value)} className="rounded-[12px] py-2.5 text-[13px] font-bold border"
-            style={sizeFilter === item.value ? { background: 'var(--gradient)', color: 'white', borderColor: 'transparent' } : { background: 'var(--bg-card)', color: 'var(--text-sub)', borderColor: 'var(--border)' }}>
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex items-center gap-2 rounded-[14px] px-[14px] py-[11px] mb-4 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-        <span className="text-[15px] shrink-0">🔍</span>
-        <input className="flex-1 bg-transparent text-[14px] min-w-0" style={{ color: 'var(--text)' }} placeholder="키워드로 검색 (ex. 카페, 운동)" value={searchInput} onChange={e => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }} />
-        {search && <button className="text-[12px] px-1" style={{ color: 'var(--text-muted)' }} onClick={() => setSearch('')}>✕</button>}
-      </div>
-
-      {/* 목록 */}
-      {meetingsLoading ? (
-        <div className="flex flex-col items-center py-16 gap-2.5">
-          <span className="text-[48px]">🎉</span>
-          <p className="text-[15px] font-bold" style={{ color: 'var(--text-sub)' }}>불러오는 중이에요...</p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center py-16 gap-2.5">
-          <span className="text-[48px]" style={{ animation: 'float 2.8s ease-in-out infinite' }}>🎉</span>
-          <p className="text-[15px] font-bold" style={{ color: 'var(--text-sub)' }}>{search ? '검색 결과가 없어요' : '아직 미팅이 없어요'}</p>
-          <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>미팅을 개설하거나 다른 키워드로 검색해보세요</p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {filtered.map((m, idx) => (
-            <div key={m.id} className="slot-reel" style={{ animationDelay: `${idx * 0.1}s` }}>
-              <MeetingCard m={m} onOpen={() => setSelectedMeeting(m)} />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {showCreate && (
-        <CreateSheet onClose={() => setShowCreate(false)} onSubmit={handleCreateSubmit} />
-      )}
-
-      {selectedMeeting && (
-        <MeetingDetailSheet
-          m={selectedMeeting}
-          onClose={() => setSelectedMeeting(null)}
-          onJoin={handleJoin}
-          hasChance={hasChance}
-          chanceLoading={chanceLoading}
-        />
-      )}
-
-      {showCodeModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center px-5" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }} onClick={() => { setShowCodeModal(false); setCodeInput(''); }}>
-          <div className="w-full max-w-[340px] rounded-[24px] p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
-            <p className="text-[17px] font-extrabold mb-1.5" style={{ color: 'var(--text)' }}>🔑 코드로 입장하기</p>
-            <p className="text-[13px] mb-5" style={{ color: 'var(--text-muted)' }}>친구에게 받은 초대코드를 입력하세요</p>
-            <input
-              className="w-full rounded-[14px] px-4 py-3 text-[16px] font-bold text-center tracking-widest border mb-4"
-              style={{ background: 'var(--bg-card2)', borderColor: 'var(--border)', color: 'var(--text)' }}
-              placeholder="초대코드 입력"
-              value={codeInput}
-              onChange={e => setCodeInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleJoinByCode()}
-            />
-            <div className="flex gap-2">
-              <button className="flex-1 py-3 rounded-[14px] text-[14px] font-bold border" style={{ background: 'var(--bg-card2)', color: 'var(--text-muted)', borderColor: 'var(--border)' }} onClick={() => { setShowCodeModal(false); setCodeInput(''); }}>취소</button>
-              <button className="flex-1 py-3 rounded-[14px] text-[14px] font-bold text-white" style={{ background: codeInput.trim() ? 'var(--gradient)' : 'var(--bg-card2)', color: codeInput.trim() ? 'white' : 'var(--text-muted)' }} disabled={!codeInput.trim()} onClick={handleJoinByCode}>입장하기</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showJoinModal && pendingJoin && (
-        <ChanceModal
-          label={`"${pendingJoin.title}"\n정말 오늘의 기회를 사용하시겠습니까?`}
-          onConfirm={confirmJoin}
-          onCancel={() => { setShowJoinModal(false); setPendingJoin(null); }}
-        />
-      )}
-
-      {showCreateModal && pendingCreate && (
-        <ChanceModal
-          label={`미팅을 개설하면\n오늘의 기회를 사용해요`}
-          onConfirm={confirmCreate}
-          onCancel={() => { setShowCreateModal(false); setPendingCreate(null); }}
-        />
-      )}
     </div>
-  );
+    <div className="flex gap-2 mb-3">{[0,2,3,4,5].map(n => <button key={n} type="button" onClick={() => setSizeFilter(n)} className="flex-1 rounded-[12px] py-2.5 text-[13px] font-bold border" style={{ color: sizeFilter === n ? 'white' : 'var(--text-sub)', background: sizeFilter === n ? 'var(--gradient)' : 'var(--bg-card)', borderColor: 'var(--border)' }}>{n ? `${n}:${n}` : '전체'}</button>)}</div>
+    <input aria-label="미팅 검색" placeholder="미팅 제목으로 검색" style={{ ...inputStyle, marginBottom: 16 }} value={search} onChange={e => setSearch(e.target.value)} />
+    <QueryStatus loading={query.isLoading} error={query.error ?? error} retry={() => { setError(null); void query.refetch(); }} />
+    {!query.isLoading && !query.error && (filtered.length ? <div className="flex flex-col gap-3">{filtered.map(m => <MeetingCard key={m.id} m={m} onOpen={() => { setError(null); setSelectedId(m.id); }} />)}</div> : <p style={{ padding: '48px 0', textAlign: 'center', color: 'var(--text-muted)' }}>{search || sizeFilter ? '불러온 미팅 중 검색 결과가 없어요' : '아직 미팅이 없어요. 첫 미팅을 개설해보세요!'}</p>)}
+    {query.hasNextPage && <button className="action-button w-full mt-4" disabled={query.isFetchingNextPage} onClick={() => { void query.fetchNextPage(); }}>{query.isFetchingNextPage ? '불러오는 중…' : '미팅 더 보기'}</button>}
+    {showCreate && <CreateSheet onClose={() => setShowCreate(false)} onSubmit={data => setPending({ kind: 'create', data })} />}
+    {selectedId != null && <MeetingDetailSheet id={selectedId} onClose={() => setSelectedId(null)} onJoin={meeting => { setError(null); setPending({ kind: 'join', meeting }); }} onLeave={meeting => { setError(null); setPending({ kind: 'leave', meeting }); }} onChat={openChat} busy={busy} hasChance={hasChance} chanceLoading={chanceLoading} myGender={me?.gender} myId={me?.id} />}
+    {error && (selectedId != null || showCreate || showCode) && <div role="alert" style={{ position: 'fixed', zIndex: 600, bottom: 'max(20px, env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', width: 'calc(100% - 32px)', maxWidth: 398, padding: 16, borderRadius: 14, background: 'var(--bg-card)', color: 'var(--text)', boxShadow: '0 4px 24px #0005' }}>{error.message}<button aria-label="오류 닫기" onClick={() => setError(null)} style={{ float: 'right', marginLeft: 8 }}>✕</button></div>}
+    {showCode && <div className="fixed inset-0 z-[200] flex items-center justify-center px-5" style={{ background: 'rgba(0,0,0,0.55)' }} onClick={() => setShowCode(false)}><form className="w-full max-w-[340px] rounded-[24px] p-6" style={{ background: 'var(--bg-card)' }} onClick={e => e.stopPropagation()} onSubmit={e => { e.preventDefault(); setError(null); setPending({ kind: 'code', code: codeInput }); }}>
+      <h2 style={{ color: 'var(--text)', fontSize: 17, fontWeight: 800 }}>🔑 코드로 입장하기</h2><p style={{ color: 'var(--text-muted)', margin: '10px 0', fontSize: 13 }}>친구에게 받은 32자리 초대코드를 입력하세요. 참여 시 기회 1회를 사용해요.</p>
+      <input aria-label="초대코드" required pattern="[0-9A-Fa-f]{32}" maxLength={32} autoCapitalize="characters" autoComplete="off" style={inputStyle} value={codeInput} onChange={e => setCodeInput(e.target.value.trim().toUpperCase())} />
+      <div className="flex gap-2 mt-4"><button type="button" className="action-button flex-1" style={{ color: 'var(--text-sub)' }} onClick={() => setShowCode(false)}>취소</button><button className="action-button flex-1 rounded-[14px]" disabled={!/^[0-9A-F]{32}$/.test(codeInput) || !hasChance || chanceLoading} style={{ background: 'var(--gradient)', color: 'white' }}>{chanceLoading ? '확인 중…' : hasChance ? '입장하기' : '기회 없음'}</button></div>
+    </form></div>}
+    {pending && pending.kind !== 'leave' && <ChanceModal busy={busy} label={pending.kind === 'create' ? '미팅을 개설하면 기회 1회를 사용해요' : '미팅에 참여하면 기회 1회를 사용해요'} onConfirm={() => { void confirm(); }} onCancel={reset} />}
+    {pending?.kind === 'leave' && <div className="fixed inset-0 z-[500] flex items-center justify-center px-6" style={{ background: '#0009' }}><div className="w-full max-w-[340px] p-6 rounded-[24px]" style={{ background: 'var(--bg-card)', color: 'var(--text)' }}><h2 className="font-bold text-[18px]">미팅에서 나갈까요?</h2><p className="text-[13px] my-4">채팅방에서도 나가게 돼요. 사용한 기회는 환급되지 않고, 재참여하면 기회를 다시 사용해요.</p><div className="flex gap-3"><button className="action-button flex-1" disabled={busy} onClick={reset}>취소</button><button className="action-button flex-1" disabled={busy} onClick={() => { void confirm(); }}>{busy ? '처리 중…' : '나가기'}</button></div></div></div>}
+  </div>;
 }

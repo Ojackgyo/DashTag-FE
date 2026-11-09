@@ -104,7 +104,7 @@ export default function DatePage() {
           <span className="text-[52px]">💘</span>
           <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>불러오는 중이에요...</p>
         </div>
-      ) : profiles.length === 0 ? (
+      ) : !capabilities.profileDiscovery ? null : profiles.length === 0 ? (
         <div className="flex flex-col items-center py-16 gap-2.5">
           <span className="text-[52px]" style={{ animation: 'float 2.8s ease-in-out infinite' }}>💘</span>
           <p className="text-[16px] font-bold" style={{ color: 'var(--text-sub)' }}>아직 소개팅 프로필이 없어요</p>
