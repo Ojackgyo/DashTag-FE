@@ -61,6 +61,7 @@ type ChatRoomApiResponse = {
   scheduledAt?: string | null;
   active?: boolean;
   canSetSchedule?: boolean;
+  canManageSchedule?: boolean;
   canLeave?: boolean;
   canClose?: boolean;
 };
@@ -101,7 +102,7 @@ function toRoom(room: ChatRoomApiResponse): ChatRoomResponse {
     related_id: room.datingRequestId ?? room.meetingId ?? room.communityId,
     scheduled_at: room.scheduledAt,
     active: room.active,
-    can_set_schedule: room.canSetSchedule,
+    can_set_schedule: room.canManageSchedule ?? room.canSetSchedule,
     can_leave: room.canLeave,
     can_close: room.canClose,
   };

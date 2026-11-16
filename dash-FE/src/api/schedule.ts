@@ -1,5 +1,6 @@
 import { api } from "./client";
 import { requireCapability } from "./capabilities";
+import { getChatRooms } from "./chat";
 import { positiveId, textValue } from "./contracts";
 export interface Schedule {
   id: number;
@@ -29,28 +30,75 @@ export function validateSchedule(input: ScheduleInput) {
     location: textValue(input.location, "장소", 0, 200),
   };
 }
-export function getSchedule(roomId: number) {
+export function koreanTimestamp(value: string) {
+  return /(Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}+09:00`;
+}
+export async function getSchedule(roomId: number): Promise<Schedule | null> {
   requireCapability("chatSchedule");
-  return api.get<Schedule | null>(
-    `/api/chat-rooms/${positiveId(roomId)}/schedule`,
-  );
+  const room = (await getChatRooms()).find((r) => r.id === positiveId(roomId));
+  if (!room) throw new Error("채팅방에 접근할 수 없어요");
+  return room.scheduled_at
+    ? {
+        id: room.id,
+        roomId: room.id,
+        roomType: room.room_type.toUpperCase() as Schedule["roomType"],
+        title: room.name ?? "함께하는 약속",
+        scheduledAt: koreanTimestamp(room.scheduled_at),
+        location: "",
+        updatedAt: "",
+        canEdit: room.can_set_schedule === true,
+      }
+    : null;
 }
 export function saveSchedule(roomId: number, input: ScheduleInput) {
   requireCapability("chatSchedule");
-  return api.put<Schedule>(
-    `/api/chat-rooms/${positiveId(roomId)}/schedule`,
-    validateSchedule(input),
-  );
+  const valid = validateSchedule(input);
+  const date = new Date(valid.scheduledAt);
+  return api.put<Schedule>(`/api/chat-rooms/${positiveId(roomId)}/schedule`, {
+    scheduledAt: `${koreanDate(date)}T${koreanTime(date)}:${String(date.getUTCSeconds()).padStart(2, "0")}`,
+  });
 }
 export function deleteSchedule(roomId: number) {
-  requireCapability("chatSchedule");
+  requireCapability("chatScheduleExtras");
   return api.delete<void>(`/api/chat-rooms/${positiveId(roomId)}/schedule`);
 }
-export function getSchedules(from: string, to: string) {
+interface HomeSchedule {
+  roomId: number;
+  roomType: Schedule["roomType"];
+  roomName: string;
+  scheduledAt: string;
+}
+function adaptHomeSchedule(item: HomeSchedule): Schedule {
+  return {
+    id: item.roomId,
+    roomId: item.roomId,
+    roomType: item.roomType,
+    title: item.roomName,
+    scheduledAt: koreanTimestamp(item.scheduledAt),
+    location: "",
+    updatedAt: "",
+    canEdit: false,
+  };
+}
+export async function getSchedules(from: string, to: string) {
   requireCapability("chatSchedule");
-  return api.get<Schedule[]>(
-    `/api/members/me/schedules?${new URLSearchParams({ from, to })}`,
-  );
+  const [year, month] = from.split("-").map(Number);
+  return (
+    await api.get<HomeSchedule[]>(
+      `/api/home/schedules?${new URLSearchParams({ year: String(year), month: String(month) })}`,
+    )
+  )
+    .map(adaptHomeSchedule)
+    .filter((s) => {
+      const date = koreanDate(new Date(s.scheduledAt));
+      return date >= from && date <= to;
+    });
+}
+export async function getUpcomingSchedules(limit = 5) {
+  requireCapability("chatSchedule");
+  return (
+    await api.get<HomeSchedule[]>(`/api/home/schedules/upcoming?limit=${limit}`)
+  ).map(adaptHomeSchedule);
 }
 export function koreanDate(date = new Date()) {
   return new Intl.DateTimeFormat("sv-SE", {
@@ -76,5 +124,5 @@ export function displaySchedule(value: string) {
     weekday: "short",
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(value));
+  }).format(new Date(koreanTimestamp(value)));
 }

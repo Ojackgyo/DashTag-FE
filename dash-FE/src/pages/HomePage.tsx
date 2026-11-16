@@ -1,11 +1,18 @@
 import QueryStatus from "../components/QueryStatus";
 import { useQuery } from "@tanstack/react-query";
 import { capabilities } from "../api/capabilities";
-import { getSchedules, koreanDate, displaySchedule } from "../api/schedule";
+import {
+  getSchedules,
+  getUpcomingSchedules,
+  koreanDate,
+  displaySchedule,
+} from "../api/schedule";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useChance } from "../hooks/useChance";
 import { useMe } from "../hooks/useMe";
+import { getHomeSummary } from "../api/home";
+import { queryKeys } from "../lib/queryKeys";
 import { useDatingRequests } from "../hooks/useDatingRequests";
 
 export default function HomePage() {
@@ -22,19 +29,22 @@ export default function HomePage() {
   const { data: requests, isLoading, error, refetch } = useDatingRequests();
 
   const myId = user?.id;
-  const received =
-    requests?.filter((r) => r.status === "pending" && r.to_user_id === myId) ??
-    [];
-  const sent = requests?.filter((r) => r.from_user_id === myId) ?? [];
+  const summary = useQuery({
+    queryKey: [...queryKeys.datingRequests, "summary"],
+    queryFn: getHomeSummary,
+    refetchInterval: 15000,
+  });
+  const receivedCount = summary.data?.receivedPendingCount ?? 0;
+  const sent =
+    requests?.filter(
+      (r) => r.status === "pending" && r.from_user_id === myId,
+    ) ?? [];
 
   const [viewMonth, setViewMonth] = useState(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1);
+    const [year, month] = koreanDate().split("-").map(Number);
+    return new Date(year, month - 1, 1);
   });
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  });
+  const [selectedDate, setSelectedDate] = useState(() => koreanDate());
 
   const changeMonth = (offset: number) => {
     const next = new Date(
@@ -65,6 +75,11 @@ export default function HomePage() {
     queryFn: () => getSchedules(from, to),
     enabled: capabilities.chatSchedule,
   });
+  const upcoming = useQuery({
+    queryKey: ["schedules", "upcoming"],
+    queryFn: () => getUpcomingSchedules(),
+    enabled: capabilities.chatSchedule,
+  });
   const selectedSchedules = (schedules.data ?? [])
     .filter((s) => koreanDate(new Date(s.scheduledAt)) === selectedDate)
     .sort((a, b) => Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt));
@@ -78,9 +93,10 @@ export default function HomePage() {
     >
       <div className="home-content" style={{ padding: "16px 20px 0" }}>
         <QueryStatus
-          error={error ?? chanceError}
+          error={error ?? summary.error ?? chanceError}
           retry={() => {
             void refetch();
+            void summary.refetch();
           }}
         />
 
@@ -107,7 +123,7 @@ export default function HomePage() {
               position: "relative",
             }}
           >
-            {received.length > 0 && (
+            {receivedCount > 0 && (
               <div
                 style={{
                   position: "absolute",
@@ -126,7 +142,7 @@ export default function HomePage() {
                   color: "white",
                 }}
               >
-                {received.length}
+                {receivedCount}
               </div>
             )}
             <div
@@ -156,7 +172,7 @@ export default function HomePage() {
                 letterSpacing: "-1px",
               }}
             >
-              {isLoading ? "—" : received.length}
+              {summary.isLoading || summary.error ? "—" : receivedCount}
             </p>
             <p
               style={{
@@ -171,16 +187,18 @@ export default function HomePage() {
               style={{
                 fontSize: 11,
                 color:
-                  received.length > 0 ? "var(--primary)" : "var(--text-muted)",
+                  receivedCount > 0 ? "var(--primary)" : "var(--text-muted)",
                 fontWeight: 600,
                 marginTop: 3,
               }}
             >
-              {isLoading
+              {summary.isLoading
                 ? "불러오는 중..."
-                : received.length > 0
-                  ? `${received.length}개 새 요청`
-                  : "새 요청 없음"}
+                : summary.error
+                  ? "다시 확인해주세요"
+                  : receivedCount > 0
+                    ? `${receivedCount}개 새 요청`
+                    : "새 요청 없음"}
             </p>
           </button>
 
@@ -611,6 +629,58 @@ export default function HomePage() {
             )}
           </div>
         </div>
+
+        <section style={{ marginTop: 20 }} aria-label="다가오는 약속">
+          <h2 className="feature-title" style={{ fontSize: 15 }}>
+            다가오는 약속
+          </h2>
+          <QueryStatus
+            loading={upcoming.isLoading}
+            error={upcoming.error}
+            retry={() => {
+              void upcoming.refetch();
+            }}
+          />
+          {upcoming.data?.map((item) => (
+            <button
+              key={item.roomId}
+              style={{
+                width: "100%",
+                padding: 16,
+                marginTop: 8,
+                textAlign: "left",
+                background: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                borderRadius: 16,
+                color: "var(--text)",
+              }}
+              onClick={() =>
+                navigate("/chat", {
+                  state: {
+                    openRoom: {
+                      type: item.roomType.toLowerCase(),
+                      roomId: item.roomId,
+                    },
+                  },
+                })
+              }
+            >
+              <strong>{item.title}</strong>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-muted)",
+                  marginTop: 4,
+                }}
+              >
+                {displaySchedule(item.scheduledAt)}
+              </p>
+            </button>
+          ))}
+          {upcoming.data?.length === 0 && (
+            <p className="feature-notice">예정된 약속이 없어요.</p>
+          )}
+        </section>
 
         <footer
           style={{

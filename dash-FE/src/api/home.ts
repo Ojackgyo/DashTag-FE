@@ -55,3 +55,7 @@ export function acceptDatingRequest(requestId: number) {
 export function rejectDatingRequest(requestId: number) {
   return api.post<{ id: number; status: DatingStatus }>(`/api/dating/requests/${requestId}/reject`);
 }
+
+export function getHomeSummary() {
+  return api.get<{ receivedPendingCount: number }>("/api/home/summary");
+}

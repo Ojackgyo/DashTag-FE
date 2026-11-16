@@ -7,9 +7,10 @@ const schema = JSON.parse(await readFile(new URL('./fixtures/openapi.json', impo
 const server = await createServer({ cacheDir: '/private/tmp/dashtag-existing-tests-cache', server: { middlewareMode: true, hmr: false, ws: false, watch: null }, appType: 'custom' });
 after(() => server.close());
 const modules = {};
-for (const name of ['client', 'auth', 'home', 'date', 'chat', 'chance', 'user', 'college', 'idealPreference', 'studentVerification', 'onboarding', 'meeting']) {
+for (const name of ['client', 'auth', 'home', 'date', 'chat', 'chance', 'user', 'college', 'idealPreference', 'studentVerification', 'onboarding', 'meeting', 'community', 'review', 'schedule', 'capabilities']) {
   modules[name] = await server.ssrLoadModule(`/src/api/${name}.ts`);
 }
+const { presentMessages } = await server.ssrLoadModule('/src/lib/chatPresentation.ts');
 const birthdateHelpers = await server.ssrLoadModule('/src/lib/birthdate.ts');
 const storage = new Map();
 globalThis.localStorage = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };
@@ -246,4 +247,100 @@ test('new ideal preferences normalize XXL, retain fields on save and clear limit
   for (const key of ['topSize', 'hairStyle', 'minHeight', 'maxHeight']) assert.equal(cleared[key], null);
   for (const extra of [{ idealMinHeight: '190', idealMaxHeight: '150' }, { idealMinHeight: '-1' }, { idealMaxHeight: 'NaN' }, { idealTopSize: '3XL' }]) assert.throws(() => modules.onboarding.buildOnboardingPayload({ ...answers, ...extra }));
   calls.forEach(documented);
+});
+
+
+test('latest deployed feature gates enable documented APIs and retain unsupported operations behind gates', () => {
+  const c = modules.capabilities.capabilities;
+  for (const name of ['profileDiscovery', 'meetings', 'communities', 'reviews', 'chatSchedule']) assert.equal(c[name], true);
+  for (const name of ['chatDetails', 'chatReports', 'support', 'account', 'communityLeave', 'reviewManagement', 'publicReviews', 'chatScheduleExtras']) assert.equal(c[name], false);
+  assert.equal(Object.values(schema.paths).reduce((n,p) => n + Object.keys(p).length, 0), 44);
+});
+test('recommendations use the unpaginated live array and do not require a proposed canRequest field', async () => {
+  reply = () => ({ result: [{ memberId: 8, nickname: '하늘', age: 24, gender: 'FEMALE', majorId: 1, majorName: '컴퓨터공학과', topSize: 'XXL', smokingStatus: 'NON_SMOKER', tattooStatus: 'NONE', charmPoints: [] }] });
+  const page = await modules.date.getDateProfilePage();
+  assert.equal(page.items[0].nickname, '하늘');
+  assert.equal(page.items[0].top_size, '2XL');
+  assert.equal(page.items[0].id, 8);
+  assert.equal(page.hasNext, false);
+  assert.equal(calls[0].path, '/api/recommendations');
+  assert.equal(calls[0].query.size, 0);
+  calls.forEach(documented);
+});
+const community = { id: 100, creatorId: 7, title: '책 모임', description: null, emoji: '📚', tags: [], genderPolicy: 'ALL', active: true, memberCount: 1, joined: true, chatRoomId: 42, createdAt: '2026-11-15T10:00:00' };
+test('live communities use genderPolicy, server filters and status PATCH with no unsupported fields', async () => {
+  reply = req => ({ result: req.method === 'GET' ? { items: [community], hasNext: false, nextCursor: null } : { ...community, ...JSON.parse(req.body ?? '{}') } });
+  const input = { title: '책 모임', description: '', emoji: '📚', tags: [' 독서 '], gender: 'ANY' };
+  const created = await modules.community.createCommunity(input);
+  assert.equal(created.gender, 'ANY');
+  matches('CommunityCreateRequest', JSON.parse(calls[0].body));
+  assert.deepEqual(JSON.parse(calls[0].body), { title: '책 모임', description: '', emoji: '📚', tags: ['독서'], genderPolicy: 'ALL' });
+  await modules.community.updateCommunity(100, { ...input, active: false });
+  matches('CommunityUpdateRequest', JSON.parse(calls[1].body));
+  assert.equal(JSON.parse(calls[1].body).active, undefined);
+  assert.equal(JSON.parse(calls[1].body).genderPolicy, undefined);
+  assert.equal((await modules.community.setCommunityStatus(100, false)).active, false);
+  matches('CommunityStatusUpdateRequest', JSON.parse(calls[2].body));
+  await modules.community.getCommunities({ keyword: ' 독서 ', gender: 'MALE', tag: '책', cursor: 110 });
+  assert.equal(calls[3].query.get('search'), '독서');
+  assert.equal(calls[3].query.get('genderPolicy'), 'MALE_ONLY');
+  assert.equal(calls[3].query.has('keyword'), false);
+  calls.forEach(documented);
+});
+test('live review list, separate summary and create adapt ten-point units and paginate', async () => {
+  const raw = { id: 500, datingRequestId: 301, reviewerId: 8, reviewedMemberId: 7, rating: 35, content: '편했어요', createdAt: '2026-11-15T12:00:00' };
+  reply = req => ({ result: req.path.endsWith('/summary') ? { averageRating: 37.5, totalCount: 30 } : req.method === 'POST' ? { ...raw, ...JSON.parse(req.body) } : { items: [raw], hasNext: true, nextCursor: 500 } });
+  const page = await modules.review.getReviews('received', 600);
+  assert.equal(page.items[0].rating, 3.5); assert.equal(page.averageRating, 3.75); assert.equal(page.totalCount, 30);
+  assert.equal(calls[0].query.get('cursor'), '600');
+  assert.equal(calls[1].path, '/api/reviews/received/summary');
+  const created = await modules.review.createReview({ reviewedMemberId: 8, datingRequestId: 301, rating: 4, content: '좋아요' });
+  assert.equal(created.rating, 4);
+  matches('ReviewCreateRequest', JSON.parse(calls[2].body));
+  assert.deepEqual(JSON.parse(calls[2].body), { datingRequestId: 301, rating: 40, content: '좋아요' });
+  calls.forEach(documented);
+});
+test('chat message nicknames and live schedule permissions survive their adapters', async () => {
+  reply = req => ({ result: req.path.endsWith('/messages') ? { messages: [{ ...message(100), senderId: 2, senderNickname: '하늘' }], hasNext: false, nextCursor: null } : [{ id: 42, roomType: 'DATING', name: '소개팅', createdAt: '2026-11-15T12:00:00', scheduledAt: '2030-01-20T19:00:00', canManageSchedule: true }] });
+  const page = await modules.chat.getChatMessagePage(42);
+  assert.equal(page.messages[0].sender_nickname, '하늘');
+  const room = (await modules.chat.getChatRooms())[0];
+  assert.equal(room.can_set_schedule, true);
+  const schedule = await modules.schedule.getSchedule(42);
+  assert.equal(schedule.scheduledAt, '2030-01-20T19:00:00+09:00');
+  assert.equal(schedule.canEdit, true);
+  assert.equal(calls.some(c => c.path.endsWith('/schedule')), false);
+  calls.forEach(documented);
+});
+test('home summary, monthly and upcoming schedules use live routes and Korea timestamps', async () => {
+  reply = req => ({ result: req.path.endsWith('/summary') ? { receivedPendingCount: 12 } : [{ roomId: 42, roomType: 'DATING', roomName: '약속', scheduledAt: '2030-01-20T19:00:00' }] });
+  assert.equal((await modules.home.getHomeSummary()).receivedPendingCount, 12);
+  const monthly = await modules.schedule.getSchedules('2030-01-01', '2030-01-31');
+  assert.equal(monthly[0].title, '약속'); assert.equal(monthly[0].scheduledAt, '2030-01-20T19:00:00+09:00');
+  assert.equal(calls[1].query.get('year'), '2030'); assert.equal(calls[1].query.get('month'), '1');
+  await modules.schedule.getUpcomingSchedules(5);
+  assert.equal(calls[2].query.get('limit'), '5');
+  reply = req => ({ result: { roomId: 42, ...JSON.parse(req.body) } });
+  await modules.schedule.saveSchedule(42, { title: '제목', location: '장소', scheduledAt: '2030-01-20T10:00:00Z' });
+  matches('SaveChatScheduleRequest', JSON.parse(calls[3].body));
+  assert.deepEqual(JSON.parse(calls[3].body), { scheduledAt: '2030-01-20T19:00:00' });
+  calls.forEach(documented);
+});
+function displayMessage(id, sender, time, nickname) { return { id, room_id: 42, sender_id: sender, sender_nickname: nickname, content: '텍스트', is_read: false, created_at: time }; }
+test('consecutive messages show one nickname and the time only on the last message per sender and minute', () => {
+  const messages = [displayMessage(1,2,'2026-11-15T11:21:01+09:00','하늘'), displayMessage(2,2,'2026-11-15T11:21:30+09:00'), displayMessage(3,2,'2026-11-15T11:22:00+09:00'), displayMessage(4,7,'2026-11-15T11:22:10+09:00'), displayMessage(5,2,'2026-11-15T11:22:20+09:00')];
+  const rows = presentMessages(messages, 7);
+  assert.deepEqual(rows.map(r => r.showTime), [false,true,true,true,true]);
+  assert.deepEqual(rows.map(r => r.showSender), [true,false,false,false,true]);
+  assert.equal(rows[0].nickname, '하늘'); assert.equal(rows[4].nickname, '하늘');
+  const appended = presentMessages([...messages, displayMessage(6,2,'2026-11-15T11:22:40+09:00')], 7);
+  assert.equal(appended[4].showTime, false); assert.equal(appended[5].showTime, true);
+});
+test('chat groups break across dates and resolve names from participants or later messages without numeric IDs', () => {
+  const messages = [displayMessage(1,2,'2026-11-15T11:21:01+09:00'), displayMessage(2,2,'2026-11-16T11:21:01+09:00','새 닉네임')];
+  const rows = presentMessages(messages,7,[{ memberId:2,nickname:'이전 닉네임' }]);
+  assert.deepEqual(rows.map(r => r.showSender), [true,true]); assert.deepEqual(rows.map(r => r.showTime), [true,true]);
+  assert.equal(rows[0].nickname, '새 닉네임');
+  assert.equal(presentMessages([displayMessage(1,3,'2026-11-15T11:21:00+09:00')],7,[{memberId:3,nickname:'별명'}])[0].nickname,'별명');
+  assert.equal(presentMessages([displayMessage(1,4,'2026-11-15T11:21:00+09:00')],7)[0].nickname,'알 수 없는 회원');
 });

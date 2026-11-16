@@ -39,6 +39,9 @@ const spec = JSON.parse(
     "utf8",
   ),
 );
+const deployedSpec = JSON.parse(
+  await readFile(new URL("./fixtures/openapi.json", import.meta.url), "utf8"),
+);
 const storage = new Map();
 globalThis.localStorage = {
   getItem: (k) => storage.get(k) ?? null,
@@ -48,11 +51,12 @@ globalThis.localStorage = {
 globalThis.window = new EventTarget();
 let backend;
 let calls;
-function validate(schema, value) {
+function validate(schema, value, document = spec) {
   if (schema.$ref)
     return validate(
-      spec.components.schemas[schema.$ref.split("/").at(-1)],
+      document.components.schemas[schema.$ref.split("/").at(-1)],
       value,
+      document,
     );
   if (value === null) {
     assert.ok(schema.nullable, "unexpected null");
@@ -66,12 +70,19 @@ function validate(schema, value) {
     for (const [key, entry] of Object.entries(value)) {
       if (schema.additionalProperties === false)
         assert.ok(schema.properties[key], `undocumented ${key}`);
-      if (schema.properties[key]) validate(schema.properties[key], entry);
+      if (
+        entry === null &&
+        document === deployedSpec &&
+        !(schema.required ?? []).includes(key)
+      )
+        continue;
+      if (schema.properties[key])
+        validate(schema.properties[key], entry, document);
     }
   }
   if (schema.type === "array") {
     assert.ok(Array.isArray(value));
-    for (const entry of value) validate(schema.items, entry);
+    for (const entry of value) validate(schema.items, entry, document);
     if (schema.maxItems != null) assert.ok(value.length <= schema.maxItems);
   }
   if (schema.type === "string") {
@@ -102,16 +113,26 @@ beforeEach(() => {
   globalThis.fetch = async (url, init = {}) => {
     const u = new URL(url);
     const method = (init.method ?? "GET").toLowerCase();
-    const route = Object.keys(spec.paths).find((path) =>
+    const document = Object.entries(deployedSpec.paths).some(
+      ([path, methods]) =>
+        methods[method] &&
+        new RegExp("^" + path.replace(/\{[^}]+\}/g, "[^/]+") + "$").test(
+          u.pathname,
+        ),
+    )
+      ? deployedSpec
+      : spec;
+    const route = Object.keys(document.paths).find((path) =>
       new RegExp("^" + path.replace(/\{[^}]+\}/g, "[^/]+") + "$").test(
         u.pathname,
       ),
     );
-    const operation = spec.paths[route]?.[method];
+    const operation = document.paths[route]?.[method];
     if (operation?.requestBody)
       validate(
         operation.requestBody.content["application/json"].schema,
         JSON.parse(init.body),
+        document,
       );
     calls.push({
       path: u.pathname,
@@ -123,7 +144,7 @@ beforeEach(() => {
     if (response.ok && operation) {
       const body = await response.clone().json();
       const success = operation.responses["200"] ?? operation.responses["201"];
-      validate(success.content["application/json"].schema, body);
+      validate(Object.values(success.content)[0].schema, body, document);
     }
     return response;
   };
@@ -177,79 +198,75 @@ test("community creation and updates preserve fields, permissions and linked roo
     active: false,
   });
   assert.equal(changed.title, "새 책모임");
-  assert.equal(changed.status, "PAUSED");
+  assert.equal(changed.status, "RECRUITING");
+  await api.community.setCommunityStatus(created.id, false);
+  assert.equal((await api.community.getCommunity(created.id)).active, false);
   assert.equal(
     (await api.chat.getChatRoomDetail(created.chatRoomId)).room.name,
     "새 책모임",
   );
 });
-test("community join and leave update memberships and room access together", async () => {
+test("community joins link the exact room, preserve chances and block duplicate joins", async () => {
   const joined = await api.community.joinCommunity(101);
   assert.equal(joined.joined, true);
-  assert.equal(joined.canJoin, false);
   assert.ok(joined.chatRoomId);
   await assert.rejects(
     api.community.joinCommunity(101),
     (e) => e.status === 409,
   );
-  const roomId = joined.chatRoomId;
-  await api.community.leaveCommunity(101);
-  assert.equal((await api.community.getCommunity(101)).joined, false);
-  await assert.rejects(
-    api.chat.getChatRoomDetail(roomId),
-    (e) => e.status === 403,
-  );
+  assert.throws(() => api.community.leaveCommunity(101), /서버 연결/);
   assert.equal((await api.client.api.get("/api/chances")).remainingCount, 2);
 });
-test("community owner removal, counts, self-removal denial and closure are authoritative", async () => {
+test("community removal and recruitment status preserve existing chat and allow reopening", async () => {
   const before = await api.community.getCommunityDashboard(100);
   assert.equal(before.members.length, 3);
   await api.community.removeCommunityMember(100, 8);
   const after = await api.community.getCommunityDashboard(100);
   assert.equal(after.members.length, 2);
-  assert.equal(after.maleCount, 0);
   await assert.rejects(
     api.community.removeCommunityMember(100, 7),
     (e) => e.status === 403,
   );
-  await assert.rejects(
-    api.community.leaveCommunity(100),
-    (e) => e.status === 409,
+  const closed = await api.community.closeCommunity(100);
+  assert.equal(closed.status, "PAUSED");
+  assert.equal(
+    (await api.chat.getChatRooms()).some((r) => r.id === closed.chatRoomId),
+    true,
   );
-  await api.community.closeCommunity(100);
-  const group = await api.community.getCommunity(100);
-  assert.equal(group.status, "CLOSED");
-  assert.equal(group.canLeave, true);
-  assert.equal(group.canEdit, false);
-  await api.community.leaveCommunity(100);
-  assert.equal((await api.community.getCommunity(100)).joined, false);
+  assert.equal(
+    (await api.community.getCommunities()).items.some((g) => g.id === 100),
+    false,
+  );
+  assert.equal(
+    (await api.community.setCommunityStatus(100, true)).active,
+    true,
+  );
 });
-test("community validation rejects invalid fields before a network request and capacity reductions on server", async () => {
+test("community deployed limits reject invalid fields and omit unsupported capacity and status fields", async () => {
   const input = {
     emoji: "☕",
     title: "모임",
-    description: "소개",
+    description: "",
     tags: [],
     gender: "ANY",
     maxMembers: 10,
   };
   for (const patch of [
     { title: " " },
-    { maxMembers: 1 },
-    { maxMembers: 101 },
+    { title: "a".repeat(25) },
+    { description: "a".repeat(501) },
     { gender: "ALL" },
     { tags: ["a", "b", "c", "d", "e", "f"] },
   ])
     assert.throws(() => api.community.createCommunity({ ...input, ...patch }));
   assert.equal(calls.length, 0);
-  await assert.rejects(
-    api.community.updateCommunity(100, {
-      ...input,
-      maxMembers: 2,
-      active: true,
-    }),
-    (e) => e.status === 409,
-  );
+  await api.community.updateCommunity(100, { ...input, active: false });
+  assert.deepEqual(Object.keys(JSON.parse(calls[0].body)).sort(), [
+    "description",
+    "emoji",
+    "tags",
+    "title",
+  ]);
 });
 test("community filtering and cursor continuation return distinct pages", async () => {
   const first = await api.community.getCommunities({ keyword: "달려" });
@@ -265,10 +282,9 @@ test("community filtering and cursor continuation return distinct pages", async 
     [100],
   );
 });
-test("review eligibility, create, duplicate prevention, edit, received/public aggregation and delete", async () => {
+test("review targets come from accepted requests and creation uses ten-point units without a target member field", async () => {
   const targets = await api.review.getReviewTargets();
-  assert.equal(targets.find((t) => t.datingRequestId === 301).canReview, true);
-  assert.equal(targets.find((t) => t.datingRequestId === 300).canReview, false);
+  assert.deepEqual(targets.map((t) => t.datingRequestId).sort(), [300, 301]);
   const input = {
     reviewedMemberId: 11,
     datingRequestId: 301,
@@ -276,34 +292,23 @@ test("review eligibility, create, duplicate prevention, edit, received/public ag
     content: "좋았어요",
   };
   const created = await api.review.createReview(input);
+  assert.equal(created.rating, 5);
+  const body = JSON.parse(calls.find((c) => c.path === "/api/reviews").body);
+  assert.deepEqual(body, {
+    datingRequestId: 301,
+    rating: 50,
+    content: "좋았어요",
+  });
   await assert.rejects(
     api.review.createReview(input),
     (e) => e.status === 409 && e.code === "REVIEW_DUPLICATE",
   );
-  assert.equal(
-    (await api.review.getReviewTargets()).find((t) => t.datingRequestId === 301)
-      .canReview,
-    false,
-  );
-  const updated = await api.review.updateReview(created.id, {
-    rating: 3,
-    content: "수정했어요",
-  });
-  assert.equal(updated.rating, 3);
-  const summary = await api.review.getUserReviewSummary(11);
-  assert.equal(summary.totalCount, 1);
-  assert.equal(summary.averageRating, 3);
-  assert.equal(
-    (await api.review.getReviews("written")).items[0].content,
-    "수정했어요",
-  );
-  assert.equal((await api.review.getReviews("received")).totalCount, 1);
-  await api.review.deleteReview(created.id);
-  const empty = await api.review.getUserReviewSummary(11);
-  assert.equal(empty.totalCount, 0);
-  assert.equal(empty.averageRating, null);
+  const received = await api.review.getReviews("received");
+  assert.equal(received.totalCount, 1);
+  assert.equal(received.averageRating, 4);
+  assert.equal(received.items[0].rating, 4);
 });
-test("reviews enforce eligibility, authorship and rating bounds", async () => {
+test("reviews preserve eligibility failures and block undeployed editing and deletion", async () => {
   await assert.rejects(
     api.review.createReview({
       reviewedMemberId: 8,
@@ -313,10 +318,11 @@ test("reviews enforce eligibility, authorship and rating bounds", async () => {
     }),
     (e) => e.status === 403,
   );
-  await assert.rejects(
-    api.review.updateReview(500, { rating: 3, content: "" }),
-    (e) => e.status === 403,
+  assert.throws(
+    () => api.review.updateReview(500, { rating: 3, content: "" }),
+    /서버 연결/,
   );
+  assert.throws(() => api.review.deleteReview(500), /서버 연결/);
   assert.throws(() =>
     api.review.createReview({
       reviewedMemberId: 11,
@@ -334,23 +340,27 @@ test("reviews enforce eligibility, authorship and rating bounds", async () => {
     }),
   );
 });
-test("schedule save, Korea date boundaries, calendar lookup and cancellation share one record", async () => {
+test("schedule save uses Korea local time, room permissions and the deployed home routes", async () => {
   const future = new Date(Date.now() + 172800000);
   const date = api.schedule.koreanDate(future);
   const scheduledAt = `${date}T18:30:00+09:00`;
-  const saved = await api.schedule.saveSchedule(42, {
+  await api.schedule.saveSchedule(42, {
     title: "카페 약속",
     scheduledAt,
     location: "후문",
   });
-  assert.equal(saved.title, "카페 약속");
+  assert.deepEqual(JSON.parse(calls[0].body), {
+    scheduledAt: `${date}T18:30:00`,
+  });
   const read = await api.schedule.getSchedule(42);
-  assert.equal(read.id, saved.id);
   assert.equal(read.scheduledAt, scheduledAt);
+  assert.equal(read.canEdit, true);
   const calendar = await api.schedule.getSchedules(date, date);
-  assert.equal(calendar[0].id, saved.id);
-  await api.schedule.deleteSchedule(42);
-  assert.equal(await api.schedule.getSchedule(42), null);
+  assert.equal(calendar.find((s) => s.roomId === 42).scheduledAt, scheduledAt);
+  assert.ok(
+    (await api.schedule.getUpcomingSchedules()).some((s) => s.roomId === 42),
+  );
+  assert.throws(() => api.schedule.deleteSchedule(42), /서버 연결/);
   assert.throws(() =>
     api.schedule.saveSchedule(42, {
       title: "약속",

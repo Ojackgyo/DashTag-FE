@@ -140,6 +140,7 @@ export default function ReviewsPage() {
     getNextPageParam: (page, _pages, previous) => nextCursor(page, previous),
     enabled:
       capabilities.reviews &&
+      (!memberId || capabilities.publicReviews) &&
       tab !== "eligible" &&
       (memberId == null || (Number.isSafeInteger(memberId) && memberId > 0)),
   });
@@ -179,7 +180,9 @@ export default function ReviewsPage() {
           {memberId ? "회원 리뷰" : "대쉬서클 · 리뷰"}
         </h1>
       </div>
-      <ConnectionNotice available={capabilities.reviews} />
+      <ConnectionNotice
+        available={memberId ? capabilities.publicReviews : capabilities.reviews}
+      />
       {success && (
         <p role="status" className="feature-notice">
           {success}
@@ -195,7 +198,9 @@ export default function ReviewsPage() {
               {(
                 [
                   { key: "received", label: "받은 리뷰" },
-                  { key: "written", label: "쓴 리뷰" },
+                  ...(capabilities.reviewManagement
+                    ? [{ key: "written" as const, label: "쓴 리뷰" }]
+                    : []),
                   { key: "eligible", label: "작성하기" },
                 ] as const
               ).map((t) => (
@@ -273,10 +278,7 @@ export default function ReviewsPage() {
                     className="feature-row"
                     style={{ justifyContent: "space-between" }}
                   >
-                    <strong>
-                      {"★".repeat(r.rating)}
-                      {"☆".repeat(5 - r.rating)}
-                    </strong>
+                    <strong>★ {r.rating.toFixed(1)}</strong>
                     <small>
                       {new Date(r.updatedAt ?? r.createdAt).toLocaleDateString(
                         "ko-KR",

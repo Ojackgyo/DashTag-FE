@@ -15,6 +15,7 @@ import {
   joinCommunity,
   leaveCommunity,
   closeCommunity,
+  setCommunityStatus,
   getCommunityDashboard,
   removeCommunityMember,
   validateCommunity,
@@ -26,6 +27,7 @@ import type {
 } from "../api/community";
 import { nextCursor } from "../api/contracts";
 import { queryKeys } from "../lib/queryKeys";
+import { useMe } from "../hooks/useMe";
 import { useDebounce } from "../lib/hooks";
 import QueryStatus from "../components/QueryStatus";
 import {
@@ -67,7 +69,6 @@ function CommunityForm({
       : blank,
   );
   const [tagInput, setTagInput] = useState(value.tags.join(", "));
-  const [active, setActive] = useState(initial?.active ?? true);
   const [error, setError] = useState<Error | null>(null);
   const save = useMutation({
     mutationFn: async () => {
@@ -79,7 +80,7 @@ function CommunityForm({
           .filter(Boolean),
       });
       return initial
-        ? updateCommunity(initial.id, { ...body, active })
+        ? updateCommunity(initial.id, { ...body, active: initial.active })
         : createCommunity(body);
     },
     onSuccess: onSaved,
@@ -142,7 +143,8 @@ function CommunityForm({
           <input
             style={fieldStyle}
             required
-            maxLength={100}
+            minLength={2}
+            maxLength={24}
             value={value.title}
             disabled={save.isPending}
             onChange={(e) => setValue((v) => ({ ...v, title: e.target.value }))}
@@ -152,8 +154,7 @@ function CommunityForm({
           소개
           <textarea
             style={fieldStyle}
-            required
-            maxLength={2000}
+            maxLength={500}
             rows={4}
             value={value.description}
             disabled={save.isPending}
@@ -161,7 +162,7 @@ function CommunityForm({
               setValue((v) => ({ ...v, description: e.target.value }))
             }
           />
-          <small>{value.description.length}/2,000</small>
+          <small>{value.description.length}/500</small>
         </label>
         <label>
           태그 (쉼표로 구분, 최대 5개)
@@ -178,7 +179,7 @@ function CommunityForm({
           <select
             style={fieldStyle}
             value={value.gender}
-            disabled={save.isPending}
+            disabled={!!initial || save.isPending}
             onChange={(e) =>
               setValue((v) => ({
                 ...v,
@@ -193,35 +194,6 @@ function CommunityForm({
             ))}
           </select>
         </label>
-        <label>
-          정원 (개설자 포함)
-          <input
-            style={fieldStyle}
-            required
-            type="number"
-            min={2}
-            max={100}
-            value={value.maxMembers}
-            disabled={save.isPending}
-            onChange={(e) =>
-              setValue((v) => ({ ...v, maxMembers: Number(e.target.value) }))
-            }
-          />
-        </label>
-        {initial && (
-          <label>
-            <span>모집 상태</span>
-            <select
-              style={fieldStyle}
-              value={String(active)}
-              disabled={save.isPending}
-              onChange={(e) => setActive(e.target.value === "true")}
-            >
-              <option value="true">모집 중</option>
-              <option value="false">모집 중단</option>
-            </select>
-          </label>
-        )}
         <p style={{ color: "var(--text-muted)", fontSize: 12 }}>
           가입하면 소모임 채팅방에 함께 참여해요.
         </p>
@@ -245,6 +217,7 @@ function Dashboard({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { data: me } = useMe();
   const query = useQuery({
     queryKey: [...queryKeys.communities, id, "dashboard"],
     queryFn: () => getCommunityDashboard(id),
@@ -286,13 +259,13 @@ function Dashboard({
                 <div>
                   <strong>
                     {member.nickname}{" "}
-                    {member.role === "OWNER" ? "· 개설자" : ""}
+                    {member.memberId === me?.id ? "· 개설자" : ""}
                   </strong>
                   <p style={{ color: "var(--text-muted)", fontSize: 12 }}>
                     {member.majorName} · {member.age}세
                   </p>
                 </div>
-                {member.role !== "OWNER" &&
+                {member.memberId !== me?.id &&
                   query.data.community.canManageMembers && (
                     <Action
                       onClick={() =>
@@ -318,7 +291,7 @@ function Dashboard({
         <Confirm
           error={mutation.error}
           title="멤버를 내보낼까요?"
-          description={`${remove.name}님은 소모임과 채팅방에서 나가게 돼요.`}
+          description={`${remove.name}님은 소모임과 채팅방에서 나가며 다시 가입할 수 없어요.`}
           busy={mutation.isPending}
           onClose={() => setRemove(null)}
           onConfirm={() => mutation.mutate(remove.id)}
@@ -338,6 +311,7 @@ function CommunityDetail({
 }) {
   const navigate = useNavigate();
   const client = useQueryClient();
+  const { data: me } = useMe();
   const query = useQuery({
     queryKey: [...queryKeys.communities, id],
     queryFn: () => getCommunity(id),
@@ -347,9 +321,10 @@ function CommunityDetail({
   const [dashboard, setDashboard] = useState(false);
   const [confirm, setConfirm] = useState<"leave" | "close" | null>(null);
   const mutation = useMutation({
-    mutationFn: async (action: "join" | "leave" | "close") => {
+    mutationFn: async (action: "join" | "leave" | "close" | "reopen") => {
       if (action === "join") return joinCommunity(id);
       if (action === "close") return closeCommunity(id);
+      if (action === "reopen") return setCommunityStatus(id, true);
       await leaveCommunity(id);
       return getCommunity(id);
     },
@@ -360,6 +335,12 @@ function CommunityDetail({
     },
   });
   const group = query.data;
+  const owner = group?.creatorId === me?.id;
+  const canJoin =
+    group?.active &&
+    !group.joined &&
+    !!me &&
+    (group.gender === "ANY" || group.gender.toLowerCase() === me.gender);
   return (
     <Sheet
       title={group ? `${group.emoji} ${group.title}` : "소모임 상세"}
@@ -376,8 +357,7 @@ function CommunityDetail({
       {group && (
         <>
           <p style={{ color: "var(--text-muted)", marginBottom: 12 }}>
-            {genderLabel[group.gender]} · {group.memberCount}/{group.maxMembers}
-            명 ·{" "}
+            {genderLabel[group.gender]} · {group.memberCount}명 ·{" "}
             {
               { RECRUITING: "모집 중", PAUSED: "모집 중단", CLOSED: "종료" }[
                 group.status
@@ -400,12 +380,10 @@ function CommunityDetail({
           <div className="feature-form">
             {!group.joined && (
               <Action
-                disabled={!group.canJoin || mutation.isPending}
+                disabled={!canJoin || mutation.isPending}
                 onClick={() => mutation.mutate("join")}
               >
-                {group.canJoin
-                  ? "가입하고 채팅 참여"
-                  : "지금은 가입할 수 없어요"}
+                {canJoin ? "가입하고 채팅 참여" : "지금은 가입할 수 없어요"}
               </Action>
             )}
             {group.joined && group.chatRoomId != null && (
@@ -421,13 +399,13 @@ function CommunityDetail({
                 💬 채팅방으로 이동
               </Action>
             )}
-            {group.canEdit && (
+            {owner && (
               <Action onClick={() => setEditing(true)}>소모임 수정</Action>
             )}
-            {group.canManageMembers && (
+            {owner && (
               <Action onClick={() => setDashboard(true)}>멤버 관리</Action>
             )}
-            {group.canLeave && (
+            {capabilities.communityLeave && group.canLeave && (
               <Action
                 style={{
                   background: "var(--bg-card2)",
@@ -439,19 +417,22 @@ function CommunityDetail({
                 소모임 나가기
               </Action>
             )}
-            {group.canManageMembers && group.active && (
+            {owner && group.active && (
               <Action
                 style={{ background: "var(--bg-card2)", color: "#dc5467" }}
                 disabled={mutation.isPending}
                 onClick={() => setConfirm("close")}
               >
-                소모임 종료
+                모집 종료
               </Action>
             )}
-            {group.joined && !group.canLeave && (
-              <p style={{ color: "var(--text-muted)", fontSize: 12 }}>
-                개설자는 소모임을 종료한 뒤 나갈 수 있어요.
-              </p>
+            {owner && !group.active && (
+              <Action
+                disabled={mutation.isPending}
+                onClick={() => mutation.mutate("reopen")}
+              >
+                모집 재개
+              </Action>
             )}
           </div>
           {editing && (
@@ -478,12 +459,12 @@ function CommunityDetail({
               title={
                 confirm === "leave"
                   ? "소모임에서 나갈까요?"
-                  : "소모임을 종료할까요?"
+                  : "모집을 종료할까요?"
               }
               description={
                 confirm === "leave"
                   ? "소모임과 채팅방에서 나가게 돼요."
-                  : "새 가입과 채팅 전송이 중단돼요. 종료한 소모임은 다시 열 수 없어요."
+                  : "새 가입이 중단돼요. 기존 채팅은 계속 이용할 수 있고 모집을 다시 열 수 있어요."
               }
               busy={mutation.isPending}
               onClose={() => setConfirm(null)}
@@ -500,19 +481,17 @@ export default function CommunityPage() {
   const [search, setSearch] = useState("");
   const [keyword, setKeyword] = useState("");
   const [gender, setGender] = useState<CommunityGender>("ANY");
-  const [joinedOnly, setJoinedOnly] = useState(false);
   const [create, setCreate] = useState(false);
   const [id, setId] = useState<number | null>(null);
   const changeSearch = useDebounce((text: string) => setKeyword(text), 300);
   const query = useInfiniteQuery({
-    queryKey: [...queryKeys.communities, "list", keyword, gender, joinedOnly],
+    queryKey: [...queryKeys.communities, "list", keyword, gender],
     initialPageParam: undefined as number | undefined,
     queryFn: ({ pageParam }) =>
       getCommunities({
         cursor: pageParam,
         keyword,
         gender: gender === "ANY" ? undefined : gender,
-        joinedOnly: joinedOnly ? "true" : undefined,
       }),
     getNextPageParam: (page, _pages, previous) => nextCursor(page, previous),
     enabled: capabilities.communities,
@@ -555,17 +534,6 @@ export default function CommunityPage() {
           </button>
         ))}
       </div>
-      <label
-        className="feature-row"
-        style={{ color: "var(--text-sub)", marginBottom: 16 }}
-      >
-        <input
-          type="checkbox"
-          checked={joinedOnly}
-          onChange={(e) => setJoinedOnly(e.target.checked)}
-        />
-        내가 가입한 소모임
-      </label>
       <QueryStatus
         loading={query.isLoading}
         error={query.error}
@@ -599,7 +567,7 @@ export default function CommunityPage() {
             {g.description.slice(0, 90)}
           </p>
           <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            {genderLabel[g.gender]} · {g.memberCount}/{g.maxMembers}명 ·{" "}
+            {genderLabel[g.gender]} · {g.memberCount}명 ·{" "}
             {g.tags.map((t) => `#${t}`).join(" ")}
           </p>
         </button>

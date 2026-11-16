@@ -2,7 +2,7 @@ import { api } from "./client";
 import type { UserProfileResponse } from "./user";
 import { sanitizePlainText } from "../lib/security";
 import { requireCapability } from "./capabilities";
-import { nextCursor, pageQuery, type CursorPage } from "./contracts";
+import { type CursorPage } from "./contracts";
 interface DiscoveryProfile {
   memberId: number;
   nickname: string;
@@ -23,39 +23,36 @@ interface DiscoveryProfile {
   canRequest: boolean;
 }
 export async function getDateProfilePage(
-  cursor?: number,
+  _cursor?: number,
 ): Promise<CursorPage<UserProfileResponse>> {
   requireCapability("profileDiscovery");
-  const page = await api.get<CursorPage<DiscoveryProfile>>(
-    `/api/profiles?${pageQuery({ cursor })}`,
-  );
-  nextCursor(page, cursor);
+  void _cursor;
+  const profiles = await api.get<DiscoveryProfile[]>("/api/recommendations");
   return {
-    ...page,
-    items: page.items
-      .filter((p) => p.canRequest)
-      .map((p) => ({
-        id: p.memberId,
-        nickname: p.nickname,
-        age: p.age,
-        major_id: p.majorId,
-        major: p.majorName,
-        gender: p.gender.toLowerCase(),
-        face_type: p.faceType,
-        height: p.height,
-        top_size: (p.topSize === "XXL"
-          ? "2XL"
-          : p.topSize) as UserProfileResponse["top_size"],
-        skin_tone: p.skinTone,
-        hair_style: p.hairStyle,
-        mbti: p.mbti,
-        smoking_status: p.smokingStatus,
-        smoking: p.smokingStatus !== "NON_SMOKER",
-        tattoo_status: p.tattooStatus,
-        tattoo: p.tattooStatus !== "NONE",
-        military_status: p.militaryStatus,
-        charm_points: p.charmPoints,
-      })),
+    nextCursor: null,
+    hasNext: false,
+    items: profiles.map((p) => ({
+      id: p.memberId,
+      nickname: p.nickname,
+      age: p.age,
+      major_id: p.majorId,
+      major: p.majorName,
+      gender: p.gender.toLowerCase(),
+      face_type: p.faceType,
+      height: p.height,
+      top_size: (p.topSize === "XXL"
+        ? "2XL"
+        : p.topSize) as UserProfileResponse["top_size"],
+      skin_tone: p.skinTone,
+      hair_style: p.hairStyle,
+      mbti: p.mbti,
+      smoking_status: p.smokingStatus,
+      smoking: p.smokingStatus !== "NON_SMOKER",
+      tattoo_status: p.tattooStatus,
+      tattoo: p.tattooStatus !== "NONE",
+      military_status: p.militaryStatus,
+      charm_points: p.charmPoints,
+    })),
   };
 }
 export async function getDateProfiles(): Promise<UserProfileResponse[]> {

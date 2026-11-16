@@ -77,17 +77,19 @@ function ScheduleForm({
           if (!save.isPending) save.mutate();
         }}
       >
-        <label>
-          일정 제목
-          <input
-            style={fieldStyle}
-            required
-            maxLength={100}
-            disabled={!canEdit || save.isPending}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </label>
+        {capabilities.chatScheduleExtras && (
+          <label>
+            일정 제목
+            <input
+              style={fieldStyle}
+              required
+              maxLength={100}
+              disabled={!canEdit || save.isPending}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </label>
+        )}
         <label>
           날짜 (한국 시간)
           <input
@@ -111,16 +113,18 @@ function ScheduleForm({
             onChange={(e) => setTime(e.target.value)}
           />
         </label>
-        <label>
-          장소 (선택)
-          <input
-            style={fieldStyle}
-            maxLength={200}
-            disabled={!canEdit || save.isPending}
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-          />
-        </label>
+        {capabilities.chatScheduleExtras && (
+          <label>
+            장소 (선택)
+            <input
+              style={fieldStyle}
+              maxLength={200}
+              disabled={!canEdit || save.isPending}
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            />
+          </label>
+        )}
         <QueryStatus error={save.error ?? deletion.error} />
         <Action
           disabled={
@@ -132,7 +136,7 @@ function ScheduleForm({
         >
           {save.isPending ? "저장 중…" : "일정 저장"}
         </Action>
-        {initial && canEdit && (
+        {capabilities.chatScheduleExtras && initial && canEdit && (
           <Action
             type="button"
             disabled={save.isPending || deletion.isPending}

@@ -20,7 +20,7 @@ export interface CommunityResponse {
   createdAt: string;
   status: "RECRUITING" | "PAUSED" | "CLOSED";
   memberCount: number;
-  maxMembers: number;
+  maxMembers?: number;
   joined: boolean;
   chatRoomId: number | null;
   canEdit: boolean;
@@ -34,7 +34,7 @@ export interface CommunityCreate {
   description: string;
   tags: string[];
   gender: CommunityGender;
-  maxMembers: number;
+  maxMembers?: number;
 }
 export type CommunityUpdate = CommunityCreate & { active: boolean };
 export interface CommunityMemberInfo {
@@ -47,29 +47,45 @@ export interface CommunityMemberInfo {
   joinedAt: string;
 }
 export interface CommunityDashboard {
-  community: CommunityResponse;
+  community: Pick<CommunityResponse, "memberCount" | "canManageMembers">;
   maleCount: number;
   femaleCount: number;
   members: CommunityMemberInfo[];
 }
+const genderPolicy = {
+  ANY: "ALL",
+  MALE: "MALE_ONLY",
+  FEMALE: "FEMALE_ONLY",
+} as const;
+type CommunityApiResponse = Omit<CommunityResponse, "gender"> & {
+  gender?: CommunityGender;
+  genderPolicy: "ALL" | "MALE_ONLY" | "FEMALE_ONLY";
+};
+function adaptCommunity(value: CommunityApiResponse): CommunityResponse {
+  return {
+    ...value,
+    description: value.description ?? "",
+    tags: value.tags ?? [],
+    gender:
+      value.gender ??
+      ({ ALL: "ANY", MALE_ONLY: "MALE", FEMALE_ONLY: "FEMALE" } as const)[
+        value.genderPolicy
+      ],
+    status: value.status ?? (value.active ? "RECRUITING" : "PAUSED"),
+    canLeave: value.canLeave ?? false,
+  };
+}
 export function validateCommunity(body: CommunityCreate) {
   if (!["ANY", "MALE", "FEMALE"].includes(body.gender))
     throw new Error("가입 성별을 선택해주세요");
-  if (
-    !Number.isInteger(body.maxMembers) ||
-    body.maxMembers < 2 ||
-    body.maxMembers > 100
-  )
-    throw new Error("정원은 2~100명이에요");
-  const tags = [...new Set(body.tags.map((t) => textValue(t, "태그", 1, 20)))];
+  const tags = [...new Set(body.tags.map((t) => t.trim()).filter(Boolean))];
   if (tags.length > 5) throw new Error("태그는 최대 5개예요");
   return {
-    title: textValue(body.title, "제목", 1, 100),
-    description: textValue(body.description, "소개", 1, 2000),
-    emoji: textValue(body.emoji, "이모지", 1, 16),
+    title: textValue(body.title, "제목", 2, 24),
+    description: textValue(body.description, "소개", 0, 500),
+    emoji: textValue(body.emoji, "이모지", 1, 32),
     tags,
     gender: body.gender,
-    maxMembers: body.maxMembers,
   };
 }
 export async function getCommunities(
@@ -82,49 +98,77 @@ export async function getCommunities(
   } = {},
 ): Promise<CursorPage<CommunityResponse>> {
   requireCapability("communities");
-  const page = await api.get<CursorPage<CommunityResponse>>(
-    `/api/communities?${pageQuery(options)}`,
+  const page = await api.get<CursorPage<CommunityApiResponse>>(
+    `/api/communities?${pageQuery({ cursor: options.cursor, search: options.keyword?.trim(), genderPolicy: options.gender ? genderPolicy[options.gender] : undefined, tag: options.tag })}`,
   );
   nextCursor(page, options.cursor);
-  return page;
+  return { ...page, items: page.items.map(adaptCommunity) };
 }
-export function getCommunity(id: number) {
+export async function getCommunity(id: number) {
   requireCapability("communities");
-  return api.get<CommunityResponse>(`/api/communities/${positiveId(id)}`);
+  return adaptCommunity(
+    await api.get<CommunityApiResponse>(`/api/communities/${positiveId(id)}`),
+  );
 }
 export function createCommunity(body: CommunityCreate) {
   requireCapability("communities");
-  return api.post<CommunityResponse>(
-    "/api/communities",
-    validateCommunity(body),
+  const { gender, ...fields } = validateCommunity(body);
+  return api
+    .post<CommunityApiResponse>("/api/communities", {
+      ...fields,
+      genderPolicy: genderPolicy[gender],
+    })
+    .then(adaptCommunity);
+}
+export async function updateCommunity(id: number, body: CommunityUpdate) {
+  requireCapability("communities");
+  const { gender: _gender, ...fields } = validateCommunity(body);
+  void _gender;
+  return adaptCommunity(
+    await api.put<CommunityApiResponse>(
+      `/api/communities/${positiveId(id)}`,
+      fields,
+    ),
   );
 }
-export function updateCommunity(id: number, body: CommunityUpdate) {
+export async function setCommunityStatus(id: number, active: boolean) {
   requireCapability("communities");
-  return api.put<CommunityResponse>(`/api/communities/${positiveId(id)}`, {
-    ...validateCommunity(body),
-    active: body.active,
-  });
+  return adaptCommunity(
+    await api.patch<CommunityApiResponse>(
+      `/api/communities/${positiveId(id)}/status`,
+      { active },
+    ),
+  );
 }
-export function joinCommunity(id: number) {
+export async function joinCommunity(id: number) {
   requireCapability("communities");
-  return api.post<CommunityResponse>(`/api/communities/${positiveId(id)}/join`);
+  return adaptCommunity(
+    await api.post<CommunityApiResponse>(
+      `/api/communities/${positiveId(id)}/join`,
+    ),
+  );
 }
 export function leaveCommunity(id: number) {
-  requireCapability("communities");
+  requireCapability("communityLeave");
   return api.delete<void>(`/api/communities/${positiveId(id)}/leave`);
 }
 export function closeCommunity(id: number) {
-  requireCapability("communities");
-  return api.post<CommunityResponse>(
-    `/api/communities/${positiveId(id)}/close`,
-  );
+  return setCommunityStatus(id, false);
 }
-export function getCommunityDashboard(id: number) {
+export async function getCommunityDashboard(
+  id: number,
+): Promise<CommunityDashboard> {
   requireCapability("communities");
-  return api.get<CommunityDashboard>(
+  const value = await api.get<CommunityDashboard & { memberCount: number }>(
     `/api/communities/${positiveId(id)}/dashboard`,
   );
+  return {
+    ...value,
+    community: value.community ?? {
+      memberCount: value.memberCount,
+      canManageMembers: true,
+    },
+  };
 }
 export function removeCommunityMember(id: number, memberId: number) {
   requireCapability("communities");

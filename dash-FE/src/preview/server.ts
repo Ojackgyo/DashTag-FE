@@ -6,7 +6,11 @@ import type {
 } from "../api/community";
 import { validateCommunity } from "../api/community";
 import { validateReview, type ReviewResponse } from "../api/review";
-import { validateSchedule, type Schedule } from "../api/schedule";
+import {
+  koreanTimestamp,
+  validateSchedule,
+  type Schedule,
+} from "../api/schedule";
 import type { Inquiry } from "../api/support";
 
 type Member = {
@@ -452,9 +456,13 @@ export function createPreviewBackend(
         (m) => m.senderId !== me && m.id > (mine?.lastReadMessageId ?? 0),
       ).length,
       scheduledAt:
-        state.schedules.find((s) => s.roomId === r.id)?.scheduledAt ?? null,
+        state.meetings.find((m) => m.id === r.meetingId)?.scheduledAt ??
+        state.schedules.find((s) => s.roomId === r.id)?.scheduledAt ??
+        null,
       canSetSchedule:
-        r.active && (r.roomType === "DATING" || r.creatorId === me),
+        r.active &&
+        (r.roomType === "DATING" ||
+          (r.roomType === "COMMUNITY" && r.creatorId === me)),
       canLeave: !(r.roomType === "COMMUNITY" && r.creatorId === me && r.active),
       canClose: r.active && (r.roomType === "DATING" || r.creatorId === me),
     };
@@ -479,7 +487,7 @@ export function createPreviewBackend(
       g.active &&
       !g.closed &&
       !joined(g.members) &&
-      active(g.members).length < g.maxMembers &&
+      active(g.members).length < (g.maxMembers ?? 100) &&
       (g.gender === "ANY" || g.gender === member(me).gender),
     canLeave: joined(g.members) && (g.creatorId !== me || g.closed),
     canManageMembers: g.creatorId === me && !g.closed,
@@ -628,7 +636,7 @@ export function createPreviewBackend(
         rechargeAt,
       };
     }
-    if (p === "/api/profiles") {
+    if (p === "/api/recommendations" || p === "/api/profiles") {
       const profiles = state.members
         .filter(
           (m) =>
@@ -646,6 +654,7 @@ export function createPreviewBackend(
           majorName: "컴퓨터공학과",
           canRequest: true,
         }));
+      if (p === "/api/recommendations") return profiles;
       const result = page(
         profiles.map((m) => ({ ...m, id: m.memberId })),
         url,
@@ -812,13 +821,24 @@ export function createPreviewBackend(
       return meeting(m);
     }
     if (p === "/api/communities" && method === "GET") {
-      const keyword = url.searchParams.get("keyword")?.toLowerCase() ?? "";
-      const gender = url.searchParams.get("gender");
+      const keyword = url.searchParams.get("search")?.toLowerCase() ?? "";
+      const policy = url.searchParams.get("genderPolicy");
+      const gender = policy
+        ? (
+            { ALL: "ANY", MALE_ONLY: "MALE", FEMALE_ONLY: "FEMALE" } as Record<
+              string,
+              string
+            >
+          )[policy]
+        : undefined;
       return page(
         state.groups
           .filter(
             (g) =>
+              g.active &&
               !g.closed &&
+              (!url.searchParams.get("tag") ||
+                g.tags.includes(url.searchParams.get("tag")!)) &&
               (!gender || g.gender === gender) &&
               (g.title + " " + g.description).toLowerCase().includes(keyword) &&
               (url.searchParams.get("joinedOnly") !== "true" ||
@@ -829,7 +849,12 @@ export function createPreviewBackend(
       );
     }
     if (p === "/api/communities" && method === "POST") {
-      const valid = validateCommunity(body as CommunityCreate);
+      const valid = validateCommunity({
+        ...body,
+        gender: (
+          { ALL: "ANY", MALE_ONLY: "MALE", FEMALE_ONLY: "FEMALE" } as const
+        )[body.genderPolicy as "ALL"],
+      } as CommunityCreate);
       const members: Membership[] = [];
       add(members, me, true);
       const groupId = id();
@@ -848,7 +873,7 @@ export function createPreviewBackend(
       return group(g);
     }
     match = p.match(
-      /^\/api\/communities\/(\d+)(?:\/(join|leave|close|dashboard|members)(?:\/(\d+))?)?$/,
+      /^\/api\/communities\/(\d+)(?:\/(join|leave|close|status|dashboard|members)(?:\/(\d+))?)?$/,
     );
     if (match) {
       const g = getGroup(Number(match[1]));
@@ -905,6 +930,11 @@ export function createPreviewBackend(
         removeMember(g, me);
         return null;
       }
+      if (action === "status" && method === "PATCH") {
+        if (g.creatorId !== me) fail("개설자만 변경할 수 있어요", 403);
+        g.active = body.active;
+        return group(g);
+      }
       if (action === "close") {
         if (!group(g).canManageMembers) fail("종료할 권한이 없어요", 403);
         g.closed = true;
@@ -915,10 +945,8 @@ export function createPreviewBackend(
       }
       if (method === "PUT") {
         if (!group(g).canEdit) fail("수정 권한이 없어요", 403);
-        const valid = validateCommunity(body);
-        if (valid.maxMembers < active(g.members).length)
-          fail("현재 인원보다 작은 정원은 설정할 수 없어요", 409);
-        Object.assign(g, valid, { active: body.active });
+        const valid = validateCommunity({ ...body, gender: g.gender });
+        Object.assign(g, valid);
         state.rooms.find((r) => r.id === g.roomId)!.name = g.title;
         emit("ROOM_UPDATED", g.roomId);
       }
@@ -950,6 +978,15 @@ export function createPreviewBackend(
             reviewId: written?.id ?? null,
           };
         });
+    if (p === "/api/reviews/received/summary") {
+      const reviews = state.reviews.filter((r) => r.reviewedMemberId === me);
+      return {
+        totalCount: reviews.length,
+        averageRating: reviews.length
+          ? reviews.reduce((n, r) => n + r.rating * 10, 0) / reviews.length
+          : 0,
+      };
+    }
     match = p.match(/^\/api\/reviews\/(received|written|users\/\d+)$/);
     if (match) {
       const kind = match[1];
@@ -968,7 +1005,12 @@ export function createPreviewBackend(
           canDelete: r.reviewerId === me,
         }));
       return {
-        ...page(reviews, url),
+        ...page(
+          kind === "received"
+            ? reviews.map((r) => ({ ...r, rating: r.rating * 10 }))
+            : reviews,
+          url,
+        ),
         averageRating: reviews.length
           ? reviews.reduce((n, r) => n + r.rating, 0) / reviews.length
           : null,
@@ -976,10 +1018,15 @@ export function createPreviewBackend(
       };
     }
     if (p === "/api/reviews" && method === "POST") {
-      const input = validateReview(body);
       const dating =
-        state.dating.find((d) => d.id === input.datingRequestId) ??
+        state.dating.find((d) => d.id === body.datingRequestId) ??
         fail("소개팅이 없어요", 404);
+      const input = validateReview({
+        ...body,
+        rating: body.rating / 10,
+        reviewedMemberId:
+          dating.senderId === me ? dating.receiverId : dating.senderId,
+      });
       if (
         !dating.completed ||
         ![dating.senderId, dating.receiverId].includes(me) ||
@@ -992,7 +1039,8 @@ export function createPreviewBackend(
       if (
         state.reviews.some(
           (r) =>
-            r.datingRequestId === input.datingRequestId && r.reviewerId === me,
+            r.reviewedMemberId === input.reviewedMemberId &&
+            r.reviewerId === me,
         )
       )
         fail("이미 작성한 리뷰예요", 409, "REVIEW_DUPLICATE");
@@ -1007,7 +1055,7 @@ export function createPreviewBackend(
         canDelete: true,
       };
       state.reviews.push(review);
-      return review;
+      return { ...review, rating: review.rating * 10 };
     }
     match = p.match(/^\/api\/reviews\/(\d+)$/);
     if (match) {
@@ -1031,6 +1079,47 @@ export function createPreviewBackend(
         updatedAt: now(),
       });
       return review;
+    }
+    if (p === "/api/home/summary")
+      return {
+        receivedPendingCount: state.dating.filter(
+          (d) => d.receiverId === me && d.status === "PENDING",
+        ).length,
+      };
+    if (p === "/api/home/schedules" || p === "/api/home/schedules/upcoming") {
+      let items = state.rooms
+        .filter((r) => r.active && joined(r.members))
+        .map((r) => ({
+          roomId: r.id,
+          roomType: r.roomType,
+          roomName: r.name,
+          scheduledAt: summary(r).scheduledAt,
+        }))
+        .filter(
+          (s): s is typeof s & { scheduledAt: string } => !!s.scheduledAt,
+        );
+      if (p.endsWith("upcoming"))
+        items = items.filter(
+          (s) => Date.parse(koreanTimestamp(s.scheduledAt)) >= Date.now(),
+        );
+      else
+        items = items.filter((s) => {
+          const local = koreanTimestamp(s.scheduledAt);
+          const date = new Intl.DateTimeFormat("sv-SE", {
+            timeZone: "Asia/Seoul",
+          }).format(new Date(local));
+          return date.startsWith(
+            `${url.searchParams.get("year")}-${String(url.searchParams.get("month")).padStart(2, "0")}`,
+          );
+        });
+      items.sort(
+        (a, b) =>
+          Date.parse(koreanTimestamp(a.scheduledAt)) -
+            Date.parse(koreanTimestamp(b.scheduledAt)) || a.roomId - b.roomId,
+      );
+      return p.endsWith("upcoming")
+        ? items.slice(0, Number(url.searchParams.get("limit") ?? 5))
+        : items;
     }
     if (p === "/api/members/me/schedules") {
       const from = url.searchParams.get("from") ?? "";
@@ -1143,7 +1232,11 @@ export function createPreviewBackend(
           emit("SCHEDULE_DELETED", r.id);
           return null;
         }
-        const valid = validateSchedule(body);
+        const valid = validateSchedule({
+          title: r.name,
+          location: "",
+          scheduledAt: koreanTimestamp(body.scheduledAt),
+        });
         const schedule: Schedule = {
           ...valid,
           id: initial?.id ?? id(),

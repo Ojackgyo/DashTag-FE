@@ -131,7 +131,7 @@ export default function DatePage() {
         </p>
       </div>
 
-      {selectedProfile && capabilities.reviews && (
+      {selectedProfile && capabilities.publicReviews && (
         <button
           className="action-button"
           style={{ color: "var(--primary)" }}

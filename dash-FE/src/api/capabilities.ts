@@ -8,12 +8,16 @@ const enabled = new Set(
 );
 const planned = (name: string) => previewMode || enabled.has(name);
 export const capabilities = {
-  profileDiscovery: planned("profileDiscovery"),
+  profileDiscovery: true,
   meetings: true,
-  communities: planned("communities"),
-  reviews: planned("reviews"),
+  communities: true,
+  communityLeave: previewMode,
+  reviews: true,
+  reviewManagement: previewMode,
+  publicReviews: previewMode,
   chatDetails: planned("chatDetails"),
-  chatSchedule: planned("chatSchedule"),
+  chatSchedule: true,
+  chatScheduleExtras: previewMode,
   chatReports: planned("chatReports"),
   support: planned("support"),
   account: planned("account"),

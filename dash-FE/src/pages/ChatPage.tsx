@@ -26,6 +26,7 @@ import { ScheduleSheet, ReportSheet } from "../features/ChatActions";
 import { displaySchedule, getSchedule } from "../api/schedule";
 import { Action, Sheet, Confirm } from "../components/FeatureUI";
 import { cardStyle } from "../components/featureStyles";
+import { presentMessages } from "../lib/chatPresentation";
 
 interface OpenRoomState {
   type: string;
@@ -365,14 +366,11 @@ function ChatRoomView({
   const permissions = detail.data?.room ?? room;
   const allowSetDate =
     capabilities.chatSchedule && permissions.can_set_schedule === true;
-  const isGroup =
-    room.room_type === "meeting" || room.room_type === "community";
-
-  // sender_id → 닉네임 캐시 (sender_nickname 필드 있으면 그걸로, 없으면 ID 축약)
-  const nicknameOf = (msg: MessageResponse): string => {
-    if (msg.sender_nickname) return msg.sender_nickname;
-    return `#${msg.sender_id}`;
-  };
+  const displayMessages = presentMessages(
+    messages,
+    userId,
+    detail.data?.participants ?? room.participants,
+  );
 
   const formatMsgTime = (iso: string) => {
     const d = new Date(iso);
@@ -471,25 +469,20 @@ function ChatRoomView({
         </button>
       </div>
 
-      <p
-        role="status"
-        style={{
-          fontSize: 11,
-          padding: "6px 18px",
-          color: "var(--text-muted)",
-        }}
-      >
-        {unavailable
-          ? "종료되었거나 참여 권한이 없는 채팅방이에요"
-          : {
-              connecting: "실시간 연결 중…",
-              connected: "실시간 연결됨",
-              reconnecting: "실시간 재연결 중 · 메시지 복구 중",
-              unconfigured: "실시간 연결 대기 · REST로 새 메시지 확인 중",
-              closed: "연결 종료",
-              unauthorized: "인증 확인이 필요해요. 다시 로그인해주세요.",
-            }[connectionState]}
-      </p>
+      {(unavailable || connectionState === "unauthorized") && (
+        <p
+          role="status"
+          style={{
+            fontSize: 11,
+            padding: "6px 18px",
+            color: "var(--text-muted)",
+          }}
+        >
+          {unavailable
+            ? "종료되었거나 참여 권한이 없는 채팅방이에요"
+            : "인증 확인이 필요해요. 다시 로그인해주세요."}
+        </p>
+      )}
       <QueryStatus
         loading={loading}
         error={loadError ?? sendError ?? readError ?? schedule.error}
@@ -593,71 +586,69 @@ function ChatRoomView({
             </p>
           </div>
         )}
-        {messages.map((msg, idx) => {
-          const mine = msg.sender_id === userId;
-          const prevMsg = idx > 0 ? messages[idx - 1] : null;
-          const showSender =
-            !mine &&
-            (isGroup || room.room_type === "dating") &&
-            (!prevMsg || prevMsg.sender_id !== msg.sender_id);
-          return (
-            <div
-              key={msg.id}
-              className={`flex flex-col max-w-[78%] gap-[3px] ${mine ? "self-end items-end" : "self-start items-start"}`}
-            >
-              {showSender && (
-                <span
-                  className="text-[11px] font-semibold px-1"
-                  style={{ color: "var(--text-sub)" }}
-                >
-                  {nicknameOf(msg)}
-                </span>
-              )}
+        {displayMessages.map(
+          ({ message: msg, mine, nickname, showSender, showTime }) => {
+            return (
               <div
-                className="px-[14px] py-2.5 text-[14px] leading-relaxed break-words"
-                style={{
-                  borderRadius: mine
-                    ? "18px 18px 4px 18px"
-                    : "18px 18px 18px 4px",
-                  ...(mine
-                    ? { background: "var(--gradient)", color: "white" }
-                    : {
-                        background: "var(--bg-card)",
-                        border: "1px solid var(--border)",
-                        color: "var(--text)",
-                      }),
-                }}
+                key={msg.id}
+                className={`flex flex-col max-w-[78%] gap-[3px] ${mine ? "self-end items-end" : "self-start items-start"}`}
               >
-                {msg.content}
+                {showSender && (
+                  <span
+                    className="text-[11px] font-semibold px-1"
+                    style={{ color: "var(--text-sub)" }}
+                  >
+                    {nickname}
+                  </span>
+                )}
+                <div
+                  className="px-[14px] py-2.5 text-[14px] leading-relaxed break-words"
+                  style={{
+                    borderRadius: mine
+                      ? "18px 18px 4px 18px"
+                      : "18px 18px 18px 4px",
+                    ...(mine
+                      ? { background: "var(--gradient)", color: "white" }
+                      : {
+                          background: "var(--bg-card)",
+                          border: "1px solid var(--border)",
+                          color: "var(--text)",
+                        }),
+                  }}
+                >
+                  {msg.content}
+                </div>
+                {(showTime || (mine && detail.data)) && (
+                  <span
+                    className="text-[10px] px-0.5"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {showTime && formatMsgTime(msg.created_at)}
+                    {mine &&
+                      detail.data &&
+                      (() => {
+                        const others = detail.data.participants.filter(
+                          (p) => p.memberId !== userId && p.active,
+                        );
+                        const unread = others.filter(
+                          (p) =>
+                            Math.max(
+                              p.lastReadMessageId ?? 0,
+                              readPositions[p.memberId] ?? 0,
+                            ) < msg.id,
+                        ).length;
+                        return others.length
+                          ? unread
+                            ? `${showTime ? " · " : ""}안 읽음 ${unread}`
+                            : `${showTime ? " · " : ""}읽음`
+                          : "";
+                      })()}
+                  </span>
+                )}
               </div>
-              <span
-                className="text-[10px] px-0.5"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {formatMsgTime(msg.created_at)}
-                {mine &&
-                  detail.data &&
-                  (() => {
-                    const others = detail.data.participants.filter(
-                      (p) => p.memberId !== userId && p.active,
-                    );
-                    const unread = others.filter(
-                      (p) =>
-                        Math.max(
-                          p.lastReadMessageId ?? 0,
-                          readPositions[p.memberId] ?? 0,
-                        ) < msg.id,
-                    ).length;
-                    return others.length
-                      ? unread
-                        ? ` · 안 읽음 ${unread}`
-                        : " · 읽음"
-                      : "";
-                  })()}
-              </span>
-            </div>
-          );
-        })}
+            );
+          },
+        )}
         <div ref={bottomRef} />
       </div>
 
