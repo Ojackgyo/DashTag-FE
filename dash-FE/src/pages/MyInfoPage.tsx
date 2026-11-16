@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { faceTypeToEmoji, updateMe } from "../api/user";
@@ -10,12 +10,11 @@ import { getReceivedReviews } from "../api/review";
 import { useMe } from "../hooks/useMe";
 import { queryKeys } from "../lib/queryKeys";
 import type { UserResponse, UserUpdate } from "../api/user";
-import { getColleges } from "../api/college";
 import IdealPreferenceEditor from "../components/IdealPreferenceEditor";
 import {
   faceTypes,
   skinTones,
-  hairStyles,
+  hairStyles, hairStylesFor, hairStyleLabel, hairStyleAvailable,
   smokingStatuses,
   tattooStatuses,
   optionLabel,
@@ -63,8 +62,9 @@ interface FieldRow {
   label: string;
   displayValue: (u: UserResponse | null) => string;
   editorType:
-    "text" | "number" | "choice" | "boolean" | "mbti" | "major-select" | "tags";
+    "text" | "number" | "choice" | "boolean" | "mbti" | "tags";
   options?: string[];
+  readOnly?: boolean;
   min?: number;
   max?: number;
   unit?: string;
@@ -99,7 +99,8 @@ const FIELD_GROUPS: { title: string; rows: FieldRow[] }[] = [
         key: "major_id",
         label: "학과",
         displayValue: (u) => u?.major ?? "미설정",
-        editorType: "major-select",
+        editorType: "text",
+        readOnly: true,
       },
       {
         key: "mbti",
@@ -148,7 +149,7 @@ const FIELD_GROUPS: { title: string; rows: FieldRow[] }[] = [
       {
         key: "hair_style",
         label: "헤어스타일",
-        displayValue: (u) => optionLabel(hairStyles, u?.hair_style) || "미설정",
+        displayValue: (u) => hairStyleLabel(u?.gender, u?.hair_style) || "미설정",
         editorType: "choice",
         options: Object.keys(hairStyles),
       },
@@ -232,23 +233,8 @@ function FieldEditorSheet({
   const [tagsVal, setTagsVal] = useState<string[]>(
     Array.isArray(rawVal) ? rawVal : [],
   );
-  const [majorSearch, setMajorSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  const collegesQuery = useQuery({
-    queryKey: ["colleges"],
-    queryFn: getColleges,
-    enabled: field.editorType === "major-select",
-    staleTime: 300000,
-  });
-  const filteredMajors = useMemo(
-    () =>
-      (collegesQuery.data ?? [])
-        .flatMap((c) => c.majors)
-        .filter((m) => m.name.includes(majorSearch)),
-    [collegesQuery.data, majorSearch],
-  );
 
   const handleSave = async () => {
     setSaving(true);
@@ -263,9 +249,6 @@ function FieldEditorSheet({
         break;
       case "choice":
         value = choiceVal || null;
-        break;
-      case "major-select":
-        value = Number(choiceVal);
         break;
       case "boolean":
         value = boolVal;
@@ -291,11 +274,6 @@ function FieldEditorSheet({
           new Date(textVal) >= new Date())
       )
         throw new Error("올바른 생년월일을 입력해주세요");
-      if (
-        field.key === "major_id" &&
-        !filteredMajors.some((m) => m.id === Number(choiceVal))
-      )
-        throw new Error("학과를 목록에서 선택해주세요");
       await onSave(field.key, value);
       onClose();
     } catch (e) {
@@ -470,11 +448,14 @@ function FieldEditorSheet({
             </div>
           )}
 
+          {field.key === "height" && <button type="button" className="action-button" aria-label="키 5cm 늘리기" disabled={numVal >= (field.max ?? 200)} onClick={() => setNumVal(v => Math.min(field.max ?? 200, v + 5))} style={{ width: "100%", borderRadius: 12, color: "var(--primary)", background: "var(--primary-bg)", marginBottom: 12 }}>+5 cm</button>}
+
           {field.editorType === "choice" && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {(field.options ?? []).map((opt) => (
+              {(field.key === "hair_style" ? Object.keys(hairStylesFor(user?.gender)) : field.options ?? []).map((opt) => (
                 <button
                   key={opt}
+                  disabled={field.key === "hair_style" && !hairStyleAvailable(opt)}
                   onClick={() => setChoiceVal(opt)}
                   style={{
                     padding: "10px 16px",
@@ -496,7 +477,7 @@ function FieldEditorSheet({
                 >
                   {field.key === "face_type"
                     ? `${faceTypeToEmoji(opt)} ${optionLabel(faceTypes, opt)}`
-                    : optionLabel(FIELD_OPTIONS[field.key] ?? {}, opt)}
+                    : field.key === "hair_style" ? `${hairStyleLabel(user?.gender, opt)}${hairStyleAvailable(opt) ? "" : " (준비 중)"}` : optionLabel(FIELD_OPTIONS[field.key] ?? {}, opt)}
                 </button>
               ))}
             </div>
@@ -607,73 +588,6 @@ function FieldEditorSheet({
                 >
                   {mbtiVal.join("")}
                 </span>
-              </div>
-            </div>
-          )}
-
-          {field.editorType === "major-select" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <input
-                style={{
-                  width: "100%",
-                  padding: "12px 14px",
-                  borderRadius: 12,
-                  fontSize: 14,
-                  background: "var(--bg-card2)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text)",
-                  marginBottom: 4,
-                  boxSizing: "border-box",
-                }}
-                placeholder="학과 검색..."
-                value={majorSearch}
-                onChange={(e) => setMajorSearch(e.target.value)}
-                autoFocus
-              />
-              <QueryStatus
-                loading={collegesQuery.isLoading}
-                error={collegesQuery.error}
-                retry={() => {
-                  void collegesQuery.refetch();
-                }}
-              />
-              <div
-                style={{
-                  maxHeight: 260,
-                  overflowY: "auto",
-                  scrollbarWidth: "none",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 2,
-                }}
-              >
-                {filteredMajors.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => setChoiceVal(String(m.id))}
-                    style={{
-                      padding: "12px 14px",
-                      borderRadius: 10,
-                      fontSize: 14,
-                      fontWeight: 600,
-                      textAlign: "left",
-                      background:
-                        choiceVal === String(m.id)
-                          ? "var(--primary-bg)"
-                          : "transparent",
-                      color:
-                        choiceVal === String(m.id)
-                          ? "var(--primary)"
-                          : "var(--text-sub)",
-                      border:
-                        choiceVal === String(m.id)
-                          ? "1px solid var(--primary-border)"
-                          : "1px solid transparent",
-                    }}
-                  >
-                    {m.name}
-                  </button>
-                ))}
               </div>
             </div>
           )}
@@ -963,7 +877,8 @@ function MyProfileSheet({
               return (
                 <button
                   key={row.key}
-                  onClick={() => setEditField(row)}
+                  disabled={row.readOnly}
+                  onClick={() => { if (!row.readOnly) setEditField(row); }}
                   style={{
                     width: "100%",
                     display: "flex",
@@ -1011,7 +926,7 @@ function MyProfileSheet({
                         flexShrink: 0,
                       }}
                     >
-                      ›
+                      {row.readOnly ? "" : "›"}
                     </span>
                   </div>
                 </button>
@@ -1367,7 +1282,7 @@ export default function MyInfoPage() {
         onClick={() => navigate("/account")}
         style={{ color: "var(--text-sub)", width: "100%" }}
       >
-        계정 관리 · 비밀번호 / 탈퇴
+        회원 탈퇴 · 계정 관리
       </button>
       <QueryStatus error={logoutError} />
       {/* 로그아웃 */}

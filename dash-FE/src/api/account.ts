@@ -22,7 +22,7 @@ export async function resetPassword(resetToken: string, password: string) {
   clearTokens();
 }
 export function withdrawAccount(password: string) {
-  requireCapability("account");
+  requireCapability("accountWithdrawal");
   if (!password) throw new Error("현재 비밀번호를 입력해주세요");
   return api.post<void>("/api/members/me/withdrawal", {
     password,

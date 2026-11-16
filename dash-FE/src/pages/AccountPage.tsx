@@ -185,8 +185,9 @@ export default function AccountPage() {
   });
   return (
     <div className="page-container px-[18px] pb-6">
+      <button type="button" className="action-button" onClick={() => navigate("/myinfo")}>‹ 내 정보로</button>
       <h1 className="feature-title">계정 관리</h1>
-      <ConnectionNotice available={capabilities.account} />
+      <ConnectionNotice available={capabilities.accountWithdrawal} />
       <Action onClick={() => navigate("/password-reset")}>
         비밀번호 재설정
       </Action>
@@ -208,7 +209,7 @@ export default function AccountPage() {
         className="feature-form"
         onSubmit={(e) => {
           e.preventDefault();
-          setConfirm(true);
+          if (capabilities.accountWithdrawal && confirmation === "탈퇴" && password && !mutation.isPending) setConfirm(true);
         }}
       >
         <label>
@@ -236,7 +237,7 @@ export default function AccountPage() {
         <QueryStatus error={mutation.error} />
         <Action
           disabled={
-            !capabilities.account ||
+            !capabilities.accountWithdrawal ||
             confirmation !== "탈퇴" ||
             !password ||
             mutation.isPending

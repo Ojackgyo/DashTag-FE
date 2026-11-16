@@ -1,19 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { verifyStudent } from '../api/studentVerification';
+import { capabilities } from '../api/capabilities';
+import type { MajorResponse } from '../api/college';
+import MajorPicker from './MajorPicker';
 
 type Props = {
-  onChange: (studentId: string) => void;
-  onPreFill: (name: string, birthDate: string) => void;
+  initialVerified?: boolean;
+  initialMajor?: MajorResponse | null;
+  onVerified: (data: { studentNumber: string; name: string; major: MajorResponse }) => void;
 };
 
-export default function StudentIdVerify({ onChange, onPreFill }: Props) {
+export default function StudentIdVerify({ initialVerified = false, initialMajor = null, onVerified }: Props) {
   const [studentNumber, setStudentNumber] = useState('');
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [verified, setVerified] = useState(false);
+  const [verified, setVerified] = useState(initialVerified);
   const [error, setError] = useState('');
+  const [major, setMajor] = useState<MajorResponse | null>(initialMajor);
+  const [complete, setComplete] = useState(initialVerified && !!initialMajor);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     if (!file) { setPreview(''); return; }
@@ -31,33 +43,48 @@ export default function StudentIdVerify({ onChange, onPreFill }: Props) {
       return;
     }
     setFile(next);
-    onChange('');
   };
 
   const confirm = async () => {
-    if (submitting || verified) return;
+    if (submitting || complete) return;
+    if ((capabilities.studentVerificationMajor || verified) && !major) { setError('학과를 선택해주세요'); return; }
+    if (verified) {
+      if (capabilities.studentVerificationMajor) { setError('인증된 학과 정보를 불러올 수 없어요. 다시 로그인해주세요.'); return; }
+      setComplete(true);
+      onVerified({ studentNumber: studentNumber || 'verified', name, major: major! });
+      return;
+    }
     if (!/^\d{8}$/.test(studentNumber)) { setError('숫자 8자리 학번을 입력해주세요'); return; }
     if (name.trim().length < 2 || name.trim().length > 20) { setError('학생증에 표시된 이름을 2~20자로 입력해주세요'); return; }
     if (!file) { setError('모바일 학생증 이미지를 선택해주세요'); return; }
     setSubmitting(true);
     setError('');
     try {
-      await verifyStudent(studentNumber, name.trim(), file);
+      const result = await verifyStudent(studentNumber, name.trim(), file, major?.id);
+      if (!mounted.current) return;
       setVerified(true);
-      onPreFill(name.trim(), '');
-      onChange(studentNumber);
+      if (capabilities.studentVerificationMajor) {
+        if (!Number.isInteger(result.majorId) || !result.majorId || result.majorId <= 0 || !result.majorName) { setError('인증된 학과 정보를 불러올 수 없어요. 다시 로그인해주세요.'); return; }
+        const confirmedMajor = { id: result.majorId, name: result.majorName };
+        setMajor(confirmedMajor);
+        setComplete(true);
+        onVerified({ studentNumber, name: name.trim(), major: confirmedMajor });
+      }
     } catch (e) {
+      if (!mounted.current) return;
       setError(e instanceof Error ? e.message : '학생 인증에 실패했어요. 다시 시도해주세요');
-    } finally { setSubmitting(false); }
+    } finally { if (mounted.current) setSubmitting(false); }
   };
 
-  if (verified) return <div role="status" style={{ padding: 24, marginTop: 20, textAlign: 'center', background: 'var(--primary-bg)', borderRadius: 16 }}>
+  if (complete) return <div role="status" style={{ padding: 24, marginTop: 20, textAlign: 'center', background: 'var(--primary-bg)', borderRadius: 16 }}>
     <p style={{ fontSize: 32 }}>✅</p>
     <p style={{ fontWeight: 700, color: 'var(--text)' }}>학생 인증이 완료됐어요</p>
+    <p style={{ marginTop: 8 }}>{major?.name}</p>
     <p style={{ marginTop: 8, color: 'var(--text-muted)' }}>다음 단계에서 프로필을 작성해주세요.</p>
   </div>;
 
   return <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    {!verified && <>
     <p style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--text-sub)' }}>모바일 학생증에 표시된 학번과 이름을 입력해주세요.<br />학번·이름·바코드가 잘 보이는 원본 이미지를 선택해주세요.</p>
     <label style={{ color: 'var(--text)', fontWeight: 700 }}>
       학번
@@ -73,9 +100,12 @@ export default function StudentIdVerify({ onChange, onPreFill }: Props) {
     </label>
     {preview && <img src={preview} alt="선택한 학생증 미리보기" style={{ width: '100%', maxHeight: 320, objectFit: 'contain', borderRadius: 12 }} />}
     <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>인증하기를 누르면 입력 정보와 이미지가 학생 인증을 위해 서버로 전송돼요.</p>
+    </>}
+    {(verified || capabilities.studentVerificationMajor) ? <MajorPicker value={major} onChange={setMajor} disabled={submitting || (verified && capabilities.studentVerificationMajor)} label="학생증 학과" /> : <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>학생 인증 후 이 화면에서 학과를 선택해주세요.</p>}
+    {verified && <p role="status">학생 인증이 완료됐어요. 학과를 확인해주세요.</p>}
     {error && <p role="alert" style={{ color: '#FF6B6B', fontSize: 13 }}>{error}</p>}
-    <button className="action-button" type="button" onClick={confirm} disabled={submitting || !file || !studentNumber || !name.trim()} style={{ padding: 16, borderRadius: 16, background: 'var(--gradient)', color: 'white', fontWeight: 700, opacity: submitting || !file ? 0.6 : 1 }}>
-      {submitting ? '학생증 인증 중…' : '학생 인증하기'}
+    <button className="action-button" type="button" onClick={confirm} disabled={submitting || (verified ? !major : !file || !studentNumber || !name.trim() || (capabilities.studentVerificationMajor && !major))} style={{ padding: 16, borderRadius: 16, background: 'var(--gradient)', color: 'white', fontWeight: 700, opacity: submitting ? 0.6 : 1 }}>
+      {submitting ? '학생증 인증 중…' : verified ? '학과 확인하기' : '학생 인증하기'}
     </button>
   </div>;
 }

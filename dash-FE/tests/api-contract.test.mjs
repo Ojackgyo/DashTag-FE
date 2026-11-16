@@ -7,7 +7,7 @@ const schema = JSON.parse(await readFile(new URL('./fixtures/openapi.json', impo
 const server = await createServer({ cacheDir: '/private/tmp/dashtag-existing-tests-cache', server: { middlewareMode: true, hmr: false, ws: false, watch: null }, appType: 'custom' });
 after(() => server.close());
 const modules = {};
-for (const name of ['client', 'auth', 'home', 'date', 'chat', 'chance', 'user', 'college', 'idealPreference', 'studentVerification', 'onboarding', 'meeting', 'community', 'review', 'schedule', 'capabilities']) {
+for (const name of ['client', 'auth', 'home', 'date', 'chat', 'chance', 'user', 'college', 'idealPreference', 'studentVerification', 'onboarding', 'meeting', 'community', 'review', 'schedule', 'capabilities', 'profileOptions']) {
   modules[name] = await server.ssrLoadModule(`/src/api/${name}.ts`);
 }
 const { presentMessages } = await server.ssrLoadModule('/src/lib/chatPresentation.ts');
@@ -56,13 +56,35 @@ test('onboarding matches deployed enums, required topSize and separate age limit
   assert.equal(result.profile.topSize, 'XXL'); assert.equal(result.profile.hairStyle, 'MEDIUM_LENGTH');
   assert.equal(result.profile.militaryStatus, 'COMPLETED'); assert.equal(result.ideal.tattooPreference, 'NONE_ONLY');
   assert.equal(result.ideal.maxYoungerAgeDiff, 1); assert.equal(result.ideal.maxOlderAgeDiff, 7);
-  assert.equal(result.ideal.militaryPreference, 'COMPLETED_PREFERRED');
+  assert.equal(result.ideal.militaryPreference, 'ANY');
 });
 test('unlimited and zero age preferences survive, female military is not applicable', () => {
   const result = modules.onboarding.buildOnboardingPayload({ ...answers, gender: '여성', idealAge: 'any,0', idealMilitary: '' });
   assert.equal(result.ideal.maxYoungerAgeDiff, null); assert.equal(result.ideal.maxOlderAgeDiff, 0);
   assert.equal(result.profile.militaryStatus, 'NOT_APPLICABLE');
   assert.equal(modules.onboarding.buildOnboardingPayload({ ...answers, military: '미필' }).profile.militaryStatus, 'NOT_SERVED');
+});
+test('male ideal preferences override a saved military choice with ANY and retain zero age limits', async () => {
+  const { profile, ideal } = modules.onboarding.buildOnboardingPayload({ ...answers, idealAge: '0,0' });
+  assert.equal(ideal.militaryPreference, 'ANY');
+  assert.equal(profile.militaryStatus, 'COMPLETED');
+  reply = req => ({ result: JSON.parse(req.body) });
+  const saved = await modules.idealPreference.saveIdealPreference({ ...ideal, militaryPreference: 'COMPLETED_PREFERRED' }, 'male');
+  assert.equal(saved.militaryPreference, 'ANY');
+  assert.equal(saved.maxYoungerAgeDiff, 0);
+  assert.equal(saved.maxOlderAgeDiff, 0);
+  matches('IdealPreferenceRequest', JSON.parse(calls[0].body));
+  calls.forEach(documented);
+});
+test('female ideal preferences preserve the selected military preference and unlimited age limits', async () => {
+  const { ideal } = modules.onboarding.buildOnboardingPayload({ ...answers, gender: '여성', idealAge: 'any,any' });
+  assert.equal(ideal.militaryPreference, 'COMPLETED_PREFERRED');
+  reply = req => ({ result: JSON.parse(req.body) });
+  const saved = await modules.idealPreference.saveIdealPreference(ideal, 'female');
+  assert.equal(saved.militaryPreference, 'COMPLETED_PREFERRED');
+  assert.equal(saved.maxYoungerAgeDiff, null);
+  assert.equal(saved.maxOlderAgeDiff, null);
+  calls.forEach(documented);
 });
 test('birthdate adds separators while typing and supports deletion and pasting', () => {
   const cases = [['2','2'], ['2000','2000'], ['20000','2000-0'], ['200001','2000-01'], ['2000010','2000-01-0'], ['20000102','2000-01-02'], ['2000-01-0','2000-01-0'], ['2000.01.02','2000-01-02']];
@@ -109,9 +131,9 @@ test('profile 404 remains distinct from auth failure for onboarding routing', as
 test('profile load resolves major ID; edits preserve all other required fields including topSize', async () => {
   reply = req => ({ result: req.path === '/api/colleges' ? [{ id: 1, name: '공대', majors: [{ id: 1, name: '컴퓨터공학과' }, { id: 2, name: '기계공학과' }] }] : req.method === 'PUT' ? { ...JSON.parse(req.body), memberId: 7 } : profile });
   const me = await modules.user.getMe(); assert.equal(me.major, '컴퓨터공학과'); assert.equal(me.top_size, '2XL');
-  await modules.user.updateMe({ nickname: 'Updated', major_id: 2, charm_points: [] });
+  await modules.user.updateMe({ nickname: 'Updated', charm_points: [] });
   const body = JSON.parse(calls.find(c => c.method === 'PUT').body);
-  matches('MemberProfileRequest', body); assert.equal(body.topSize, 'XXL'); assert.equal(body.majorId, 2); assert.deepEqual(body.charmPoints, []);
+  matches('MemberProfileRequest', body); assert.equal(body.topSize, 'XXL'); assert.equal(body.majorId, 1); assert.deepEqual(body.charmPoints, []);
   assert.equal(body.smokingStatus, 'OCCASIONAL'); calls.forEach(documented);
 });
 test('student verification sends original file and exact multipart fields, no JSON content type', async () => {
@@ -343,4 +365,30 @@ test('chat groups break across dates and resolve names from participants or late
   assert.equal(rows[0].nickname, '새 닉네임');
   assert.equal(presentMessages([displayMessage(1,3,'2026-11-15T11:21:00+09:00')],7,[{memberId:3,nickname:'별명'}])[0].nickname,'별명');
   assert.equal(presentMessages([displayMessage(1,4,'2026-11-15T11:21:00+09:00')],7)[0].nickname,'알 수 없는 회원');
+});
+
+
+test('profile editing refuses department changes before any request', async () => {
+  await assert.rejects(() => modules.user.updateMe({ major_id: 2 }), /학과/);
+  await assert.rejects(() => modules.user.updateMe({ major: '기계공학과' }), /학과/);
+  assert.equal(calls.length, 0);
+});
+
+test('hair choices use gender length categories and opposite gender ideal preferences', () => {
+  const options = modules.profileOptions;
+  assert.deepEqual(Object.values(options.hairStylesFor('남성')), ['짧은 기장 머리', '중간 기장 머리', '긴 기장 머리', '장발']);
+  assert.deepEqual(Object.values(options.hairStylesFor('FEMALE')), ['단발', '중단발', '장발']);
+  assert.deepEqual(options.idealHairStylesFor('MALE'), options.femaleHairStyles);
+  const result = modules.onboarding.buildOnboardingPayload({ ...answers, hairStyle: '긴 기장 머리', idealHairStyle: '장발' });
+  assert.equal(result.profile.hairStyle, 'LONG');
+  assert.equal(result.ideal.hairStyle, 'LONG');
+  assert.throws(() => modules.onboarding.buildOnboardingPayload({ ...answers, hairStyle: '장발' }), /준비 중/);
+});
+
+test('undeployed department meetings fail without silently creating unrestricted meetings', async () => {
+  await assert.rejects(() => modules.meeting.createMeeting({ title: '과팅', required_male: 2, required_female: 2, scheduled_at: '2099-12-01T18:00:00', meeting_type: 'DEPARTMENT', host_major_id: 1, target_major_id: 2 }), /준비/);
+  assert.equal(calls.length, 0);
+  assert.equal(modules.capabilities.capabilities.departmentMeetings, false);
+  assert.equal(modules.capabilities.capabilities.studentVerificationMajor, false);
+  assert.equal(modules.capabilities.capabilities.accountWithdrawal, false);
 });

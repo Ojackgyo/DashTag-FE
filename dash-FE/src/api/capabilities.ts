@@ -10,6 +10,9 @@ const planned = (name: string) => previewMode || enabled.has(name);
 export const capabilities = {
   profileDiscovery: true,
   meetings: true,
+  departmentMeetings: planned("departmentMeetings"),
+  studentVerificationMajor: planned("studentVerificationMajor"),
+  hairLengthCategories: planned("hairLengthCategories"),
   communities: true,
   communityLeave: previewMode,
   reviews: true,
@@ -21,6 +24,7 @@ export const capabilities = {
   chatReports: planned("chatReports"),
   support: planned("support"),
   account: planned("account"),
+  accountWithdrawal: planned("accountWithdrawal") || planned("account"),
 };
 export function requireCapability(name: keyof typeof capabilities) {
   if (!capabilities[name])

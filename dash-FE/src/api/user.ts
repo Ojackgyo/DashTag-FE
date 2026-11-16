@@ -1,6 +1,6 @@
 import { api } from './client';
 import { getColleges } from './college';
-import { faceTypes, skinTones, hairStyles, optionValue } from './profileOptions';
+import { faceTypes, skinTones, hairStylesFor, hairStyleValue, optionValue } from './profileOptions';
 
 export interface MemberProfileRequest {
   nickname: string; gender: string; birthdate: string; majorId: number;
@@ -79,13 +79,14 @@ export async function saveMemberProfile(body: MemberProfileRequest): Promise<Use
 }
 
 export async function updateMe(body: UserUpdate): Promise<UserResponse> {
+  if (body.major_id != null || body.major != null) throw new Error('학과는 학생증 인증 정보로 관리돼요');
   const p = await api.get<MemberProfileApiResponse>('/api/members/me/profile');
   return saveMemberProfile({
     nickname: body.nickname ?? p.nickname, gender: body.gender ?? p.gender,
-    birthdate: body.birthdate ?? p.birthdate, majorId: body.major_id ?? p.majorId,
+    birthdate: body.birthdate ?? p.birthdate, majorId: p.majorId,
     faceType: optionValue(faceTypes, body.face_type ?? p.faceType), height: body.height ?? p.height,
     topSize: body.top_size === '2XL' ? 'XXL' : body.top_size ?? p.topSize,
-    skinTone: optionValue(skinTones, body.skin_tone ?? p.skinTone), hairStyle: optionValue(hairStyles, body.hair_style ?? p.hairStyle),
+    skinTone: optionValue(skinTones, body.skin_tone ?? p.skinTone), hairStyle: hairStyleValue(hairStylesFor(body.gender ?? p.gender), body.hair_style ?? p.hairStyle),
     mbti: body.mbti ?? p.mbti,
     smokingStatus: body.smoking_status ?? (body.smoking == null ? p.smokingStatus : body.smoking ? 'SMOKER' : 'NON_SMOKER'),
     tattooStatus: body.tattoo_status ?? (body.tattoo == null ? p.tattooStatus : body.tattoo ? 'SMALL' : 'NONE'),

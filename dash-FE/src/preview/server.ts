@@ -70,6 +70,9 @@ type Group = Omit<
   | "status"
 > & { roomId: number; members: Membership[]; closed: boolean };
 type Meeting = {
+  meetingType?: "MEETING" | "DEPARTMENT";
+  hostMajorId?: number | null;
+  targetMajorId?: number | null;
   id: number;
   creatorId: number;
   title: string;
@@ -492,7 +495,14 @@ export function createPreviewBackend(
     canLeave: joined(g.members) && (g.creatorId !== me || g.closed),
     canManageMembers: g.creatorId === me && !g.closed,
   });
+  const majorName = (id?: number | null) => id === 1 ? "컴퓨터공학과" : id === 2 ? "기계공학과" : id === 3 ? "경영학과" : null;
   const meeting = (m: Meeting) => ({
+    meetingType: m.meetingType ?? "MEETING",
+    hostMajorId: m.hostMajorId ?? null,
+    hostMajorName: majorName(m.hostMajorId),
+    targetMajorId: m.targetMajorId ?? null,
+    targetMajorName: majorName(m.targetMajorId),
+    ...(m.meetingType === "DEPARTMENT" && ![m.hostMajorId, m.targetMajorId].includes(member(me).majorId) ? { canJoin: false, joinBlockReason: "MAJOR_NOT_ALLOWED" } : {}),
     id: m.id,
     creatorId: m.creatorId,
     title: m.title,
@@ -574,8 +584,8 @@ export function createPreviewBackend(
     const url = new URL(path, "http://preview.invalid");
     const p = url.pathname;
     const method = init.method ?? "GET";
-    const body = typeof init.body === "string" ? JSON.parse(init.body) : {};
-    if (state.withdrawn && !p.startsWith("/api/auth/"))
+    const body = typeof init.body === "string" ? JSON.parse(init.body) : init.body instanceof FormData ? Object.fromEntries(init.body.entries()) : {};
+    if (state.withdrawn)
       fail("탈퇴한 계정이에요", 401, "AUTH_INVALID");
     if (p === "/api/auth/refresh")
       return { accessToken: `preview-session-${id()}` };
@@ -604,10 +614,17 @@ export function createPreviewBackend(
     if (p === "/api/auth/email-verifications/confirm")
       return { verificationToken: "preview-verification" };
     if (p === "/api/auth/email-verifications") return null;
-    if (p === "/api/student-verifications/status") return { verified: true };
-    if (p === "/api/student-verifications") return { verifiedAt: now() };
+    if (p === "/api/student-verifications/status") return { verified: true, majorId: member(me).majorId, majorName: majorName(member(me).majorId) };
+    if (p === "/api/student-verifications") {
+      if (!majorName(Number(body.majorId))) fail("학과를 확인해주세요");
+      member(me).majorId = Number(body.majorId);
+      return { verifiedAt: now(), majorId: member(me).majorId, majorName: majorName(member(me).majorId) };
+    }
     if (p === "/api/members/me/profile") {
-      if (method === "PUT") Object.assign(member(me), body);
+      if (method === "PUT") {
+        if (body.majorId !== member(me).majorId) fail("인증된 학과는 수정할 수 없어요", 403, "VERIFIED_MAJOR_IMMUTABLE");
+        Object.assign(member(me), body);
+      }
       return member(me);
     }
     if (p === "/api/colleges")
@@ -618,6 +635,7 @@ export function createPreviewBackend(
           majors: [
             { id: 1, name: "컴퓨터공학과" },
             { id: 2, name: "기계공학과" },
+            { id: 3, name: "경영학과" },
           ],
         },
       ];
@@ -746,6 +764,10 @@ export function createPreviewBackend(
         url,
       );
     if (p === "/api/meetings" && method === "POST") {
+      if (body.meetingType === "DEPARTMENT") {
+        if (body.hostMajorId !== member(me).majorId) fail("본인 학과가 일치하지 않아요", 403, "MAJOR_NOT_ALLOWED");
+        if (!majorName(body.targetMajorId) || body.targetMajorId === body.hostMajorId) fail("타깃 학과를 확인해주세요");
+      }
       if (
         !body.title?.trim() ||
         ![body.requiredMale, body.requiredFemale].every(
@@ -764,6 +786,9 @@ export function createPreviewBackend(
       const meetingId = id();
       const r = newRoom("MEETING", body.title, me, meetingId, members);
       const m: Meeting = {
+        meetingType: body.meetingType ?? "MEETING",
+        hostMajorId: body.meetingType === "DEPARTMENT" ? member(me).majorId : null,
+        targetMajorId: body.meetingType === "DEPARTMENT" ? body.targetMajorId : null,
         id: meetingId,
         creatorId: me,
         title: body.title,
@@ -803,6 +828,7 @@ export function createPreviewBackend(
         return null;
       }
       if (action === "join") {
+        if (m.meetingType === "DEPARTMENT" && ![m.hostMajorId, m.targetMajorId].includes(member(me).majorId)) fail("해당 학과 학생만 참여할 수 있어요", 403, "MAJOR_NOT_ALLOWED");
         if (joined(m.members)) fail("이미 참여 중이에요", 409);
         if (!m.active || Date.parse(m.scheduledAt) <= Date.now())
           fail("마감된 미팅이에요", 409);

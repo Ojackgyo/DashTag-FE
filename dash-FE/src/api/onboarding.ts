@@ -1,7 +1,7 @@
 import type { MemberProfileRequest } from './user';
 import type { IdealPreferenceRequest } from './idealPreference';
 import { normalizeBirthdate } from '../lib/birthdate';
-import { faceTypes, skinTones, hairStyles, smokingStatuses, tattooStatuses, tattooPreferences, smokingPreferences, militaryPreferences, optionValue } from './profileOptions';
+import { faceTypes, skinTones, hairStylesFor, idealHairStylesFor, hairStyleValue, smokingStatuses, tattooStatuses, tattooPreferences, smokingPreferences, militaryPreferences, optionValue } from './profileOptions';
 
 function select(options: Record<string, string>, value: string, label: string) {
   const code = optionValue(options, value);
@@ -40,7 +40,7 @@ export function buildOnboardingPayload(values: Record<string, string>): { profil
     profile: {
       nickname: values.nickname.trim(), gender: values.gender === '남성' ? 'MALE' : 'FEMALE', birthdate, majorId,
       faceType: select(faceTypes, values.faceType, '얼굴상'), height, topSize,
-      skinTone: select(skinTones, values.skinTone, '피부톤'), hairStyle: select(hairStyles, values.hairStyle, '헤어스타일'), mbti,
+      skinTone: select(skinTones, values.skinTone, '피부톤'), hairStyle: hairStyleValue(hairStylesFor(values.gender), values.hairStyle), mbti,
       smokingStatus: select(smokingStatuses, values.smoking, '흡연'), tattooStatus: select(tattooStatuses, values.tattoo, '타투'),
       militaryStatus: values.gender === '남성' ? (values.military === '군필' ? 'COMPLETED' : 'NOT_SERVED') : 'NOT_APPLICABLE',
       charmPoints: (values.charmPoints || '').split(',').map(v => v.trim()).filter(Boolean).slice(0, 3),
@@ -51,10 +51,10 @@ export function buildOnboardingPayload(values: Record<string, string>): { profil
       mbtiPattern, maxYoungerAgeDiff: ageDiff(younger), maxOlderAgeDiff: ageDiff(older),
       tattooPreference: select(tattooPreferences, values.idealTattoo, '이상형 타투'),
       smokingPreference: select(smokingPreferences, values.idealSmoking, '이상형 흡연'),
-      militaryPreference: select(militaryPreferences, values.idealMilitary || '상관없어요', '이상형 군필'),
+      militaryPreference: values.gender === '남성' ? 'ANY' : select(militaryPreferences, values.idealMilitary || '상관없어요', '이상형 군필'),
       topSize: !idealTopSize || idealTopSize === '상관없어요' ? null : idealTopSize,
       minHeight, maxHeight,
-      hairStyle: !values.idealHairStyle || values.idealHairStyle === '상관없어요' ? null : select(hairStyles, values.idealHairStyle, '이상형 헤어스타일'),
+      hairStyle: !values.idealHairStyle || values.idealHairStyle === '상관없어요' ? null : hairStyleValue(idealHairStylesFor(values.gender), values.idealHairStyle),
     },
   };
 }
